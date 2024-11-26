@@ -409,6 +409,10 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (offset_next, format!("idx:{}", idx))
             }
             Opcode::dyncall | Opcode::syscall => (offset_param, String::new()),
+            Opcode::pub_index_function => {
+                let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
+                (offset_next, format!("idx:{}", idx))
+            }
             // host
             // Opcode::panic => (offset_param, String::new()),
             Opcode::panic => {
