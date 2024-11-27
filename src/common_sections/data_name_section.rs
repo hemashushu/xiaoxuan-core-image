@@ -36,15 +36,33 @@ pub struct DataNameSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct DataNameItem {
+    /*
+     the value of 'name' may be a name path, e.g.
+     "namespace::identifier"
+     note that name path is a path relative to the module,
+     it does not include the name of module.
+    */
     pub name_offset: u32,
     pub name_length: u32,
-    // pub data_public_index: u32, // this field is used for bridge function call
-    pub export: u8, // 0=false, 1=true
+
+    // // pub data_public_index: u32, // this field is used for bridge function call
+
+    // Used to indicate the visibility of this item when this
+    // module is used as a shared module.
+    // Note that in the case of static linking, the item is always
+    // visible to other modules, regardless of the value of this property.
+    //
+    // 0=false, 1=true
+    pub export: u8,
     _padding0: [u8; 3],
 }
 
 impl DataNameItem {
-    pub fn new(name_offset: u32, name_length: u32, /* data_public_index: u32, */ export: u8) -> Self {
+    pub fn new(
+        name_offset: u32,
+        name_length: u32,
+        /* data_public_index: u32, */ export: u8,
+    ) -> Self {
         Self {
             name_offset,
             name_length,
@@ -75,7 +93,7 @@ impl<'a> DataNameSection<'a> {
     pub fn get_item_index_and_export(
         &'a self,
         expected_name: &str,
-    // ) -> Option<(usize, usize, bool)> {
+        // ) -> Option<(usize, usize, bool)> {
     ) -> Option<(usize, bool)> {
         let items = self.items;
         let names_data = self.names_data;
@@ -90,7 +108,10 @@ impl<'a> DataNameSection<'a> {
 
         opt_idx.map(|idx| {
             let item = &items[idx];
-            (idx, /* item.data_public_index as usize, */ item.export != 0)
+            (
+                idx,
+                /* item.data_public_index as usize, */ item.export != 0,
+            )
         })
     }
 
@@ -131,7 +152,9 @@ impl<'a> DataNameSection<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        common_sections::data_name_section::{DataNameItem, DataNameSection}, entry::DataNameEntry, module_image::SectionEntry
+        common_sections::data_name_section::{DataNameItem, DataNameSection},
+        entry::DataNameEntry,
+        module_image::SectionEntry,
     };
 
     #[test]
@@ -225,9 +248,6 @@ mod tests {
             Some((1, /*13,*/ true))
         );
 
-        assert_eq!(
-            section.get_item_index_and_export("bar"),
-            None
-        );
+        assert_eq!(section.get_item_index_and_export("bar"), None);
     }
 }

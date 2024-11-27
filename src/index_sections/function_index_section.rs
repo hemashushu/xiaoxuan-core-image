@@ -4,6 +4,21 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
+//! this section is used to map the:
+//! `(module[current_module_index]).call(function_public_index)`
+//! to
+//! `target_module_index` and `function_internal_index`
+//!
+//! where
+//! - `current_module_index` == `index_of_range_item`
+//! - `items[range.offset + function_public_index]` is the entry for the `function_public_index`
+//!
+//! the function public index is mixed by the following items (and are sorted by the following order):
+//! - the imported functions
+//! - the internal functions
+//!
+//! `function_public_index` = 'the amount of imported functions' + 'function internal index'
+
 // "function index section" binary layout
 //
 //         |--------------------------------------|
@@ -14,11 +29,11 @@
 //         | ...                                  |
 //         |--------------------------------------|
 //
-//         |--------------------------------------------------------------------------------------|
-//         | function public idx 0 (u32) | target mod idx 0 (u32) | function internal idx 0 (u32) | <-- table 1
-//         | function public idx 1       | target mod idx 1       | function internal idx 1       |
-//         | ...                                                                                  |
-//         |--------------------------------------------------------------------------------------|
+//         |--------------------------------------------------------|
+//         | target mod idx 0 (u32) | function internal idx 0 (u32) | <-- table 1
+//         | target mod idx 1       | function internal idx 1       |
+//         | ...                                                    |
+//         |--------------------------------------------------------|
 
 use crate::{
     entry::FunctionIndexListEntry,
@@ -32,21 +47,17 @@ pub struct FunctionIndexSection<'a> {
     pub items: &'a [FunctionIndexItem],
 }
 
+/// the index for this item is the `function_public_index`.
+///
+/// the function public index is mixed by the following items (and are sorted by the following order):
+/// - the imported functions
+/// - the internal functions
+///
+/// `function_public_index` = 'the amount of imported functions' + 'function internal index'
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct FunctionIndexItem {
-    // the index of function item in public
-    //
-    // the function public index includes (and are sorted by the following order):
-    // - the imported functions
-    // - the internal functions
-    //
-    // the value of 'function public index' is equal to:
-    // 'the amount of imported functions' + 'function internal index'
-    //
-    // this field is REDUNDANT because its value always starts
-    // from 0 to the total number of items within a certain range/module.
-    pub function_public_index: u32,
+    // pub function_public_index: u32,
 
     // target module index
     pub target_module_index: u32,
@@ -60,12 +71,12 @@ pub struct FunctionIndexItem {
 
 impl FunctionIndexItem {
     pub fn new(
-        function_public_index: u32,
+        // function_public_index: u32,
         target_module_index: u32,
         function_internal_index: u32,
     ) -> Self {
         Self {
-            function_public_index,
+            // function_public_index,
             target_module_index,
             function_internal_index,
         }
@@ -98,10 +109,10 @@ impl<'a> FunctionIndexSection<'a> {
         let range = &self.ranges[module_index];
 
         // bounds check
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "bounds_check")]
         {
             if function_public_index > range.count as usize {
-                panic!("Out of bounds of the function index, module index: {}, total functions (includes imported): {}, request function public index: {}.",
+                panic!("Out of bounds of the function public index, module index: {}, total functions (includes imported): {}, request function public index: {}.",
                     module_index,
                     range.count,
                     function_public_index
@@ -136,7 +147,6 @@ impl<'a> FunctionIndexSection<'a> {
             .flat_map(|index_module_entry| {
                 index_module_entry.index_entries.iter().map(|entry| {
                     FunctionIndexItem::new(
-                        entry.function_public_index as u32,
                         entry.target_module_index as u32,
                         entry.function_internal_index as u32,
                     )
@@ -170,17 +180,17 @@ mod tests {
             2, 0, 0, 0, // offset 1 (item 1)
             1, 0, 0, 0, // count 1
             //
-            1, 0, 0, 0, // function pub idx 0, item 0 (little endian)
+            // 1, 0, 0, 0, // function pub idx 0, item 0 (little endian)
             2, 0, 0, 0, // target module idx 0
             3, 0, 0, 0, // function internal idx 0
             //
-            5, 0, 0, 0, // function pub idx 1, item 1
-            7, 0, 0, 0, // target module idx 1
-            11, 0, 0, 0, // function internal idx 1
+            // 5, 0, 0, 0, // function pub idx 1, item 1
+            5, 0, 0, 0, // target module idx 1
+            7, 0, 0, 0, // function internal idx 1
             //
-            13, 0, 0, 0, // function pub idx 2, item 2
-            17, 0, 0, 0, // target module idx 2
-            19, 0, 0, 0, // function internal idx 2
+            // 13, 0, 0, 0, // function pub idx 2, item 2
+            11, 0, 0, 0, // target module idx 2
+            13, 0, 0, 0, // function internal idx 2
         ];
 
         let section = FunctionIndexSection::load(&section_data);
@@ -194,9 +204,9 @@ mod tests {
         let items = section.items;
 
         assert_eq!(items.len(), 3);
-        assert_eq!(items[0], FunctionIndexItem::new(1, 2, 3,));
-        assert_eq!(items[1], FunctionIndexItem::new(5, 7, 11,));
-        assert_eq!(items[2], FunctionIndexItem::new(13, 17, 19,));
+        assert_eq!(items[0], FunctionIndexItem::new(2, 3,));
+        assert_eq!(items[1], FunctionIndexItem::new(5, 7));
+        assert_eq!(items[2], FunctionIndexItem::new(11, 13));
 
         // test get index item
         assert_eq!(
@@ -206,12 +216,12 @@ mod tests {
 
         assert_eq!(
             section.get_item_target_module_index_and_function_internal_index(0, 1),
-            (7, 11,)
+            (5, 7,)
         );
 
         assert_eq!(
             section.get_item_target_module_index_and_function_internal_index(1, 0),
-            (17, 19,)
+            (11, 13,)
         );
     }
 
@@ -220,9 +230,9 @@ mod tests {
         let ranges = vec![RangeItem::new(0, 2), RangeItem::new(2, 1)];
 
         let items = vec![
-            FunctionIndexItem::new(1, 2, 3),
-            FunctionIndexItem::new(5, 7, 11),
-            FunctionIndexItem::new(13, 17, 19),
+            FunctionIndexItem::new(2, 3),
+            FunctionIndexItem::new(5, 7),
+            FunctionIndexItem::new(11, 13),
         ];
 
         let section = FunctionIndexSection {
@@ -244,17 +254,17 @@ mod tests {
                 2, 0, 0, 0, // offset 1 (item 1)
                 1, 0, 0, 0, // count 1
                 //
-                1, 0, 0, 0, // function puc idx 0, item 0 (little endian)
+                // 1, 0, 0, 0, // function puc idx 0, item 0 (little endian)
                 2, 0, 0, 0, // target module idx 0
                 3, 0, 0, 0, // function internal idx 0
                 //
-                5, 0, 0, 0, // function puc idx 1, item 1
-                7, 0, 0, 0, // target module idx 1
-                11, 0, 0, 0, // function internal idx 1
+                // 5, 0, 0, 0, // function puc idx 1, item 1
+                5, 0, 0, 0, // target module idx 1
+                7, 0, 0, 0, // function internal idx 1
                 //
-                13, 0, 0, 0, // function puc idx 2, item 2
-                17, 0, 0, 0, // target module idx 2
-                19, 0, 0, 0, // function internal idx 2
+                // 13, 0, 0, 0, // function puc idx 2, item 2
+                11, 0, 0, 0, // target module idx 2
+                13, 0, 0, 0, // function internal idx 2
             ]
         );
     }
@@ -263,13 +273,13 @@ mod tests {
     fn test_convert() {
         let entries = vec![
             FunctionIndexListEntry::new(vec![
-                FunctionIndexEntry::new(0, 1, 3),
-                FunctionIndexEntry::new(1, 5, 7),
+                FunctionIndexEntry::new(2, 3),
+                FunctionIndexEntry::new(5, 7),
             ]),
             FunctionIndexListEntry::new(vec![
-                FunctionIndexEntry::new(0, 11, 13),
-                FunctionIndexEntry::new(1, 17, 19),
-                FunctionIndexEntry::new(2, 23, 29),
+                FunctionIndexEntry::new(11, 13),
+                FunctionIndexEntry::new(17, 19),
+                FunctionIndexEntry::new(23, 29),
             ]),
         ];
 
@@ -282,7 +292,7 @@ mod tests {
 
         assert_eq!(
             section.get_item_target_module_index_and_function_internal_index(0, 0),
-            (1, 3)
+            (2, 3)
         );
 
         assert_eq!(

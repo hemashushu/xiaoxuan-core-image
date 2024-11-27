@@ -4,6 +4,9 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
+//! The binary layout of this section is
+//! the same as `DataSection`
+
 // "type section" binary layout
 //
 //                     |-----------------------------------------------------------------------------------------------|
@@ -30,8 +33,8 @@ use crate::{
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
-#[derive(Debug, PartialEq)]
-pub struct TypeSection<'a> {
+#[derive(Debug, PartialEq, Default)]
+pub struct UnifiedExternalTypeSection<'a> {
     pub items: &'a [TypeItem],
     pub types_data: &'a [u8],
 }
@@ -53,10 +56,10 @@ pub struct TypeItem {
     pub results_offset: u32,
 }
 
-impl<'a> SectionEntry<'a> for TypeSection<'a> {
+impl<'a> SectionEntry<'a> for UnifiedExternalTypeSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
         let (items, types_data) = load_section_with_table_and_data_area::<TypeItem>(section_data);
-        TypeSection { items, types_data }
+        UnifiedExternalTypeSection { items, types_data }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
@@ -64,11 +67,11 @@ impl<'a> SectionEntry<'a> for TypeSection<'a> {
     }
 
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::Type
+        ModuleSectionId::UnifiedExternalType
     }
 }
 
-impl<'a> TypeSection<'a> {
+impl<'a> UnifiedExternalTypeSection<'a> {
     pub fn get_item_params_and_results(
         &'a self,
         idx: usize,

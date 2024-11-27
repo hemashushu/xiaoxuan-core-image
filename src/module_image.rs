@@ -118,10 +118,11 @@ use crate::{
     index_sections::{
         data_index_section::DataIndexSection,
         external_function_index_section::ExternalFunctionIndexSection,
+        external_function_section::UnifiedExternalFunctionSection,
+        external_library_section::UnifiedExternalLibrarySection,
+        external_type_section::UnifiedExternalTypeSection,
         function_index_section::FunctionIndexSection, index_property_section::IndexPropertySection,
         module_list_section::ModuleListSection,
-        unified_external_function_section::UnifiedExternalFunctionSection,
-        unified_external_library_section::UnifiedExternalLibrarySection,
     },
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
     BinaryError,
@@ -179,10 +180,10 @@ impl ModuleSectionItem {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ModuleSectionId {
     // essential
-    Type = 0x0010,  // 0x10
-    LocalVariable,  // 0x11
-    Function,       // 0x12
-    CommonProperty, // 0x13
+    CommonProperty = 0x0010, // 0x10
+    Type,                    // 0x11
+    LocalVariable,           // 0x12
+    Function,                // 0x13
 
     // optional
     ReadOnlyData = 0x0020, // 0x20
@@ -204,21 +205,26 @@ pub enum ModuleSectionId {
     ExternalLibrary,       // 0x43
     ExternalFunction,      // 0x43
 
-    // essential (application only)
-    FunctionIndex = 0x0080, // 0x80
-    IndexProperty,          // 0x81
+    /*
+     essential (application only)
+    */
+    IndexProperty = 0x0080, // 0x80
+    // this section is used by the module loader
+    ModuleList,    // 0x81
+    FunctionIndex, // 0x82
 
-    // optional (application only)
-    DataIndex = 0x0090,      // 0x90
-    UnifiedExternalLibrary,  // 0x91
-    UnifiedExternalFunction, // 0x92
+    /*
+    optional (application only)
+    */
+    DataIndex = 0x0090, // 0x90
+
+    UnifiedExternalType = 0x00a0, // 0xa0
+    UnifiedExternalLibrary,       // 0xa1
+    UnifiedExternalFunction,      // 0xa2
 
     // the section ExternalFunctionIndex is used for mapping
-    // 'external function' to 'unified external function')
-    ExternalFunctionIndex, // 0x93
-
-    // this section is used by the module loader
-    ModuleList = 0x00a0, // 0xa0
+    // 'external function' to 'unified external function'
+    ExternalFunctionIndex, // 0xa3
 }
 
 // `RangeItem` is used for data index section and function index section
@@ -384,6 +390,15 @@ impl<'a> ModuleImage<'a> {
     }
 
     // essential section
+    pub fn get_common_property_section(&'a self) -> CommonPropertySection {
+        self.get_section_data_by_id(ModuleSectionId::CommonProperty)
+            .map_or_else(
+                || panic!("Can not find the common property section."),
+                CommonPropertySection::load,
+            )
+    }
+
+    // essential section
     pub fn get_type_section(&'a self) -> TypeSection<'a> {
         self.get_section_data_by_id(ModuleSectionId::Type)
             .map_or_else(
@@ -410,12 +425,21 @@ impl<'a> ModuleImage<'a> {
             )
     }
 
-    // essential section
-    pub fn get_common_property_section(&'a self) -> CommonPropertySection {
-        self.get_section_data_by_id(ModuleSectionId::CommonProperty)
+    // essential section (application only)
+    pub fn get_index_property_section(&'a self) -> IndexPropertySection {
+        self.get_section_data_by_id(ModuleSectionId::IndexProperty)
             .map_or_else(
-                || panic!("Can not find the common property section."),
-                CommonPropertySection::load,
+                || panic!("Can not find the index property section."),
+                IndexPropertySection::load,
+            )
+    }
+
+    // essential section (application only)
+    pub fn get_module_list_section(&'a self) -> ModuleListSection<'a> {
+        self.get_section_data_by_id(ModuleSectionId::ModuleList)
+            .map_or_else(
+                || panic!("Can not find the index property section."),
+                ModuleListSection::load,
             )
     }
 
@@ -425,15 +449,6 @@ impl<'a> ModuleImage<'a> {
             .map_or_else(
                 || panic!("Can not find the function index section."),
                 FunctionIndexSection::load,
-            )
-    }
-
-    // essential section (application only)
-    pub fn get_index_property_section(&'a self) -> IndexPropertySection {
-        self.get_section_data_by_id(ModuleSectionId::IndexProperty)
-            .map_or_else(
-                || panic!("Can not find the index property section."),
-                IndexPropertySection::load,
             )
     }
 
@@ -455,6 +470,18 @@ impl<'a> ModuleImage<'a> {
             .map(UninitDataSection::load)
     }
 
+    // optional section (for debug and link only), and for bridge function call
+    pub fn get_optional_function_name_section(&'a self) -> Option<FunctionNameSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::FunctionName)
+            .map(FunctionNameSection::load)
+    }
+
+    // optional section (for debug and link only), and for bridge function call
+    pub fn get_optional_data_name_section(&'a self) -> Option<DataNameSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::DataName)
+            .map(DataNameSection::load)
+    }
+
     // optional section (for debug and link only)
     pub fn get_optional_import_module_section(&'a self) -> Option<ImportModuleSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ImportModule)
@@ -473,18 +500,6 @@ impl<'a> ModuleImage<'a> {
             .map(ImportDataSection::load)
     }
 
-    // optional section (for debug and link only), and for bridge function call
-    pub fn get_optional_function_name_section(&'a self) -> Option<FunctionNameSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::FunctionName)
-            .map(FunctionNameSection::load)
-    }
-
-    // optional section (for debug and link only), and for bridge function call
-    pub fn get_optional_data_name_section(&'a self) -> Option<DataNameSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::DataName)
-            .map(DataNameSection::load)
-    }
-
     // optional section (for debug and link only)
     pub fn get_optional_external_library_section(&'a self) -> Option<ExternalLibrarySection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExternalLibrary)
@@ -501,6 +516,14 @@ impl<'a> ModuleImage<'a> {
     pub fn get_optional_data_index_section(&'a self) -> Option<DataIndexSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::DataIndex)
             .map(DataIndexSection::load)
+    }
+
+    // optional section (application only)
+    pub fn get_optional_unified_external_type_section(
+        &'a self,
+    ) -> Option<UnifiedExternalTypeSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::UnifiedExternalType)
+            .map(UnifiedExternalTypeSection::load)
     }
 
     // optional section (application only)
@@ -525,12 +548,6 @@ impl<'a> ModuleImage<'a> {
     ) -> Option<ExternalFunctionIndexSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExternalFunctionIndex)
             .map(ExternalFunctionIndexSection::load)
-    }
-
-    // optional section (application only)
-    pub fn get_optional_module_list_section(&'a self) -> Option<ModuleListSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::ModuleList)
-            .map(ModuleListSection::load)
     }
 }
 
@@ -558,6 +575,21 @@ mod tests {
 
     #[test]
     fn test_save_module_image_and_load_module_image() {
+        // build common property section
+        let mut module_name_buffer = [0u8; MODULE_NAME_BUFFER_LENGTH];
+        module_name_buffer[0] = 29;
+        module_name_buffer[1] = 31;
+        module_name_buffer[2] = 37;
+
+        let common_property_section = CommonPropertySection {
+            constructor_function_public_index: 11,
+            destructor_function_public_index: 13,
+            import_data_count: 17,
+            import_function_count: 19,
+            module_name_length: 3,
+            module_name_buffer,
+        };
+
         // build TypeSection instance
         // note: arbitrary types
         let type_entries = vec![
@@ -619,10 +651,10 @@ mod tests {
         // note: arbitrary indices
         let function_index_module_entries = vec![
             FunctionIndexListEntry::new(vec![
-                FunctionIndexEntry::new(0, 1, 3),
-                FunctionIndexEntry::new(1, 5, 7),
+                FunctionIndexEntry::new(2, 3),
+                FunctionIndexEntry::new(5, 7),
             ]),
-            FunctionIndexListEntry::new(vec![FunctionIndexEntry::new(0, 11, 13)]),
+            FunctionIndexListEntry::new(vec![FunctionIndexEntry::new(11, 13)]),
         ];
 
         let (function_index_ranges, function_index_items) =
@@ -631,21 +663,6 @@ mod tests {
         let function_index_section = FunctionIndexSection {
             ranges: &function_index_ranges,
             items: &function_index_items,
-        };
-
-        // build common property section
-        let mut module_name_buffer = [0u8; MODULE_NAME_BUFFER_LENGTH];
-        module_name_buffer[0] = 29;
-        module_name_buffer[1] = 31;
-        module_name_buffer[2] = 37;
-
-        let common_property_section = CommonPropertySection {
-            constructor_function_public_index: 11,
-            destructor_function_public_index: 13,
-            import_data_count: 17,
-            import_function_count: 19,
-            module_name_length: 3,
-            module_name_buffer,
         };
 
         // build ModuleImage instance
@@ -686,24 +703,24 @@ mod tests {
         assert_eq!(
             section_table_data,
             &[
-                0x10u8, 0, 0, 0, // section id, type section
+                0x11u8, 0, 0, 0, // section id, type section
                 0, 0, 0, 0, // offset 0
                 36, 0, 0, 0, // length 0
                 //
-                0x12, 0, 0, 0, // section id, function section
+                0x13, 0, 0, 0, // section id, function section
                 36, 0, 0, 0, // offset 1
                 52, 0, 0, 0, // length 1
                 //
-                0x11, 0, 0, 0, // section id, local variable section
+                0x12, 0, 0, 0, // section id, local variable section
                 88, 0, 0, 0, // offset 2
                 68, 0, 0, 0, // length 2
                 //
-                0x80, 0, 0, 0, // section id, function index section
+                0x82, 0, 0, 0, // section id, function index section
                 156, 0, 0, 0, // offset 3
-                60, 0, 0, 0, // length 3
+                48, 0, 0, 0, // length 3
                 //
-                0x13, 0, 0, 0, // section id, property section
-                216, 0, 0, 0, // offset 6,
+                0x10, 0, 0, 0, // section id, common property section
+                204, 0, 0, 0, // offset 6,
                 20, 1, 0, 0 // length 256 + 20
             ]
         );
@@ -796,7 +813,7 @@ mod tests {
             ]
         );
 
-        let (function_index_section_data, remains) = remains.split_at(60);
+        let (function_index_section_data, remains) = remains.split_at(48);
         assert_eq!(
             function_index_section_data,
             &[
@@ -808,14 +825,15 @@ mod tests {
                 2, 0, 0, 0, // offset 1
                 1, 0, 0, 0, // count 1
                 /* table 1 - module 0 */
-                0, 0, 0, 0, // function idx 0
-                1, 0, 0, 0, // target module idx 0
+                // 0, 0, 0, 0, // function idx 0
+                2, 0, 0, 0, // target module idx 0
                 3, 0, 0, 0, // target function idx 0
-                1, 0, 0, 0, // function idx 1
+                //
+                // 1, 0, 0, 0, // function idx 1
                 5, 0, 0, 0, // target module idx 1
                 7, 0, 0, 0, // target function idx 1
                 /* table 1 - module 0 */
-                0, 0, 0, 0, // function idx 0
+                // 0, 0, 0, 0, // function idx 0
                 11, 0, 0, 0, // target module idx 0
                 13, 0, 0, 0, // target function idx 0
             ]
@@ -902,15 +920,15 @@ mod tests {
 
         assert_eq!(
             &function_index_section_restore.items[0],
-            &FunctionIndexItem::new(0, 1, 3)
+            &FunctionIndexItem::new(2, 3)
         );
         assert_eq!(
             &function_index_section_restore.items[1],
-            &FunctionIndexItem::new(1, 5, 7)
+            &FunctionIndexItem::new(5, 7)
         );
         assert_eq!(
             &function_index_section_restore.items[2],
-            &FunctionIndexItem::new(0, 11, 13)
+            &FunctionIndexItem::new(11, 13)
         );
 
         // check property section

@@ -4,6 +4,26 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
+//! this section is used to map the:
+//! `(module[current_module_index]).data_load/store(data_public_index)`
+//! to
+//! `target_module_index` and `data_internal_index`
+//!
+//! where
+//! - `current_module_index` == `index_of_range_item`
+//! - `items[range.offset+data_public_index]` is the entry for the `data_public_index`
+//! - note that the `data_internal_index` is section relevant, which
+//!   means `data_internal_index` in readwrite/readonly/uninit sections are both start with 0.
+//!
+//! the data public index is mixed the following items (and are sorted by the following order):
+//!
+//! - imported read-only data items
+//! - imported read-write data items
+//! - imported uninitilized data items
+//! - internal read-only data items
+//! - internal read-write data items
+//! - internal uninitilized data items
+
 // "data index section" binary layout
 //
 //         |--------------------------------------|
@@ -14,19 +34,18 @@
 //         | ...                                  |
 //         |--------------------------------------|
 //
-//         |--------------------------------------------------------------------------------------------------------------------------------|
-//         | data public idx 0 (u32) | target mod idx 0 (u32) | data internal idx 0 (u32) | target data section type 0 (u8) | pad (3 bytes) | <-- table 1
-//         | data public idx 1       | target mod idx 1       | data internal idx 1       | target data section type 1      |               |
-//         | ...                                                                                                                            |
-//         |--------------------------------------------------------------------------------------------------------------------------------|
+//         |------------------------------------------------------------------------------------------------------|
+//         | target mod idx 0 (u32) | data internal idx 0 (u32) | target data section type 0 (u8) | pad (3 bytes) | <-- table 1
+//         | target mod idx 1       | data internal idx 1       | target data section type 1      |               |
+//         | ...                                                                                                  |
+//         |------------------------------------------------------------------------------------------------------|
 
 use anc_isa::DataSectionType;
 
 use crate::{
-    entry::DataIndexListEntry, module_image::{ModuleSectionId, RangeItem, SectionEntry}, tableaccess::{
-        load_section_with_two_tables,
-        save_section_with_two_tables,
-    }
+    entry::DataIndexListEntry,
+    module_image::{ModuleSectionId, RangeItem, SectionEntry},
+    tableaccess::{load_section_with_two_tables, save_section_with_two_tables},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -35,31 +54,28 @@ pub struct DataIndexSection<'a> {
     pub items: &'a [DataIndexItem],
 }
 
+/// the index of this item is the `data_public_index`
+///
+/// the data public index is mixed the following items (and are sorted by the following order):
+///
+/// - imported read-only data items
+/// - imported read-write data items
+/// - imported uninitilized data items
+/// - internal read-only data items
+/// - internal read-write data items
+/// - internal uninitilized data items
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct DataIndexItem {
-    // the index of data item in public
-    //
-    // the data public index includes (and are sorted by the following order):
-    //
-    // - imported read-only data items
-    // - internal read-only data items
-    // - imported read-write data items
-    // - internal read-write data items
-    // - imported uninitilized data items
-    // - internal uninitilized data items
-    //
-    // this field is REDUNDANT because its value always starts
-    // from 0 to the total number of items within a certain range/module.
-    pub data_public_index: u32,
+    // pub data_public_index: u32,
 
     // target module index
     pub target_module_index: u32,
 
     // the index of the internal data item in a specified data section
     //
-    // this index is the actual index of the internal data item in a specified data section
-    // i.e., it excludes the imported data items, and it is section relevant.
+    // note that the `data_internal_index` is section relevant, which
+    // means `data_internal_index` in readwrite/readonly/uninit sections are both start with 0.
     //
     // e.g.
     // there are indices 0,1,2,3... in read-only section, and
@@ -75,13 +91,13 @@ pub struct DataIndexItem {
 
 impl DataIndexItem {
     pub fn new(
-        data_public_index: u32,
+        // data_public_index: u32,
         target_module_index: u32,
         data_internal_index: u32,
         target_data_section_type: DataSectionType,
     ) -> Self {
         Self {
-            data_public_index,
+            // data_public_index,
             target_module_index,
             data_internal_index,
             target_data_section_type,
@@ -115,11 +131,11 @@ impl<'a> DataIndexSection<'a> {
         let range = &self.ranges[module_index];
 
         // bounds check
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "bounds_check")]
         {
             if data_public_index > range.count as usize {
                 panic!(
-                    "Out of bounds of the data index, module index: {}, data items: {} data index: {}.",
+                    "Out of bounds of the data public index, module index: {}, total data items: {}, request data index: {}.",
                     module_index, range.count, data_public_index
                 );
             }
@@ -154,7 +170,7 @@ impl<'a> DataIndexSection<'a> {
             .flat_map(|index_module_entry| {
                 index_module_entry.index_entries.iter().map(|entry| {
                     DataIndexItem::new(
-                        entry.data_public_index as u32,
+                        // entry.data_public_index as u32,
                         entry.target_module_index as u32,
                         entry.data_internal_index as u32,
                         entry.target_data_section_type,
@@ -172,7 +188,9 @@ mod tests {
     use anc_isa::DataSectionType;
 
     use crate::{
-        entry::DataIndexEntry, index_sections::data_index_section::{DataIndexItem, DataIndexSection, RangeItem}, module_image::SectionEntry
+        entry::DataIndexEntry,
+        index_sections::data_index_section::{DataIndexItem, DataIndexSection, RangeItem},
+        module_image::SectionEntry,
     };
 
     use super::DataIndexListEntry;
@@ -188,22 +206,22 @@ mod tests {
             2, 0, 0, 0, // offset 1 (item 1)
             1, 0, 0, 0, // count 1
             //
-            2, 0, 0, 0, // data pub index, item 0 (little endian)
-            3, 0, 0, 0, // t module index
-            5, 0, 0, 0, // data internal idx
-            0, // t data section type
+            // 2, 0, 0, 0, // data pub index, item 0 (little endian)
+            2, 0, 0, 0, // target module index
+            3, 0, 0, 0, // data internal idx
+            0, // target data section type
             0, 0, 0, // padding
             //
-            7, 0, 0, 0, // data pub index, item 1 (little endian)
-            11, 0, 0, 0, // t module index
+            // 7, 0, 0, 0, // data pub index, item 1 (little endian)
+            5, 0, 0, 0, // target module index
+            7, 0, 0, 0, // data internal idx
+            1, // target data section type
+            0, 0, 0, // padding
+            //
+            // 17, 0, 0, 0, // data pub index, item 2 (little endian)
+            11, 0, 0, 0, // target module index
             13, 0, 0, 0, // data internal idx
-            1, // t data section type
-            0, 0, 0, // padding
-            //
-            17, 0, 0, 0, // data pub index, item 2 (little endian)
-            19, 0, 0, 0, // t module index
-            23, 0, 0, 0, // data internal idx
-            1, // t data section type
+            2, // target data section type
             0, 0, 0, // padding
         ];
 
@@ -221,36 +239,36 @@ mod tests {
 
         assert_eq!(
             items[0],
-            DataIndexItem::new(2, 3, 5, DataSectionType::ReadOnly,)
+            DataIndexItem::new(2, 3, DataSectionType::ReadOnly,)
         );
 
         assert_eq!(
             items[1],
-            DataIndexItem::new(7, 11, 13, DataSectionType::ReadWrite,)
+            DataIndexItem::new(5, 7, DataSectionType::ReadWrite,)
         );
 
         assert_eq!(
             items[2],
-            DataIndexItem::new(17, 19, 23, DataSectionType::ReadWrite,)
+            DataIndexItem::new(11, 13, DataSectionType::Uninit,)
         );
 
         // test get index item
         assert_eq!(
             section
                 .get_item_target_module_index_and_data_internal_index_and_data_section_type(0, 0),
-            (3, 5, DataSectionType::ReadOnly)
+            (2, 3, DataSectionType::ReadOnly)
         );
 
         assert_eq!(
             section
                 .get_item_target_module_index_and_data_internal_index_and_data_section_type(0, 1),
-            (11, 13, DataSectionType::ReadWrite,)
+            (5, 7, DataSectionType::ReadWrite,)
         );
 
         assert_eq!(
             section
                 .get_item_target_module_index_and_data_internal_index_and_data_section_type(1, 0),
-            (19, 23, DataSectionType::ReadWrite)
+            (11, 13, DataSectionType::Uninit)
         );
     }
 
@@ -259,9 +277,9 @@ mod tests {
         let ranges = vec![RangeItem::new(0, 2), RangeItem::new(2, 1)];
 
         let items = vec![
-            DataIndexItem::new(2, 3, 5, DataSectionType::ReadOnly),
-            DataIndexItem::new(7, 11, 13, DataSectionType::ReadWrite),
-            DataIndexItem::new(17, 19, 23, DataSectionType::ReadWrite),
+            DataIndexItem::new(2, 3, DataSectionType::ReadOnly),
+            DataIndexItem::new(5, 7, DataSectionType::ReadWrite),
+            DataIndexItem::new(11, 13, DataSectionType::Uninit),
         ];
 
         let section = DataIndexSection {
@@ -283,22 +301,22 @@ mod tests {
                 2, 0, 0, 0, // offset 1 (item 1)
                 1, 0, 0, 0, // count 1
                 //
-                2, 0, 0, 0, // data pub index, item 0 (little endian)
-                3, 0, 0, 0, // t module index
-                5, 0, 0, 0, // data internal idx
+                // 2, 0, 0, 0, // data pub index, item 0 (little endian)
+                2, 0, 0, 0, // t module index
+                3, 0, 0, 0, // data internal idx
                 0, // t data section type
                 0, 0, 0, // padding
                 //
-                7, 0, 0, 0, // data pub index, item 1 (little endian)
-                11, 0, 0, 0, // t module index
-                13, 0, 0, 0, // datainternal  idx
+                // 7, 0, 0, 0, // data pub index, item 1 (little endian)
+                5, 0, 0, 0, // t module index
+                7, 0, 0, 0, // datainternal  idx
                 1, // t data section type
                 0, 0, 0, // padding
                 //
-                17, 0, 0, 0, // data pub index, item 2 (little endian)
-                19, 0, 0, 0, // t module index
-                23, 0, 0, 0, // data internal idx
-                1, // t data section type
+                // 17, 0, 0, 0, // data pub index, item 2 (little endian)
+                11, 0, 0, 0, // t module index
+                13, 0, 0, 0, // data internal idx
+                2, // t data section type
                 0, 0, 0, // padding
             ]
         );
@@ -308,13 +326,13 @@ mod tests {
     fn test_convert() {
         let entries = vec![
             DataIndexListEntry::new(vec![
-                DataIndexEntry::new(0, 1, 3, DataSectionType::ReadOnly),
-                DataIndexEntry::new(1, 5, 7, DataSectionType::ReadWrite),
-                DataIndexEntry::new(2, 11, 13, DataSectionType::Uninit),
+                DataIndexEntry::new(2, 3, DataSectionType::ReadOnly),
+                DataIndexEntry::new(5, 7, DataSectionType::ReadWrite),
+                DataIndexEntry::new(11, 13, DataSectionType::Uninit),
             ]),
             DataIndexListEntry::new(vec![
-                DataIndexEntry::new(0, 17, 19, DataSectionType::ReadWrite),
-                DataIndexEntry::new(1, 23, 29, DataSectionType::ReadWrite),
+                DataIndexEntry::new(17, 19, DataSectionType::ReadWrite),
+                DataIndexEntry::new(23, 29, DataSectionType::ReadWrite),
             ]),
         ];
 
@@ -328,7 +346,7 @@ mod tests {
         assert_eq!(
             section
                 .get_item_target_module_index_and_data_internal_index_and_data_section_type(0, 0),
-            (1, 3, DataSectionType::ReadOnly)
+            (2, 3, DataSectionType::ReadOnly)
         );
 
         assert_eq!(

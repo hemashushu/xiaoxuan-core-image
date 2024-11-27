@@ -4,7 +4,7 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-// "read-only/read-write data section" binary layout
+// "read-only data section" binary layout
 //
 //              |------------------------------------------------------------------------------------------------------|
 //              | item count (u32) | (4 bytes padding)                                                                 |
@@ -18,6 +18,7 @@
 // offset 1 ----|----------|                                                                                           |
 //              |------------------------------------------------------------------------------------------------------|
 //
+// the "read-write data section" binary layout is the same as "read-only data section".
 //
 // "uninit data section" binary layout
 //
@@ -33,10 +34,12 @@
 use anc_isa::MemoryDataType;
 
 use crate::{
-    entry::{InitedDataEntry, UninitDataEntry}, module_image::{ModuleSectionId, SectionEntry}, tableaccess::{
+    entry::{InitedDataEntry, UninitDataEntry},
+    module_image::{ModuleSectionId, SectionEntry},
+    tableaccess::{
         load_section_with_one_table, load_section_with_table_and_data_area,
         save_section_with_one_table, save_section_with_table_and_data_area,
-    }
+    },
 };
 
 #[derive(Debug, PartialEq)]
@@ -287,9 +290,8 @@ mod tests {
     use anc_isa::MemoryDataType;
 
     use crate::{
-        common_sections::data_section::{
-            DataItem, InitedDataEntry, UninitDataEntry, UninitDataSection,
-        },
+        common_sections::data_section::{DataItem, UninitDataSection},
+        entry::{InitedDataEntry, UninitDataEntry},
         module_image::SectionEntry,
     };
 

@@ -13,8 +13,8 @@
 //! at runtime, which accesses the binary image directly.
 
 use anc_isa::{
-    DataSectionType, ExternalLibraryDependentType, ExternalLibraryDependentValue, MemoryDataType,
-    ModuleDependentType, ModuleDependentValue, OperandDataType,
+    DataSectionType, ExternalLibraryDependentValue, MemoryDataType, ModuleDependentValue,
+    OperandDataType,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -221,19 +221,19 @@ impl UninitDataEntry {
 pub struct ExternalLibraryEntry {
     pub name: String,
     pub value: Box<ExternalLibraryDependentValue>,
-    pub external_library_dependent_type: ExternalLibraryDependentType,
+    // pub external_library_dependent_type: ExternalLibraryDependentType,
 }
 
 impl ExternalLibraryEntry {
     pub fn new(
         name: String,
         value: Box<ExternalLibraryDependentValue>,
-        external_library_dependent_type: ExternalLibraryDependentType,
+        // external_library_dependent_type: ExternalLibraryDependentType,
     ) -> Self {
         Self {
             name,
             value,
-            external_library_dependent_type,
+            // external_library_dependent_type,
         }
     }
 }
@@ -257,9 +257,15 @@ impl ExternalFunctionEntry {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportModuleEntry {
+    /*
+    Note that this is the name of module/package,
+    it CANNOT be the sub-module name even if the current image is
+    the object file of a sub-module.
+    it CANNOT be a name path either.
+    */
     pub name: String,
     pub value: Box<ModuleDependentValue>,
-    pub module_dependent_type: ModuleDependentType,
+    // pub module_dependent_type: ModuleDependentType,
     // pub module_version: EffectiveVersion,
 }
 
@@ -267,20 +273,20 @@ impl ImportModuleEntry {
     pub fn new(
         name: String,
         value: Box<ModuleDependentValue>,
-        module_dependent_type: ModuleDependentType,
+        // module_dependent_type: ModuleDependentType,
     ) -> Self {
         Self {
             name,
             value,
-            module_dependent_type,
+            // module_dependent_type,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportFunctionEntry {
-    // the original exported name path,
-    // includes the submodule name path, but excludes the module name.
+    // the exported name path,
+    // name path includes the submodule name path, but does not include the module name.
     //
     // e.g.
     // the name path of functon 'add' in module 'myapp' is 'add',
@@ -302,8 +308,8 @@ impl ImportFunctionEntry {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportDataEntry {
-    // the original exported name path,
-    // includes the submodule name path, but excludes the module name.
+    // the exported name path,
+    // name path includes the submodule name path, but does not include the module name.
     //
     // e.g.
     // the name path of data 'buf' in module 'myapp' is 'buf',
@@ -333,7 +339,7 @@ impl ImportDataEntry {
 #[derive(Debug, PartialEq)]
 pub struct FunctionNameEntry {
     // the exported name path,
-    // includes the submodule name path, but excludes the module name.
+    // name path includes the submodule name path, but does not include the module name.
     //
     // e.g.
     // the name path of functon 'add' in module 'myapp' is 'add',
@@ -356,7 +362,7 @@ impl FunctionNameEntry {
 #[derive(Debug, PartialEq)]
 pub struct DataNameEntry {
     // the exported name path,
-    // includes the submodule name path, but excludes the module name.
+    // name path includes the submodule name path, but does not include the module name.
     //
     // e.g.
     // the name path of data 'buf' in module 'myapp' is 'buf',
@@ -378,25 +384,26 @@ impl DataNameEntry {
 
 #[derive(Debug, PartialEq)]
 pub struct FunctionIndexEntry {
-    pub function_public_index: usize,
+    // pub function_public_index: usize,
     pub target_module_index: usize,
     pub function_internal_index: usize,
 }
 
 impl FunctionIndexEntry {
     pub fn new(
-        function_public_index: usize,
+        // function_public_index: usize,
         target_module_index: usize,
         function_internal_index: usize,
     ) -> Self {
         Self {
-            function_public_index,
+            // function_public_index,
             target_module_index,
             function_internal_index,
         }
     }
 }
 
+/// FunctionIndexListEntry per Module
 #[derive(Debug, PartialEq)]
 pub struct FunctionIndexListEntry {
     pub index_entries: Vec<FunctionIndexEntry>,
@@ -410,7 +417,7 @@ impl FunctionIndexListEntry {
 
 #[derive(Debug, PartialEq)]
 pub struct DataIndexEntry {
-    pub data_public_index: usize,
+    // pub data_public_index: usize,
     pub target_module_index: usize,
     pub data_internal_index: usize,
     pub target_data_section_type: DataSectionType,
@@ -418,13 +425,13 @@ pub struct DataIndexEntry {
 
 impl DataIndexEntry {
     pub fn new(
-        data_public_index: usize,
+        // data_public_index: usize,
         target_module_index: usize,
         data_internal_index: usize,
         target_data_section_type: DataSectionType,
     ) -> Self {
         Self {
-            data_public_index,
+            // data_public_index,
             target_module_index,
             data_internal_index,
             target_data_section_type,
@@ -432,6 +439,7 @@ impl DataIndexEntry {
     }
 }
 
+/// DataIndexListEntry per Module
 #[derive(Debug)]
 pub struct DataIndexListEntry {
     pub index_entries: Vec<DataIndexEntry>,
@@ -443,65 +451,41 @@ impl DataIndexListEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct UnifiedExternalLibraryEntry {
-    pub name: String,
-    pub value: Box<ExternalLibraryDependentValue>,
-    pub external_library_dependent_type: ExternalLibraryDependentType,
-}
+// #[derive(Debug, PartialEq)]
+// pub struct UnifiedExternalLibraryEntry {
+//     pub name: String,
+//     pub value: Box<ExternalLibraryDependentValue>,
+//     pub external_library_dependent_type: ExternalLibraryDependentType,
+// }
+//
+// impl UnifiedExternalLibraryEntry {
+//     pub fn new(
+//         name: String,
+//         value: Box<ExternalLibraryDependentValue>,
+//         external_library_dependent_type: ExternalLibraryDependentType,
+//     ) -> Self {
+//         Self {
+//             name,
+//             value,
+//             external_library_dependent_type,
+//         }
+//     }
+// }
 
-impl UnifiedExternalLibraryEntry {
-    pub fn new(
-        name: String,
-        value: Box<ExternalLibraryDependentValue>,
-        external_library_dependent_type: ExternalLibraryDependentType,
-    ) -> Self {
-        Self {
-            name,
-            value,
-            external_library_dependent_type,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct UnifiedExternalFunctionEntry {
-    pub name: String,
-    pub unified_external_library_index: usize,
-}
-
-impl UnifiedExternalFunctionEntry {
-    pub fn new(name: String, unified_external_library_index: usize) -> Self {
-        Self {
-            name,
-            unified_external_library_index,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ExternalFunctionIndexEntry {
-    pub external_function_index: usize,
-    pub unified_external_function_index: usize,
-
-    // copy the type_index from ExternalFuncSection of the specific module,
-    // so that the ExternalFuncSection can be omitted at runtime.
-    pub type_index: usize,
-}
-
-impl ExternalFunctionIndexEntry {
-    pub fn new(
-        external_function_index: usize,
-        unified_external_function_index: usize,
-        type_index: usize,
-    ) -> Self {
-        Self {
-            external_function_index,
-            unified_external_function_index,
-            type_index,
-        }
-    }
-}
+// #[derive(Debug, PartialEq)]
+// pub struct UnifiedExternalFunctionEntry {
+//     pub name: String,
+//     pub unified_external_library_index: usize,
+// }
+//
+// impl UnifiedExternalFunctionEntry {
+//     pub fn new(name: String, unified_external_library_index: usize) -> Self {
+//         Self {
+//             name,
+//             unified_external_library_index,
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub struct ExternalFunctionIndexListEntry {
@@ -511,5 +495,28 @@ pub struct ExternalFunctionIndexListEntry {
 impl ExternalFunctionIndexListEntry {
     pub fn new(index_entries: Vec<ExternalFunctionIndexEntry>) -> Self {
         Self { index_entries }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ExternalFunctionIndexEntry {
+    // pub external_function_index: usize,
+    pub unified_external_function_index: usize,
+    // // copy the type_index from ExternalFuncSection of the specific module,
+    // // so that the ExternalFuncSection can be omitted at runtime.
+    // pub type_index: usize,
+}
+
+impl ExternalFunctionIndexEntry {
+    pub fn new(
+        // external_function_index: usize,
+        unified_external_function_index: usize,
+        // type_index: usize,
+    ) -> Self {
+        Self {
+            // external_function_index,
+            unified_external_function_index,
+            // type_index,
+        }
     }
 }

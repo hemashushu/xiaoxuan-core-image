@@ -20,7 +20,7 @@
 //              | ...                                                                         |
 //              |-----------------------------------------------------------------------------|
 
-use anc_isa::ExternalLibraryDependentType;
+use anc_isa::{ExternalLibraryDependentType, ExternalLibraryDependentValue};
 
 use crate::{
     entry::ExternalLibraryEntry,
@@ -68,10 +68,7 @@ impl<'a> SectionEntry<'a> for ExternalLibrarySection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
         let (items, items_data) =
             load_section_with_table_and_data_area::<ExternalLibraryItem>(section_data);
-        ExternalLibrarySection {
-            items,
-            items_data,
-        }
+        ExternalLibrarySection { items, items_data }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
@@ -133,12 +130,24 @@ impl<'a> ExternalLibrarySection<'a> {
                 let value_offset = name_offset + name_length;
                 next_offset = value_offset + value_length; // for next offset
 
+                let external_library_dependent_type = match entry.value.as_ref() {
+                    ExternalLibraryDependentValue::Local(_) => ExternalLibraryDependentType::Local,
+                    ExternalLibraryDependentValue::Remote(_) => {
+                        ExternalLibraryDependentType::Remote
+                    }
+                    ExternalLibraryDependentValue::Share(_) => ExternalLibraryDependentType::Share,
+                    ExternalLibraryDependentValue::Runtime => ExternalLibraryDependentType::Runtime,
+                    ExternalLibraryDependentValue::System(_) => {
+                        ExternalLibraryDependentType::System
+                    }
+                };
+
                 ExternalLibraryItem::new(
                     name_offset,
                     name_length,
                     value_offset,
                     value_length,
-                    entry.external_library_dependent_type,
+                    external_library_dependent_type,
                 )
             })
             .collect::<Vec<ExternalLibraryItem>>();
@@ -163,9 +172,8 @@ mod tests {
     use anc_isa::{DependentRemote, ExternalLibraryDependentType, ExternalLibraryDependentValue};
 
     use crate::{
-        common_sections::external_library_section::{
-            ExternalLibraryEntry, ExternalLibraryItem, ExternalLibrarySection,
-        },
+        common_sections::external_library_section::{ExternalLibraryItem, ExternalLibrarySection},
+        entry::ExternalLibraryEntry,
         module_image::SectionEntry,
     };
 
@@ -262,7 +270,7 @@ mod tests {
                 Box::new(ExternalLibraryDependentValue::Local(
                     "hello.so.1".to_owned(),
                 )),
-                ExternalLibraryDependentType::Local,
+                // ExternalLibraryDependentType::Local,
             ),
             ExternalLibraryEntry::new(
                 "helloworld".to_owned(),
@@ -274,7 +282,7 @@ mod tests {
                         values: None,
                     },
                 ))),
-                ExternalLibraryDependentType::Remote,
+                // ExternalLibraryDependentType::Remote,
             ),
         ];
 

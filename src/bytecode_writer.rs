@@ -255,6 +255,58 @@ impl BytecodeWriter {
         // (opcode:i16 reversed_index:i16 start_inst_offset:i32)
         self.rewrite_buffer(addr + 4, start_inst_offset);
     }
+
+    pub fn rewrite_data_load_data_public_index() {
+        todo!()
+    }
+
+    pub fn rewrite_host_addr_data_data_public_index() {
+        todo!()
+    }
+
+    pub fn rewrite_data_load_extend_data_public_index() {
+        todo!()
+    }
+
+    pub fn rewrite_host_addr_data_extend_data_public_index() {
+        todo!()
+    }
+
+    pub fn rewrite_data_store_data_public_index() {
+        todo!()
+    }
+
+    pub fn rewrite_data_store_extend_data_public_index() {
+        todo!()
+    }
+
+    pub fn rewrite_block_type_index() {
+        todo!()
+    }
+
+    pub fn rewrite_block_local_list_index() {
+        todo!()
+    }
+
+    pub fn rewrite_block_alt_type_index() {
+        todo!()
+    }
+
+    pub fn rewrite_block_nez_local_list_index() {
+        todo!()
+    }
+
+    pub fn rewrite_call_function_public_index() {
+        todo!()
+    }
+
+    pub fn rewrite_pub_index_function_function_public_index() {
+        todo!()
+    }
+
+    pub fn rewrite_host_addr_function_function_public_index() {
+        todo!()
+    }
 }
 
 pub struct BytecodeWriterHelper {

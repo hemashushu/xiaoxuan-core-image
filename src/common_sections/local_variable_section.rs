@@ -43,7 +43,7 @@ use std::mem::size_of;
 use anc_isa::{MemoryDataType, OPERAND_SIZE_IN_BYTES};
 
 use crate::{
-    entry::{LocalVariableListEntry, LocalVariableEntry},
+    entry::{LocalVariableEntry, LocalVariableListEntry},
     module_image::{ModuleSectionId, SectionEntry},
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
@@ -129,7 +129,8 @@ impl<'a> SectionEntry<'a> for LocalVariableSection<'a> {
     where
         Self: Sized,
     {
-        let (items, datas) = load_section_with_table_and_data_area::<LocalVariableListItem>(section_data);
+        let (items, datas) =
+            load_section_with_table_and_data_area::<LocalVariableListItem>(section_data);
         LocalVariableSection {
             list_items: items,
             list_data: datas,
@@ -171,7 +172,9 @@ impl<'a> LocalVariableSection<'a> {
         }
     }
 
-    pub fn convert_from_entries(entiress: &[LocalVariableListEntry]) -> (Vec<LocalVariableListItem>, Vec<u8>) {
+    pub fn convert_from_entries(
+        entiress: &[LocalVariableListEntry],
+    ) -> (Vec<LocalVariableListItem>, Vec<u8>) {
         let var_item_length_in_bytes = size_of::<LocalVariableItem>();
 
         // generate a list of (list, list_allocate_bytes)
@@ -264,8 +267,9 @@ mod tests {
 
     use crate::{
         common_sections::local_variable_section::{
-            LocalVariableListItem, LocalVariableListEntry, LocalVariableEntry, LocalVariableItem, LocalVariableSection,
+            LocalVariableItem, LocalVariableListItem, LocalVariableSection,
         },
+        entry::{LocalVariableEntry, LocalVariableListEntry},
         module_image::SectionEntry,
     };
 

@@ -35,10 +35,24 @@ pub struct FunctionNameSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct FunctionNameItem {
+    /*
+     the value of 'name' may be a name path, e.g.
+     "namespace::identifier"
+     note that name path is a path relative to the module,
+     it does not include the name of module.
+    */
     pub name_offset: u32,
     pub name_length: u32,
-    // pub function_public_index: u32, // this field is used for bridge function call
-    pub export: u8, // 0=false, 1=true
+
+    // // pub function_public_index: u32, // this field is used for bridge function call
+
+    // Used to indicate the visibility of this item when this
+    // module is used as a shared module.
+    // Note that in the case of static linking, the item is always
+    // visible to other modules, regardless of the value of this property.
+    //
+    // 0=false, 1=true
+    pub export: u8,
     _padding0: [u8; 3],
 }
 
@@ -137,9 +151,8 @@ impl<'a> FunctionNameSection<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        common_sections::function_name_section::{
-            FunctionNameEntry, FunctionNameItem, FunctionNameSection,
-        },
+        common_sections::function_name_section::{FunctionNameItem, FunctionNameSection},
+        entry::FunctionNameEntry,
         module_image::SectionEntry,
     };
 
@@ -234,9 +247,6 @@ mod tests {
             Some((1, /*13,*/ true))
         );
 
-        assert_eq!(
-            section.get_item_index_and_export("bar"),
-            None
-        );
+        assert_eq!(section.get_item_index_and_export("bar"), None);
     }
 }

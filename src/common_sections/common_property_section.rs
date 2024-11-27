@@ -20,6 +20,13 @@ pub struct CommonPropertySection {
     // sections, but they are optional in the runtime.
     pub import_data_count: u32,
     pub import_function_count: u32,
+
+    /*
+     Note that this is the name of module/package,
+     it CANNOT be the sub-module name even if the current image is
+     the object file of a sub-module.
+     it CANNOT be a name path either.
+     */
     pub module_name_length: u32,
     pub module_name_buffer: [u8; 256],
 }

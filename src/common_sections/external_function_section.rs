@@ -19,7 +19,9 @@
 //              |-----------------------------------------------------------------------------------------------|
 
 use crate::{
-    entry::ExternalFunctionEntry, module_image::{ModuleSectionId, SectionEntry}, tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area}
+    entry::ExternalFunctionEntry,
+    module_image::{ModuleSectionId, SectionEntry},
+    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -126,9 +128,13 @@ impl<'a> ExternalFunctionSection<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{common_sections::external_function_section::{
-        ExternalFunctionEntry, ExternalFunctionItem, ExternalFunctionSection,
-    }, module_image::SectionEntry};
+    use crate::{
+        common_sections::external_function_section::{
+            ExternalFunctionItem, ExternalFunctionSection,
+        },
+        entry::ExternalFunctionEntry,
+        module_image::SectionEntry,
+    };
 
     #[test]
     fn test_load_section() {

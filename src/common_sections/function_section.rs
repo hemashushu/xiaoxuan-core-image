@@ -19,7 +19,9 @@
 //              |-------------------------------------------------------------------------------------------|
 
 use crate::{
-    entry::FunctionEntry, module_image::{ModuleSectionId, SectionEntry}, tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area}
+    entry::FunctionEntry,
+    module_image::{ModuleSectionId, SectionEntry},
+    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -39,7 +41,8 @@ pub struct FunctionItem {
 
 impl<'a> SectionEntry<'a> for FunctionSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
-        let (items, codes_data) = load_section_with_table_and_data_area::<FunctionItem>(section_data);
+        let (items, codes_data) =
+            load_section_with_table_and_data_area::<FunctionItem>(section_data);
         FunctionSection { items, codes_data }
     }
 
@@ -125,7 +128,11 @@ impl FunctionItem {
 
 #[cfg(test)]
 mod tests {
-    use crate::{common_sections::function_section::{FunctionEntry, FunctionItem, FunctionSection}, module_image::SectionEntry};
+    use crate::{
+        common_sections::function_section::{FunctionItem, FunctionSection},
+        entry::FunctionEntry,
+        module_image::SectionEntry,
+    };
 
     #[test]
     fn test_load_section() {
@@ -156,7 +163,10 @@ mod tests {
 
     #[test]
     fn test_save_section() {
-        let items = vec![FunctionItem::new(3, 5, 7, 11), FunctionItem::new(13, 17, 19, 23)];
+        let items = vec![
+            FunctionItem::new(3, 5, 7, 11),
+            FunctionItem::new(13, 17, 19, 23),
+        ];
 
         let section = FunctionSection {
             items: &items,

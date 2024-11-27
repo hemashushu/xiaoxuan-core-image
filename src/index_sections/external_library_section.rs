@@ -4,10 +4,10 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-//! this section is the same as 'ExternalLibrarySection' except for the section id,
-//! the source comes from 'ExternalLibrarySection'.
+//! The binary layout of this section is
+//! the same as `ExternalLibrarySection`
 
-// "unified external library section" binary layout
+// "external library section" binary layout
 //
 //              |-----------------------------------------------------------------------------|
 //              | item count (u32) | (4 bytes padding)                                        |
@@ -23,23 +23,23 @@
 //              | ...                                                                         |
 //              |-----------------------------------------------------------------------------|
 
-use anc_isa::ExternalLibraryDependentType;
+use anc_isa::{ExternalLibraryDependentType, ExternalLibraryDependentValue};
 
 use crate::{
-    entry::UnifiedExternalLibraryEntry,
+    entry::ExternalLibraryEntry,
     module_image::{ModuleSectionId, SectionEntry},
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
 pub struct UnifiedExternalLibrarySection<'a> {
-    pub items: &'a [UnifiedExternalLibraryItem],
+    pub items: &'a [ExternalLibraryItem],
     pub items_data: &'a [u8],
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct UnifiedExternalLibraryItem {
+pub struct ExternalLibraryItem {
     pub name_offset: u32, // the offset of the name string in data area
     pub name_length: u32, // the length (in bytes) of the name string in data area
     pub value_offset: u32,
@@ -48,7 +48,7 @@ pub struct UnifiedExternalLibraryItem {
     _padding0: [u8; 3],
 }
 
-impl UnifiedExternalLibraryItem {
+impl ExternalLibraryItem {
     pub fn new(
         name_offset: u32,
         name_length: u32,
@@ -69,12 +69,9 @@ impl UnifiedExternalLibraryItem {
 
 impl<'a> SectionEntry<'a> for UnifiedExternalLibrarySection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
-        let (items, names_data) =
-            load_section_with_table_and_data_area::<UnifiedExternalLibraryItem>(section_data);
-        UnifiedExternalLibrarySection {
-            items,
-            items_data: names_data,
-        }
+        let (items, items_data) =
+            load_section_with_table_and_data_area::<ExternalLibraryItem>(section_data);
+        UnifiedExternalLibrarySection { items, items_data }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
@@ -108,8 +105,8 @@ impl<'a> UnifiedExternalLibrarySection<'a> {
     }
 
     pub fn convert_from_entries(
-        entries: &[UnifiedExternalLibraryEntry],
-    ) -> (Vec<UnifiedExternalLibraryItem>, Vec<u8>) {
+        entries: &[ExternalLibraryEntry],
+    ) -> (Vec<ExternalLibraryItem>, Vec<u8>) {
         let mut name_bytes = entries
             .iter()
             .map(|entry| entry.name.as_bytes().to_vec())
@@ -136,15 +133,27 @@ impl<'a> UnifiedExternalLibrarySection<'a> {
                 let value_offset = name_offset + name_length;
                 next_offset = value_offset + value_length; // for next offset
 
-                UnifiedExternalLibraryItem::new(
+                let external_library_dependent_type = match entry.value.as_ref() {
+                    ExternalLibraryDependentValue::Local(_) => ExternalLibraryDependentType::Local,
+                    ExternalLibraryDependentValue::Remote(_) => {
+                        ExternalLibraryDependentType::Remote
+                    }
+                    ExternalLibraryDependentValue::Share(_) => ExternalLibraryDependentType::Share,
+                    ExternalLibraryDependentValue::Runtime => ExternalLibraryDependentType::Runtime,
+                    ExternalLibraryDependentValue::System(_) => {
+                        ExternalLibraryDependentType::System
+                    }
+                };
+
+                ExternalLibraryItem::new(
                     name_offset,
                     name_length,
                     value_offset,
                     value_length,
-                    entry.external_library_dependent_type,
+                    external_library_dependent_type,
                 )
             })
-            .collect::<Vec<UnifiedExternalLibraryItem>>();
+            .collect::<Vec<ExternalLibraryItem>>();
 
         let items_data = name_bytes
             .iter_mut()
@@ -166,9 +175,8 @@ mod tests {
     use anc_isa::{DependentRemote, ExternalLibraryDependentType, ExternalLibraryDependentValue};
 
     use crate::{
-        index_sections::unified_external_library_section::{
-            UnifiedExternalLibraryEntry, UnifiedExternalLibraryItem, UnifiedExternalLibrarySection,
-        },
+        common_sections::external_library_section::{ExternalLibraryItem, ExternalLibrarySection},
+        entry::ExternalLibraryEntry,
         module_image::SectionEntry,
     };
 
@@ -198,16 +206,16 @@ mod tests {
         section_data.extend_from_slice(b".bar");
         section_data.extend_from_slice(b".world");
 
-        let section = UnifiedExternalLibrarySection::load(&section_data);
+        let section = ExternalLibrarySection::load(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(
             section.items[0],
-            UnifiedExternalLibraryItem::new(0, 3, 3, 5, ExternalLibraryDependentType::Local)
+            ExternalLibraryItem::new(0, 3, 3, 5, ExternalLibraryDependentType::Local)
         );
         assert_eq!(
             section.items[1],
-            UnifiedExternalLibraryItem::new(8, 4, 12, 6, ExternalLibraryDependentType::Remote)
+            ExternalLibraryItem::new(8, 4, 12, 6, ExternalLibraryDependentType::Remote)
         );
         assert_eq!(section.items_data, "foohello.bar.world".as_bytes())
     }
@@ -215,11 +223,11 @@ mod tests {
     #[test]
     fn test_save_section() {
         let items = vec![
-            UnifiedExternalLibraryItem::new(0, 3, 3, 5, ExternalLibraryDependentType::Local),
-            UnifiedExternalLibraryItem::new(8, 4, 12, 6, ExternalLibraryDependentType::Remote),
+            ExternalLibraryItem::new(0, 3, 3, 5, ExternalLibraryDependentType::Local),
+            ExternalLibraryItem::new(8, 4, 12, 6, ExternalLibraryDependentType::Remote),
         ];
 
-        let section = UnifiedExternalLibrarySection {
+        let section = ExternalLibrarySection {
             items: &items,
             items_data: b"foohello.bar.world",
         };
@@ -260,14 +268,14 @@ mod tests {
     #[test]
     fn test_convert() {
         let entries = vec![
-            UnifiedExternalLibraryEntry::new(
+            ExternalLibraryEntry::new(
                 "foobar".to_owned(),
                 Box::new(ExternalLibraryDependentValue::Local(
                     "hello.so.1".to_owned(),
                 )),
-                ExternalLibraryDependentType::Local,
+                // ExternalLibraryDependentType::Local,
             ),
-            UnifiedExternalLibraryEntry::new(
+            ExternalLibraryEntry::new(
                 "helloworld".to_owned(),
                 Box::new(ExternalLibraryDependentValue::Remote(Box::new(
                     DependentRemote {
@@ -277,12 +285,12 @@ mod tests {
                         values: None,
                     },
                 ))),
-                ExternalLibraryDependentType::Remote,
+                // ExternalLibraryDependentType::Remote,
             ),
         ];
 
-        let (items, items_data) = UnifiedExternalLibrarySection::convert_from_entries(&entries);
-        let section = UnifiedExternalLibrarySection {
+        let (items, items_data) = ExternalLibrarySection::convert_from_entries(&entries);
+        let section = ExternalLibrarySection {
             items: &items,
             items_data: &items_data,
         };

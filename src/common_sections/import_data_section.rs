@@ -21,7 +21,9 @@
 use anc_isa::{DataSectionType, MemoryDataType};
 
 use crate::{
-    entry::ImportDataEntry, module_image::{ModuleSectionId, SectionEntry}, tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area}
+    entry::ImportDataEntry,
+    module_image::{ModuleSectionId, SectionEntry},
+    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -33,6 +35,12 @@ pub struct ImportDataSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ImportDataItem {
+    /*
+     the value of 'name' may be a name path, e.g.
+     "namespace::identifier"
+     note that name path is a path relative to the module,
+     it does not include the name of module.
+    */
     pub name_offset: u32, // the offset of the name string in data area
     pub name_length: u32, // the length (in bytes) of the name string in data area
     pub import_module_index: u32,
@@ -135,7 +143,11 @@ impl<'a> ImportDataSection<'a> {
 mod tests {
     use anc_isa::{DataSectionType, MemoryDataType};
 
-    use crate::{common_sections::import_data_section::{ImportDataItem, ImportDataSection}, entry::ImportDataEntry, module_image::SectionEntry};
+    use crate::{
+        common_sections::import_data_section::{ImportDataItem, ImportDataSection},
+        entry::ImportDataEntry,
+        module_image::SectionEntry,
+    };
 
     #[test]
     fn test_load_section() {

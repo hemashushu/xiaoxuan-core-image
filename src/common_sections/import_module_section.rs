@@ -20,7 +20,7 @@
 //              | ...                                                                         |
 //              |-----------------------------------------------------------------------------|
 
-use anc_isa::ModuleDependentType;
+use anc_isa::{ModuleDependentType, ModuleDependentValue};
 
 use crate::{
     entry::ImportModuleEntry,
@@ -131,12 +131,19 @@ impl<'a> ImportModuleSection<'a> {
                 let value_offset = name_offset + name_length;
                 next_offset = value_offset + value_length; // for next offset
 
+                let module_dependent_type = match entry.value.as_ref() {
+                    ModuleDependentValue::Local(_) => ModuleDependentType::Local,
+                    ModuleDependentValue::Remote(_) => ModuleDependentType::Remote,
+                    ModuleDependentValue::Share(_) => ModuleDependentType::Share,
+                    ModuleDependentValue::Runtime => ModuleDependentType::Runtime,
+                };
+
                 ImportModuleItem::new(
                     name_offset,
                     name_length,
                     value_offset,
                     value_length,
-                    entry.module_dependent_type,
+                    module_dependent_type,
                 )
             })
             .collect::<Vec<ImportModuleItem>>();
@@ -257,7 +264,7 @@ mod tests {
             ImportModuleEntry::new(
                 "foobar".to_owned(),
                 Box::new(ModuleDependentValue::Local("hello".to_owned())),
-                ModuleDependentType::Local,
+                // ModuleDependentType::Local,
             ),
             ImportModuleEntry::new(
                 "helloworld".to_owned(),
@@ -267,7 +274,7 @@ mod tests {
                     path: "/xyz".to_owned(),
                     values: None,
                 }))),
-                ModuleDependentType::Remote,
+                // ModuleDependentType::Remote,
             ),
         ];
 

@@ -11,6 +11,10 @@ pub mod entry;
 pub mod index_sections;
 pub mod module_image;
 pub mod tableaccess;
+
+// https://doc.rust-lang.org/reference/conditional-compilation.html#debug_assertions
+// https://doc.rust-lang.org/reference/conditional-compilation.html#test
+#[cfg(debug_assertions)]
 pub mod utils;
 
 use std::fmt::Display;

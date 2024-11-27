@@ -9,14 +9,14 @@ use crate::common_sections::data_name_section::DataNameSection;
 use crate::common_sections::function_name_section::FunctionNameSection;
 use crate::entry::{
     DataNameEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry, FunctionNameEntry,
-    InitedDataEntry, LocalVariableEntry, LocalVariableListEntry, TypeEntry,
-    UnifiedExternalFunctionEntry, UnifiedExternalLibraryEntry, UninitDataEntry,
+    InitedDataEntry, LocalVariableEntry, LocalVariableListEntry, TypeEntry, UninitDataEntry,
 };
+use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
 use crate::index_sections::index_property_section::IndexPropertySection;
 use crate::BinaryError;
 use anc_isa::{
-    DataSectionType, ExternalLibraryDependentType, ExternalLibraryDependentValue, OperandDataType,
-    RUNTIME_MAJOR_VERSION, RUNTIME_MINOR_VERSION,
+    DataSectionType, ExternalLibraryDependentValue, OperandDataType, RUNTIME_MAJOR_VERSION,
+    RUNTIME_MINOR_VERSION,
 };
 
 use crate::common_sections::data_section::{
@@ -31,27 +31,28 @@ use crate::index_sections::data_index_section::{DataIndexItem, DataIndexSection}
 use crate::index_sections::external_function_index_section::{
     ExternalFunctionIndexItem, ExternalFunctionIndexSection,
 };
+use crate::index_sections::external_function_section::UnifiedExternalFunctionSection;
+use crate::index_sections::external_library_section::UnifiedExternalLibrarySection;
 use crate::index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection};
-use crate::index_sections::unified_external_function_section::UnifiedExternalFunctionSection;
-use crate::index_sections::unified_external_library_section::UnifiedExternalLibrarySection;
 use crate::module_image::{ModuleImage, RangeItem, SectionEntry, MODULE_NAME_BUFFER_LENGTH};
 
 /// helper object for unit test
-pub struct HelperFunctionWithCodeAndSignatureAndLocalVariablesEntry {
+pub struct HelperFunctionEntryWithCodeAndSignatureAndLocalVariables {
     pub params: Vec<OperandDataType>,
     pub results: Vec<OperandDataType>,
     pub local_variable_item_entries_without_args: Vec<LocalVariableEntry>,
     pub code: Vec<u8>,
 }
 
-pub struct HelperFunctionWithCodeAndLocalVariablesEntry {
+/// helper object for unit test
+pub struct HelperFunctionEntryWithCodeAndLocalVariables {
     pub type_index: usize,
     pub local_variable_item_entries_without_args: Vec<LocalVariableEntry>,
     pub code: Vec<u8>,
 }
 
 /// helper object for unit test
-pub struct HelperBlockSignatureAndLocalVariablesEntry {
+pub struct HelperBlockEntryWithSignatureAndLocalVariables {
     pub params: Vec<OperandDataType>,
     pub results: Vec<OperandDataType>,
     pub local_variable_item_entries_without_args: Vec<LocalVariableEntry>,
@@ -59,10 +60,10 @@ pub struct HelperBlockSignatureAndLocalVariablesEntry {
 
 /// helper object for unit test
 pub struct HelperExternalFunctionEntry {
-    pub external_library_dependent_type: ExternalLibraryDependentType,
+    // pub external_library_dependent_type: ExternalLibraryDependentType,
     pub library_name: String,
-    pub library_value: Box<ExternalLibraryDependentValue>,
     pub function_name: String,
+    pub library_value: Box<ExternalLibraryDependentValue>,
     pub type_index: usize,
 }
 
@@ -140,9 +141,11 @@ pub fn helper_build_module_binary_with_single_function_and_blocks(
 
     // although there is no params and no results for the block_nez, but
     // it still is necessary create a 'HelperBlockEntry'.
-    helper_block_sig_and_local_variables_entries: Vec<HelperBlockSignatureAndLocalVariablesEntry>,
+    helper_block_entries_with_signature_and_local_variables: Vec<
+        HelperBlockEntryWithSignatureAndLocalVariables,
+    >,
 ) -> Vec<u8> {
-    let helper_function_entry = HelperFunctionWithCodeAndSignatureAndLocalVariablesEntry {
+    let helper_function_entry = HelperFunctionEntryWithCodeAndSignatureAndLocalVariables {
         params: param_datatypes,
         results: result_datatypes,
         local_variable_item_entries_without_args,
@@ -151,23 +154,25 @@ pub fn helper_build_module_binary_with_single_function_and_blocks(
 
     helper_build_module_binary_with_functions_and_blocks(
         vec![helper_function_entry],
-        helper_block_sig_and_local_variables_entries,
+        helper_block_entries_with_signature_and_local_variables,
     )
 }
 
 /// helper function for unit test
 pub fn helper_build_module_binary_with_functions_and_blocks(
-    helper_function_with_code_and_sig_and_local_variables_entries: Vec<
-        HelperFunctionWithCodeAndSignatureAndLocalVariablesEntry,
+    helper_function_entries_with_code_and_sig_and_local_variables: Vec<
+        HelperFunctionEntryWithCodeAndSignatureAndLocalVariables,
     >,
-    helper_block_sig_and_local_variables_entries: Vec<HelperBlockSignatureAndLocalVariablesEntry>,
+    helper_block_entries_with_signature_and_local_variables: Vec<
+        HelperBlockEntryWithSignatureAndLocalVariables,
+    >,
 ) -> Vec<u8> {
     // build type entries
 
     // note:
     // for simplicity, duplicate items are not merged here.
 
-    let function_type_entries = helper_function_with_code_and_sig_and_local_variables_entries
+    let function_type_entries = helper_function_entries_with_code_and_sig_and_local_variables
         .iter()
         .map(|entry| TypeEntry {
             params: entry.params.clone(),
@@ -175,7 +180,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
         })
         .collect::<Vec<_>>();
 
-    let block_type_entries = helper_block_sig_and_local_variables_entries
+    let block_type_entries = helper_block_entries_with_signature_and_local_variables
         .iter()
         .map(|entry| TypeEntry {
             params: entry.params.clone(),
@@ -193,7 +198,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
     // for simplicity, duplicate items are not merged here.
 
     let local_list_entries_of_functions =
-        helper_function_with_code_and_sig_and_local_variables_entries
+        helper_function_entries_with_code_and_sig_and_local_variables
             .iter()
             .map(|entry| {
                 let params_as_local_variables = entry
@@ -212,7 +217,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
             })
             .collect::<Vec<_>>();
 
-    let local_list_entries_of_blocks = helper_block_sig_and_local_variables_entries
+    let local_list_entries_of_blocks = helper_block_entries_with_signature_and_local_variables
         .iter()
         .map(|entry| {
             let params_as_local_variables = entry
@@ -236,7 +241,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
     local_list_entries.extend_from_slice(&local_list_entries_of_blocks);
 
     // build function entries
-    let function_entries = helper_function_with_code_and_sig_and_local_variables_entries
+    let function_entries = helper_function_entries_with_code_and_sig_and_local_variables
         .iter()
         .enumerate()
         .map(|(idx, entry)| FunctionEntry {
@@ -265,8 +270,8 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
 #[allow(clippy::too_many_arguments)]
 pub fn helper_build_module_binary_with_functions_and_external_functions(
     type_entries: Vec<TypeEntry>,
-    helper_function_with_code_and_local_variables_entries: Vec<
-        HelperFunctionWithCodeAndLocalVariablesEntry,
+    helper_function_entries_with_code_and_local_variables: Vec<
+        HelperFunctionEntryWithCodeAndLocalVariables,
     >,
     read_only_data_entries: Vec<InitedDataEntry>,
     read_write_data_entries: Vec<InitedDataEntry>,
@@ -276,7 +281,7 @@ pub fn helper_build_module_binary_with_functions_and_external_functions(
     let mut function_entries = vec![];
     let mut local_list_entries = vec![];
 
-    helper_function_with_code_and_local_variables_entries
+    helper_function_entries_with_code_and_local_variables
         .iter()
         .enumerate()
         .for_each(|(idx, entry)| {
@@ -325,7 +330,7 @@ pub fn helper_build_module_binary(
     read_write_data_entries: Vec<InitedDataEntry>,
     uninit_uninit_data_entries: Vec<UninitDataEntry>,
     type_entries: Vec<TypeEntry>,
-    local_list_entries: Vec<LocalVariableListEntry>, // this local list includes args
+    local_list_entries: Vec<LocalVariableListEntry>, // this local list includes function/block args
     function_entries: Vec<FunctionEntry>,
     helper_external_function_entries: Vec<HelperExternalFunctionEntry>,
     entry_function_public_index: u32,
@@ -379,12 +384,15 @@ pub fn helper_build_module_binary(
             ExternalLibraryEntry::new(
                 e.library_name.clone(),
                 e.library_value.clone(),
-                e.external_library_dependent_type,
+                // e.external_library_dependent_type,
             )
         })
         .collect::<Vec<_>>();
+
+    // remove the duplicated items
     external_library_entries.sort_by(|left, right| left.name.cmp(&right.name));
     external_library_entries.dedup_by(|left, right| left.value == right.value);
+
     let (external_library_items, external_library_data) =
         ExternalLibrarySection::convert_from_entries(&external_library_entries);
     let external_library_section = ExternalLibrarySection {
@@ -446,7 +454,7 @@ pub fn helper_build_module_binary(
     let function_index_items: Vec<FunctionIndexItem> = (0..function_entries.len())
         .map(|idx| {
             let idx_u32 = idx as u32;
-            FunctionIndexItem::new(idx_u32, 0, idx_u32)
+            FunctionIndexItem::new(0, idx_u32)
         })
         .collect::<Vec<_>>();
 
@@ -483,11 +491,11 @@ pub fn helper_build_module_binary(
         .iter()
         .enumerate()
         .map(|(idx, _item)| (idx, DataSectionType::Uninit));
-    for (total_data_index, (idx, data_section_type)) in
-        ro_iter.chain(rw_iter).chain(uninit_iter).enumerate()
+    for (idx, data_section_type) in ro_iter.chain(rw_iter).chain(uninit_iter)
+    // .enumerate()
     {
         data_index_items.push(DataIndexItem::new(
-            total_data_index as u32,
+            // total_data_index as u32,
             0,
             idx as u32,
             data_section_type,
@@ -521,15 +529,7 @@ pub fn helper_build_module_binary(
 
     // build unified external library section
     // it's 1:1 to the external_library_entries
-    let unified_external_library_entries = external_library_entries
-        .iter()
-        .map(|e| UnifiedExternalLibraryEntry {
-            name: e.name.clone(),
-            value: e.value.clone(),
-            external_library_dependent_type: e.external_library_dependent_type,
-        })
-        .collect::<Vec<_>>();
-
+    let unified_external_library_entries = external_library_entries.clone();
     let (unified_external_library_items, unified_external_library_data) =
         UnifiedExternalLibrarySection::convert_from_entries(&unified_external_library_entries);
     let unified_external_library_section = UnifiedExternalLibrarySection {
@@ -539,19 +539,22 @@ pub fn helper_build_module_binary(
 
     // build unified external function section
     // it's 1:1 to external_function_entries
-    let unified_external_function_entries = external_function_entries
-        .iter()
-        .map(|e| UnifiedExternalFunctionEntry {
-            name: e.name.clone(),
-            unified_external_library_index: e.external_library_index,
-        })
-        .collect::<Vec<_>>();
-
+    let unified_external_function_entries = external_function_entries.clone();
     let (unified_external_function_items, unified_external_function_data) =
         UnifiedExternalFunctionSection::convert_from_entries(&unified_external_function_entries);
     let unified_external_function_section = UnifiedExternalFunctionSection {
         items: &unified_external_function_items,
         names_data: &unified_external_function_data,
+    };
+
+    // build unified external type section
+    // it's 1:1 to type_entries
+    let unified_external_type_entries = type_entries.clone();
+    let (unified_external_type_items, unified_external_type_data) =
+        UnifiedExternalTypeSection::convert_from_entries(&unified_external_type_entries);
+    let unified_external_type_section = UnifiedExternalTypeSection {
+        items: &unified_external_type_items,
+        types_data: &unified_external_type_data,
     };
 
     // external function index section
@@ -563,9 +566,7 @@ pub fn helper_build_module_binary(
     let external_function_index_items: Vec<ExternalFunctionIndexItem> = external_function_entries
         .iter()
         .enumerate()
-        .map(|(idx, item)| {
-            ExternalFunctionIndexItem::new(idx as u32, idx as u32, item.type_index as u32)
-        })
+        .map(|(idx, _)| ExternalFunctionIndexItem::new(idx as u32))
         .collect::<Vec<_>>();
 
     let external_function_index_section = ExternalFunctionIndexSection {
@@ -582,24 +583,25 @@ pub fn helper_build_module_binary(
     // build module image
     let section_entries: Vec<&dyn SectionEntry> = vec![
         // common sections
+        &common_property_section,
         &type_section,
         &local_variable_section,
         &function_section,
         &ro_data_section,
         &rw_data_section,
         &uninit_data_section,
-        &external_library_section,
-        &external_function_section,
         &function_name_section,
         &data_name_section,
-        &common_property_section,
+        &external_library_section,
+        &external_function_section,
         // index sections
+        &index_property_section,
         &function_index_section,
+        &data_index_section,
+        &unified_external_type_section,
         &unified_external_library_section,
         &unified_external_function_section,
         &external_function_index_section,
-        &data_index_section,
-        &index_property_section,
     ];
 
     let (section_items, sections_data) = ModuleImage::convert_from_entries(&section_entries);
@@ -673,7 +675,7 @@ mod tests {
             helper_build_module_binary_with_functions_and_external_functions,
             helper_build_module_binary_with_single_function_and_data_sections,
             helper_load_modules_from_binaries, HelperExternalFunctionEntry,
-            HelperFunctionWithCodeAndLocalVariablesEntry,
+            HelperFunctionEntryWithCodeAndLocalVariables,
         },
     };
 
@@ -718,14 +720,14 @@ mod tests {
             // 2,1,3
             &[
                 //
-                DataIndexItem::new(0, 0, 0, DataSectionType::ReadOnly,),
-                DataIndexItem::new(1, 0, 1, DataSectionType::ReadOnly,),
+                DataIndexItem::new(0, 0, DataSectionType::ReadOnly,),
+                DataIndexItem::new(0, 1, DataSectionType::ReadOnly,),
                 //
-                DataIndexItem::new(2, 0, 0, DataSectionType::ReadWrite,),
+                DataIndexItem::new(0, 0, DataSectionType::ReadWrite,),
                 //
-                DataIndexItem::new(3, 0, 0, DataSectionType::Uninit,),
-                DataIndexItem::new(4, 0, 1, DataSectionType::Uninit,),
-                DataIndexItem::new(5, 0, 2, DataSectionType::Uninit,),
+                DataIndexItem::new(0, 0, DataSectionType::Uninit,),
+                DataIndexItem::new(0, 1, DataSectionType::Uninit,),
+                DataIndexItem::new(0, 2, DataSectionType::Uninit,),
             ]
         );
 
@@ -738,7 +740,7 @@ mod tests {
 
         assert_eq!(
             function_index_section.items,
-            &[FunctionIndexItem::new(0, 0, 0)]
+            &[FunctionIndexItem::new(0, 0)]
         );
 
         // check data sections
@@ -839,7 +841,7 @@ mod tests {
                     results: vec![OperandDataType::I32],
                 },
             ],
-            vec![HelperFunctionWithCodeAndLocalVariablesEntry {
+            vec![HelperFunctionEntryWithCodeAndLocalVariables {
                 type_index: 0,
                 local_variable_item_entries_without_args: vec![],
                 code: vec![0u8],
@@ -849,7 +851,7 @@ mod tests {
             vec![],
             vec![
                 HelperExternalFunctionEntry {
-                    external_library_dependent_type: ExternalLibraryDependentType::System,
+                    // external_library_dependent_type: ExternalLibraryDependentType::System,
                     library_name: "libc.so".to_string(),
                     library_value: Box::new(ExternalLibraryDependentValue::System(
                         "libc.so.1".to_owned(),
@@ -858,7 +860,7 @@ mod tests {
                     type_index: 1,
                 },
                 HelperExternalFunctionEntry {
-                    external_library_dependent_type: ExternalLibraryDependentType::System,
+                    // external_library_dependent_type: ExternalLibraryDependentType::System,
                     library_name: "libc.so".to_string(),
                     library_value: Box::new(ExternalLibraryDependentValue::System(
                         "libc.so.1".to_owned(),
@@ -867,7 +869,7 @@ mod tests {
                     type_index: 2,
                 },
                 HelperExternalFunctionEntry {
-                    external_library_dependent_type: ExternalLibraryDependentType::Share,
+                    // external_library_dependent_type: ExternalLibraryDependentType::Share,
                     library_name: "libmagic.so".to_string(),
                     library_value: Box::new(ExternalLibraryDependentValue::Share(Box::new(
                         DependentShare {
@@ -880,7 +882,7 @@ mod tests {
                     type_index: 2,
                 },
                 HelperExternalFunctionEntry {
-                    external_library_dependent_type: ExternalLibraryDependentType::Local,
+                    // external_library_dependent_type: ExternalLibraryDependentType::Local,
                     library_name: "libz.so".to_string(),
                     library_value: Box::new(ExternalLibraryDependentValue::Local(
                         "libz.so.1".to_owned(),
@@ -889,7 +891,7 @@ mod tests {
                     type_index: 1,
                 },
                 HelperExternalFunctionEntry {
-                    external_library_dependent_type: ExternalLibraryDependentType::System,
+                    // external_library_dependent_type: ExternalLibraryDependentType::System,
                     library_name: "libc.so".to_string(),
                     library_value: Box::new(ExternalLibraryDependentValue::System(
                         "libc.so.1".to_owned(),
@@ -898,7 +900,7 @@ mod tests {
                     type_index: 0,
                 },
                 HelperExternalFunctionEntry {
-                    external_library_dependent_type: ExternalLibraryDependentType::Share,
+                    // external_library_dependent_type: ExternalLibraryDependentType::Share,
                     library_name: "libmagic.so".to_string(),
                     library_value: Box::new(ExternalLibraryDependentValue::Share(Box::new(
                         DependentShare {
@@ -987,28 +989,34 @@ mod tests {
             .get_optional_unified_external_function_section()
             .unwrap();
         assert_eq!(
-            unified_external_function_section.get_item_name_and_unified_external_library_index(0),
-            ("getuid", 0)
+            unified_external_function_section
+                .get_item_name_and_external_library_index_and_type_index(0),
+            ("getuid", 0, 1)
         );
         assert_eq!(
-            unified_external_function_section.get_item_name_and_unified_external_library_index(1),
-            ("getenv", 0)
+            unified_external_function_section
+                .get_item_name_and_external_library_index_and_type_index(1),
+            ("getenv", 0, 2)
         );
         assert_eq!(
-            unified_external_function_section.get_item_name_and_unified_external_library_index(2),
-            ("magic_open", 1)
+            unified_external_function_section
+                .get_item_name_and_external_library_index_and_type_index(2),
+            ("magic_open", 1, 2)
         );
         assert_eq!(
-            unified_external_function_section.get_item_name_and_unified_external_library_index(3),
-            ("inflate", 2)
+            unified_external_function_section
+                .get_item_name_and_external_library_index_and_type_index(3),
+            ("inflate", 2, 1)
         );
         assert_eq!(
-            unified_external_function_section.get_item_name_and_unified_external_library_index(4),
-            ("fopen", 0)
+            unified_external_function_section
+                .get_item_name_and_external_library_index_and_type_index(4),
+            ("fopen", 0, 0)
         );
         assert_eq!(
-            unified_external_function_section.get_item_name_and_unified_external_library_index(5),
-            ("magic_file", 1)
+            unified_external_function_section
+                .get_item_name_and_external_library_index_and_type_index(5),
+            ("magic_file", 1, 2)
         );
 
         // check external function index section
@@ -1026,12 +1034,12 @@ mod tests {
         assert_eq!(
             external_function_index_section.items,
             &[
-                ExternalFunctionIndexItem::new(0, 0, 1),
-                ExternalFunctionIndexItem::new(1, 1, 2),
-                ExternalFunctionIndexItem::new(2, 2, 2),
-                ExternalFunctionIndexItem::new(3, 3, 1),
-                ExternalFunctionIndexItem::new(4, 4, 0),
-                ExternalFunctionIndexItem::new(5, 5, 2),
+                ExternalFunctionIndexItem::new(0),
+                ExternalFunctionIndexItem::new(1),
+                ExternalFunctionIndexItem::new(2),
+                ExternalFunctionIndexItem::new(3),
+                ExternalFunctionIndexItem::new(4),
+                ExternalFunctionIndexItem::new(5),
             ]
         );
 
