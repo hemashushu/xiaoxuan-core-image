@@ -98,7 +98,7 @@
 //   module index, function type index, data index, local (variable list) index,
 //   function index, dynamic function index, external function index
 
-use anc_isa::{IMAGE_FILE_MAGIC_NUMBER, IMAGE_FORMAT_MAJOR_VERSION, IMAGE_FORMAT_MINOR_VERSION};
+use anc_isa::{IMAGE_FORMAT_MAJOR_VERSION, IMAGE_FORMAT_MINOR_VERSION};
 
 use crate::{
     common_sections::{
@@ -155,6 +155,8 @@ use crate::{
 pub const MODULE_HEADER_LENGTH: usize = 16;
 pub const MODULE_NAME_BUFFER_LENGTH: usize = 256;
 pub const DATA_ALIGN_BYTES: usize = 4;
+
+pub const IMAGE_FILE_MAGIC_NUMBER: &[u8; 8] = b"ancmod\0\0"; // stands for the "XiaoXuan Core Module"
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleImage<'a> {
@@ -225,6 +227,19 @@ pub enum ModuleSectionId {
     // the section ExternalFunctionIndex is used for mapping
     // 'external function' to 'unified external function'
     ExternalFunctionIndex, // 0xa3
+}
+
+#[repr(u32)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ImageType {
+    // `*.anci`
+    Application,
+
+    // `*.ancso`
+    SharedModule,
+
+    // `*.anco`
+    ObjectFile,
 }
 
 // `RangeItem` is used for data index section and function index section
@@ -568,8 +583,8 @@ mod tests {
         },
         index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection},
         module_image::{
-            ModuleImage, RangeItem, SectionEntry, IMAGE_FILE_MAGIC_NUMBER, MODULE_HEADER_LENGTH,
-            MODULE_NAME_BUFFER_LENGTH,
+            ImageType, ModuleImage, RangeItem, SectionEntry, IMAGE_FILE_MAGIC_NUMBER,
+            MODULE_HEADER_LENGTH, MODULE_NAME_BUFFER_LENGTH,
         },
     };
 
@@ -582,8 +597,9 @@ mod tests {
         module_name_buffer[2] = 37;
 
         let common_property_section = CommonPropertySection {
-            constructor_function_public_index: 11,
-            destructor_function_public_index: 13,
+            image_type: ImageType::Application,
+            // constructor_function_public_index: 11,
+            // destructor_function_public_index: 13,
             import_data_count: 17,
             import_function_count: 19,
             module_name_length: 3,
@@ -721,7 +737,7 @@ mod tests {
                 //
                 0x10, 0, 0, 0, // section id, common property section
                 204, 0, 0, 0, // offset 6,
-                20, 1, 0, 0 // length 256 + 20
+                16, 1, 0, 0 // length 256 + 16
             ]
         );
 
@@ -841,10 +857,11 @@ mod tests {
 
         // common property
         assert_eq!(
-            &remains[..20],
+            &remains[..16],
             &[
-                11, 0, 0, 0, // constructor function public index
-                13, 0, 0, 0, // destructor function public index
+                0, 0, 0, 0, // image type
+                // 11, 0, 0, 0, // constructor function public index
+                // 13, 0, 0, 0, // destructor function public index
                 17, 0, 0, 0, // import_data_count
                 19, 0, 0, 0, // import_function_count
                 3, 0, 0, 0, // name length
@@ -933,14 +950,14 @@ mod tests {
 
         // check property section
         let common_property_section_restore = module_image_restore.get_common_property_section();
-        assert_eq!(
-            common_property_section_restore.constructor_function_public_index,
-            11
-        );
-        assert_eq!(
-            common_property_section_restore.destructor_function_public_index,
-            13
-        );
+        // assert_eq!(
+        //     common_property_section_restore.constructor_function_public_index,
+        //     11
+        // );
+        // assert_eq!(
+        //     common_property_section_restore.destructor_function_public_index,
+        //     13
+        // );
         assert_eq!(common_property_section_restore.import_data_count, 17);
         assert_eq!(common_property_section_restore.import_function_count, 19);
         assert_eq!(common_property_section_restore.module_name_length, 3);

@@ -23,7 +23,7 @@
 //              | ...                                                                         |
 //              |-----------------------------------------------------------------------------|
 
-use anc_isa::{ModuleDependentType, ModuleDependentValue};
+use anc_isa::{ModuleDependency, ModuleDependencyType};
 
 use crate::{
     entry::ImportModuleEntry,
@@ -44,7 +44,7 @@ pub struct ModuleListItem {
     pub name_length: u32, // the length (in bytes) of the name string in data area
     pub value_offset: u32,
     pub value_length: u32,
-    pub module_dependent_type: ModuleDependentType, // u8
+    pub module_dependent_type: ModuleDependencyType, // u8
     _padding0: [u8; 3],
 }
 
@@ -54,7 +54,7 @@ impl ModuleListItem {
         name_length: u32,
         value_offset: u32,
         value_length: u32,
-        module_dependent_type: ModuleDependentType,
+        module_dependent_type: ModuleDependencyType,
     ) -> Self {
         Self {
             name_offset,
@@ -90,7 +90,7 @@ impl<'a> ModuleListSection<'a> {
     pub fn get_item_name_and_module_dependent_type_and_value(
         &'a self,
         idx: usize,
-    ) -> (&'a str, ModuleDependentType, &'a [u8]) {
+    ) -> (&'a str, ModuleDependencyType, &'a [u8]) {
         let items = self.items;
         let items_data = self.items_data;
 
@@ -135,10 +135,10 @@ impl<'a> ModuleListSection<'a> {
                 next_offset = value_offset + value_length; // for next offset
 
                 let module_dependent_type = match entry.value.as_ref() {
-                    ModuleDependentValue::Local(_) => ModuleDependentType::Local,
-                    ModuleDependentValue::Remote(_) => ModuleDependentType::Remote,
-                    ModuleDependentValue::Share(_) => ModuleDependentType::Share,
-                    ModuleDependentValue::Runtime => ModuleDependentType::Runtime,
+                    ModuleDependency::Local(_) => ModuleDependencyType::Local,
+                    ModuleDependency::Remote(_) => ModuleDependencyType::Remote,
+                    ModuleDependency::Share(_) => ModuleDependencyType::Share,
+                    ModuleDependency::Runtime => ModuleDependencyType::Runtime,
                 };
 
                 ModuleListItem::new(
@@ -169,7 +169,7 @@ mod tests {
 
     use core::str;
 
-    use anc_isa::{DependentRemote, ModuleDependentType, ModuleDependentValue};
+    use anc_isa::{DependencyLocal, DependencyRemote, ModuleDependency, ModuleDependencyType};
 
     use crate::{
         entry::ImportModuleEntry,
@@ -208,11 +208,11 @@ mod tests {
         assert_eq!(section.items.len(), 2);
         assert_eq!(
             section.items[0],
-            ModuleListItem::new(0, 3, 3, 5, ModuleDependentType::Local)
+            ModuleListItem::new(0, 3, 3, 5, ModuleDependencyType::Local)
         );
         assert_eq!(
             section.items[1],
-            ModuleListItem::new(8, 4, 12, 6, ModuleDependentType::Remote,)
+            ModuleListItem::new(8, 4, 12, 6, ModuleDependencyType::Remote,)
         );
         assert_eq!(section.items_data, "foohello.bar.world".as_bytes())
     }
@@ -220,8 +220,8 @@ mod tests {
     #[test]
     fn test_save_section() {
         let items = vec![
-            ModuleListItem::new(0, 3, 3, 5, ModuleDependentType::Local),
-            ModuleListItem::new(8, 4, 12, 6, ModuleDependentType::Remote),
+            ModuleListItem::new(0, 3, 3, 5, ModuleDependencyType::Local),
+            ModuleListItem::new(8, 4, 12, 6, ModuleDependencyType::Remote),
         ];
 
         let section = ModuleListSection {
@@ -266,18 +266,21 @@ mod tests {
         let entries = vec![
             ImportModuleEntry::new(
                 "foobar".to_owned(),
-                Box::new(ModuleDependentValue::Local("hello".to_owned())),
-                // ModuleDependentType::Local,
+                Box::new(ModuleDependency::Local(Box::new(DependencyLocal {
+                    path: "hello".to_owned(),
+                    condition: None,
+                    values: None,
+                }))),
             ),
             ImportModuleEntry::new(
                 "helloworld".to_owned(),
-                Box::new(ModuleDependentValue::Remote(Box::new(DependentRemote {
+                Box::new(ModuleDependency::Remote(Box::new(DependencyRemote {
                     url: "http://a.b/c".to_owned(),
                     reversion: "v1.0.1".to_owned(),
                     path: "/xyz".to_owned(),
                     values: None,
+                    condition: None
                 }))),
-                // ModuleDependentType::Remote,
             ),
         ];
 
@@ -290,14 +293,14 @@ mod tests {
         let (name0, type0, value0) = section.get_item_name_and_module_dependent_type_and_value(0);
         let (name1, type1, value1) = section.get_item_name_and_module_dependent_type_and_value(1);
 
-        assert_eq!((name0, type0), ("foobar", ModuleDependentType::Local));
-        assert_eq!((name1, type1), ("helloworld", ModuleDependentType::Remote));
+        assert_eq!((name0, type0), ("foobar", ModuleDependencyType::Local));
+        assert_eq!((name1, type1), ("helloworld", ModuleDependencyType::Remote));
 
-        let v0: ModuleDependentValue =
+        let v0: ModuleDependency =
             ason::from_str(unsafe { str::from_utf8_unchecked(value0) }).unwrap();
         assert_eq!(&v0, entries[0].value.as_ref());
 
-        let v1: ModuleDependentValue =
+        let v1: ModuleDependency =
             ason::from_str(unsafe { str::from_utf8_unchecked(value1) }).unwrap();
         assert_eq!(&v1, entries[1].value.as_ref());
     }

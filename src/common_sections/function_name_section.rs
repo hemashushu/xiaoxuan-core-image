@@ -4,6 +4,8 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
+//! this section list only the internal functions.
+
 // "function name section" binary layout
 //
 //              |------------------------------------------------------------------------------------------------|
@@ -89,11 +91,15 @@ impl<'a> SectionEntry<'a> for FunctionNameSection<'a> {
 }
 
 impl<'a> FunctionNameSection<'a> {
-    pub fn get_item_index_and_export(
-        &'a self,
-        expected_name: &str,
-        // ) -> Option<(usize, usize, bool)> {
-    ) -> Option<(usize, bool)> {
+    /// the item index is the `function internal index`
+    ///
+    /// the function public index is mixed by the following items:
+    /// - the imported functions
+    /// - the internal functions
+    ///
+    /// therefore:
+    /// function_public_index = (all import functions) + function_internal_index
+    pub fn get_item_index_and_export(&'a self, expected_name: &str) -> Option<(usize, bool)> {
         let items = self.items;
         let names_data = self.names_data;
 

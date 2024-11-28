@@ -20,7 +20,7 @@
 //              | ...                                                                         |
 //              |-----------------------------------------------------------------------------|
 
-use anc_isa::{ExternalLibraryDependentType, ExternalLibraryDependentValue};
+use anc_isa::{ExternalLibraryDependency, ExternalLibraryDependencyType};
 
 use crate::{
     entry::ExternalLibraryEntry,
@@ -41,7 +41,7 @@ pub struct ExternalLibraryItem {
     pub name_length: u32, // the length (in bytes) of the name string in data area
     pub value_offset: u32,
     pub value_length: u32,
-    pub external_library_dependent_type: ExternalLibraryDependentType, // u8
+    pub external_library_dependent_type: ExternalLibraryDependencyType, // u8
     _padding0: [u8; 3],
 }
 
@@ -51,7 +51,7 @@ impl ExternalLibraryItem {
         name_length: u32,
         value_offset: u32,
         value_length: u32,
-        external_library_dependent_type: ExternalLibraryDependentType,
+        external_library_dependent_type: ExternalLibraryDependencyType,
     ) -> Self {
         Self {
             name_offset,
@@ -84,7 +84,7 @@ impl<'a> ExternalLibrarySection<'a> {
     pub fn get_item_name_and_external_library_dependent_type_and_value(
         &'a self,
         idx: usize,
-    ) -> (&'a str, ExternalLibraryDependentType, &'a [u8]) {
+    ) -> (&'a str, ExternalLibraryDependencyType, &'a [u8]) {
         let items = self.items;
         let items_data = self.items_data;
 
@@ -131,15 +131,11 @@ impl<'a> ExternalLibrarySection<'a> {
                 next_offset = value_offset + value_length; // for next offset
 
                 let external_library_dependent_type = match entry.value.as_ref() {
-                    ExternalLibraryDependentValue::Local(_) => ExternalLibraryDependentType::Local,
-                    ExternalLibraryDependentValue::Remote(_) => {
-                        ExternalLibraryDependentType::Remote
-                    }
-                    ExternalLibraryDependentValue::Share(_) => ExternalLibraryDependentType::Share,
-                    ExternalLibraryDependentValue::Runtime => ExternalLibraryDependentType::Runtime,
-                    ExternalLibraryDependentValue::System(_) => {
-                        ExternalLibraryDependentType::System
-                    }
+                    ExternalLibraryDependency::Local(_) => ExternalLibraryDependencyType::Local,
+                    ExternalLibraryDependency::Remote(_) => ExternalLibraryDependencyType::Remote,
+                    ExternalLibraryDependency::Share(_) => ExternalLibraryDependencyType::Share,
+                    ExternalLibraryDependency::Runtime => ExternalLibraryDependencyType::Runtime,
+                    ExternalLibraryDependency::System(_) => ExternalLibraryDependencyType::System,
                 };
 
                 ExternalLibraryItem::new(
@@ -169,7 +165,9 @@ impl<'a> ExternalLibrarySection<'a> {
 mod tests {
     use core::str;
 
-    use anc_isa::{DependentRemote, ExternalLibraryDependentType, ExternalLibraryDependentValue};
+    use anc_isa::{
+        DependencyLocal, DependencyRemote, ExternalLibraryDependency, ExternalLibraryDependencyType,
+    };
 
     use crate::{
         common_sections::external_library_section::{ExternalLibraryItem, ExternalLibrarySection},
@@ -208,11 +206,11 @@ mod tests {
         assert_eq!(section.items.len(), 2);
         assert_eq!(
             section.items[0],
-            ExternalLibraryItem::new(0, 3, 3, 5, ExternalLibraryDependentType::Local)
+            ExternalLibraryItem::new(0, 3, 3, 5, ExternalLibraryDependencyType::Local)
         );
         assert_eq!(
             section.items[1],
-            ExternalLibraryItem::new(8, 4, 12, 6, ExternalLibraryDependentType::Remote)
+            ExternalLibraryItem::new(8, 4, 12, 6, ExternalLibraryDependencyType::Remote)
         );
         assert_eq!(section.items_data, "foohello.bar.world".as_bytes())
     }
@@ -220,8 +218,8 @@ mod tests {
     #[test]
     fn test_save_section() {
         let items = vec![
-            ExternalLibraryItem::new(0, 3, 3, 5, ExternalLibraryDependentType::Local),
-            ExternalLibraryItem::new(8, 4, 12, 6, ExternalLibraryDependentType::Remote),
+            ExternalLibraryItem::new(0, 3, 3, 5, ExternalLibraryDependencyType::Local),
+            ExternalLibraryItem::new(8, 4, 12, 6, ExternalLibraryDependencyType::Remote),
         ];
 
         let section = ExternalLibrarySection {
@@ -267,22 +265,25 @@ mod tests {
         let entries = vec![
             ExternalLibraryEntry::new(
                 "foobar".to_owned(),
-                Box::new(ExternalLibraryDependentValue::Local(
-                    "hello.so.1".to_owned(),
-                )),
-                // ExternalLibraryDependentType::Local,
+                Box::new(ExternalLibraryDependency::Local(Box::new(
+                    DependencyLocal {
+                        path: "hello.so.1".to_owned(),
+                        values: None,
+                        condition: None,
+                    },
+                ))),
             ),
             ExternalLibraryEntry::new(
                 "helloworld".to_owned(),
-                Box::new(ExternalLibraryDependentValue::Remote(Box::new(
-                    DependentRemote {
+                Box::new(ExternalLibraryDependency::Remote(Box::new(
+                    DependencyRemote {
                         url: "http://a.b/c".to_owned(),
                         reversion: "v1.0.1".to_owned(),
                         path: "/xyz.so.2".to_owned(),
                         values: None,
+                        condition: None,
                     },
                 ))),
-                // ExternalLibraryDependentType::Remote,
             ),
         ];
 
@@ -299,18 +300,18 @@ mod tests {
 
         assert_eq!(
             (name0, type0),
-            ("foobar", ExternalLibraryDependentType::Local)
+            ("foobar", ExternalLibraryDependencyType::Local)
         );
         assert_eq!(
             (name1, type1),
-            ("helloworld", ExternalLibraryDependentType::Remote)
+            ("helloworld", ExternalLibraryDependencyType::Remote)
         );
 
-        let v0: ExternalLibraryDependentValue =
+        let v0: ExternalLibraryDependency =
             ason::from_str(unsafe { str::from_utf8_unchecked(value0) }).unwrap();
         assert_eq!(&v0, entries[0].value.as_ref());
 
-        let v1: ExternalLibraryDependentValue =
+        let v1: ExternalLibraryDependency =
             ason::from_str(unsafe { str::from_utf8_unchecked(value1) }).unwrap();
         assert_eq!(&v1, entries[1].value.as_ref());
     }

@@ -4,6 +4,11 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
+//! the data names should follow these order:
+//! 1. internal read-only data
+//! 2. internal read-write data
+//! 3. internal uninit data
+
 // "data name section" binary layout
 //
 //              |-------------------------------------------------------------------------|
@@ -90,11 +95,24 @@ impl<'a> SectionEntry<'a> for DataNameSection<'a> {
 }
 
 impl<'a> DataNameSection<'a> {
-    pub fn get_item_index_and_export(
-        &'a self,
-        expected_name: &str,
-        // ) -> Option<(usize, usize, bool)> {
-    ) -> Option<(usize, bool)> {
+    /// the item index is the 'mixed data internal index'
+    ///
+    /// the data names in the `data_name_section` is order by:
+    /// 1. internal read-only data
+    /// 2. internal read-write data
+    /// 3. internal uninit data
+    ///
+    /// and the data public index is mixed the following items:
+    /// - imported read-only data items
+    /// - imported read-write data items
+    /// - imported uninitilized data items
+    /// - internal read-only data items
+    /// - internal read-write data items
+    /// - internal uninitilized data items
+    ///
+    /// therefore:
+    /// data_public_index = (all import datas) + mixed_data_internal_index
+    pub fn get_item_index_and_export(&'a self, expected_name: &str) -> Option<(usize, bool)> {
         let items = self.items;
         let names_data = self.names_data;
 
