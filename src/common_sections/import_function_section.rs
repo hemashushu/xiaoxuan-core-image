@@ -6,17 +6,17 @@
 
 // "import function section" binary layout
 //
-//              |--------------------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                                       |
-//              |--------------------------------------------------------------------------------------------|
-//  item 0 -->  | fn name off 0 (u32) | fn name len 0 (u32) | import module idx 0 (u32) | type index 0 (u32) | <-- table
-//  item 1 -->  | fn name off 1       | fn name len 1       | import module idx 1       | type index 1       |
-//              | ...                                                                                        |
-//              |--------------------------------------------------------------------------------------------|
-// offset 0 --> | name string 0 (UTF-8)                                                                      | <-- data area
-// offset 1 --> | name string 1                                                                              |
-//              | ...                                                                                        |
-//              |--------------------------------------------------------------------------------------------|
+//              |------------------------------------------------------------------------------------------------------|
+//              | item count (u32) | (4 bytes padding)                                                                 |
+//              |------------------------------------------------------------------------------------------------------|
+//  item 0 -->  | fn name path off 0 (u32) | fn name path len 0 (u32) | import module idx 0 (u32) | type index 0 (u32) | <-- table
+//  item 1 -->  | fn name path off 1       | fn name path len 1       | import module idx 1       | type index 1       |
+//              | ...                                                                                                  |
+//              |------------------------------------------------------------------------------------------------------|
+// offset 0 --> | name path string 0 (UTF-8)                                                                           | <-- data area
+// offset 1 --> | name path string 1                                                                                   |
+//              | ...                                                                                                  |
+//              |------------------------------------------------------------------------------------------------------|
 
 use crate::{
     entry::ImportFunctionEntry,
@@ -27,34 +27,33 @@ use crate::{
 #[derive(Debug, PartialEq)]
 pub struct ImportFunctionSection<'a> {
     pub items: &'a [ImportFunctionItem],
-    pub names_data: &'a [u8],
+    pub name_paths_data: &'a [u8],
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ImportFunctionItem {
-    /*
-     the value of 'name' may be a name path, e.g.
-     "namespace::identifier"
-     note that name path is a path relative to the module,
-     it does not include the name of module.
-    */
-    pub name_offset: u32, // the offset of the name string in data area
-    pub name_length: u32, // the length (in bytes) of the name string in data area
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
+    pub name_path_offset: u32, // the offset of the name string in data area
+    pub name_path_length: u32, // the length (in bytes) of the name string in data area
     pub import_module_index: u32,
     pub type_index: u32, // the function type
 }
 
 impl ImportFunctionItem {
     pub fn new(
-        name_offset: u32,
-        name_length: u32,
+        name_path_offset: u32,
+        name_path_length: u32,
         import_module_index: u32,
         type_index: u32,
     ) -> Self {
         Self {
-            name_offset,
-            name_length,
+            name_path_offset,
+            name_path_length,
             import_module_index,
             type_index,
         }
@@ -65,11 +64,11 @@ impl<'a> SectionEntry<'a> for ImportFunctionSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
             load_section_with_table_and_data_area::<ImportFunctionItem>(section_data);
-        ImportFunctionSection { items, names_data }
+        ImportFunctionSection { items, name_paths_data: names_data }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.names_data, writer)
+        save_section_with_table_and_data_area(self.items, self.name_paths_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -78,19 +77,19 @@ impl<'a> SectionEntry<'a> for ImportFunctionSection<'a> {
 }
 
 impl<'a> ImportFunctionSection<'a> {
-    pub fn get_item_name_and_import_module_index_and_type_index(
+    pub fn get_item_name_path_and_import_module_index_and_type_index(
         &'a self,
         idx: usize,
     ) -> (&'a str, usize, usize) {
         let items = self.items;
-        let names_data = self.names_data;
+        let name_paths_data = self.name_paths_data;
 
         let item = &items[idx];
-        let name_data =
-            &names_data[item.name_offset as usize..(item.name_offset + item.name_length) as usize];
+        let name_path_data =
+            &name_paths_data[item.name_path_offset as usize..(item.name_path_offset + item.name_path_length) as usize];
 
         (
-            std::str::from_utf8(name_data).unwrap(),
+            std::str::from_utf8(name_path_data).unwrap(),
             item.import_module_index as usize,
             item.type_index as usize,
         )
@@ -99,7 +98,7 @@ impl<'a> ImportFunctionSection<'a> {
     pub fn convert_from_entries(
         entries: &[ImportFunctionEntry],
     ) -> (Vec<ImportFunctionItem>, Vec<u8>) {
-        let name_bytes = entries
+        let name_path_bytes = entries
             .iter()
             .map(|entry| entry.name_path.as_bytes())
             .collect::<Vec<&[u8]>>();
@@ -110,25 +109,25 @@ impl<'a> ImportFunctionSection<'a> {
             .iter()
             .enumerate()
             .map(|(idx, entry)| {
-                let name_offset = next_offset;
-                let name_length = name_bytes[idx].len() as u32;
-                next_offset += name_length; // for next offset
+                let name_path_offset = next_offset;
+                let name_path_length = name_path_bytes[idx].len() as u32;
+                next_offset += name_path_length; // for next offset
 
                 ImportFunctionItem::new(
-                    name_offset,
-                    name_length,
+                    name_path_offset,
+                    name_path_length,
                     entry.import_module_index as u32,
                     entry.type_index as u32,
                 )
             })
             .collect::<Vec<ImportFunctionItem>>();
 
-        let names_data = name_bytes
+        let name_paths_data = name_path_bytes
             .iter()
             .flat_map(|bytes| bytes.to_vec())
             .collect::<Vec<u8>>();
 
-        (items, names_data)
+        (items, name_paths_data)
     }
 }
 
@@ -165,7 +164,7 @@ mod tests {
         assert_eq!(section.items.len(), 2);
         assert_eq!(section.items[0], ImportFunctionItem::new(0, 3, 11, 13,));
         assert_eq!(section.items[1], ImportFunctionItem::new(3, 5, 15, 17));
-        assert_eq!(section.names_data, "foohello".as_bytes())
+        assert_eq!(section.name_paths_data, "foohello".as_bytes())
     }
 
     #[test]
@@ -177,7 +176,7 @@ mod tests {
 
         let section = ImportFunctionSection {
             items: &items,
-            names_data: b"foohello",
+            name_paths_data: b"foohello",
         };
 
         let mut section_data: Vec<u8> = Vec::new();
@@ -214,16 +213,16 @@ mod tests {
         let (items, names_data) = ImportFunctionSection::convert_from_entries(&entries);
         let section = ImportFunctionSection {
             items: &items,
-            names_data: &names_data,
+            name_paths_data: &names_data,
         };
 
         assert_eq!(
-            section.get_item_name_and_import_module_index_and_type_index(0),
+            section.get_item_name_path_and_import_module_index_and_type_index(0),
             ("foobar", 17, 19)
         );
 
         assert_eq!(
-            section.get_item_name_and_import_module_index_and_type_index(1),
+            section.get_item_name_path_and_import_module_index_and_type_index(1),
             ("helloworld", 23, 29)
         );
     }

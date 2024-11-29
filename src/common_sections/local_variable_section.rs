@@ -21,11 +21,11 @@
 //
 // the "list" is also a table, the layout of "list":
 //
-//              |----------------------------------------------------------------------------------------------------------|
-//  item 0 -->  | var offset 0 (u32) | var actual length 0 (u32) | mem data type 0 (u8) | pad (1 byte) | var align 0 (u16) |
-//  item 1 -->  | var offset 1       | var actual length 1       | mem data type 1      |              | var align 1       |
-//              | ...                                                                                                      |
-//              |----------------------------------------------------------------------------------------------------------|
+//                        |----------------------------------------------------------------------------------------------------------|
+//          | item 0 -->  | var offset 0 (u32) | var actual length 0 (u32) | mem data type 0 (u8) | pad (1 byte) | var align 0 (u16) |
+// list0 -> | item 1 -->  | var offset 1       | var actual length 1       | mem data type 1      |              | var align 1       |
+//          | item N -->  | ...                                                                                                      |
+//                        |----------------------------------------------------------------------------------------------------------|
 //
 // note:
 // - all variables in the 'local variable area' MUST be 8-byte aligned,
@@ -284,14 +284,14 @@ mod tests {
             ]),
             LocalVariableListEntry::new(vec![
                 LocalVariableEntry::from_i32(),
-                LocalVariableEntry::from_raw(1, 2),
+                LocalVariableEntry::from_bytes(1, 2),
                 LocalVariableEntry::from_i32(),
-                LocalVariableEntry::from_raw(6, 12),
-                LocalVariableEntry::from_raw(12, 16),
+                LocalVariableEntry::from_bytes(6, 12),
+                LocalVariableEntry::from_bytes(12, 16),
                 LocalVariableEntry::from_i32(),
             ]),
             LocalVariableListEntry::new(vec![]),
-            LocalVariableListEntry::new(vec![LocalVariableEntry::from_raw(1, 4)]),
+            LocalVariableListEntry::new(vec![LocalVariableEntry::from_bytes(1, 4)]),
             LocalVariableListEntry::new(vec![]),
             LocalVariableListEntry::new(vec![]),
             LocalVariableListEntry::new(vec![LocalVariableEntry::from_i32()]),
@@ -632,10 +632,10 @@ mod tests {
             list1,
             &[
                 LocalVariableItem::new(0, 4, MemoryDataType::I32, 4),
-                LocalVariableItem::new(8, 1, MemoryDataType::Raw, 2),
+                LocalVariableItem::new(8, 1, MemoryDataType::Bytes, 2),
                 LocalVariableItem::new(16, 4, MemoryDataType::I32, 4),
-                LocalVariableItem::new(24, 6, MemoryDataType::Raw, 12),
-                LocalVariableItem::new(32, 12, MemoryDataType::Raw, 16),
+                LocalVariableItem::new(24, 6, MemoryDataType::Bytes, 12),
+                LocalVariableItem::new(32, 12, MemoryDataType::Bytes, 16),
                 LocalVariableItem::new(48, 4, MemoryDataType::I32, 4),
             ]
         );
@@ -646,7 +646,7 @@ mod tests {
         let list3 = section.get_local_list(3);
         assert_eq!(
             list3,
-            &[LocalVariableItem::new(0, 1, MemoryDataType::Raw, 4),]
+            &[LocalVariableItem::new(0, 1, MemoryDataType::Bytes, 4),]
         );
 
         let list4 = section.get_local_list(4);

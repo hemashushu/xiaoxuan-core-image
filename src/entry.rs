@@ -11,6 +11,12 @@
 //! on general data types. Compiler and unit tests
 //! access Sections through Entries, but Entries are not need
 //! at runtime, which accesses the binary image directly.
+//!
+//! about the "full_name" and "name_path"
+//! -------------------------------------
+//! - "full_name" = "module_name::name_path"
+//! - "name_path" = "namespace::identifier"
+//! - "namespace" = "sub_module_name"{0,N}
 
 use anc_isa::{
     DataSectionType, ExternalLibraryDependency, MemoryDataType, ModuleDependency, OperandDataType,
@@ -79,9 +85,9 @@ impl LocalVariableEntry {
         }
     }
 
-    pub fn from_raw(length: u32, align: u16) -> Self {
+    pub fn from_bytes(length: u32, align: u16) -> Self {
         Self {
-            memory_data_type: MemoryDataType::Raw,
+            memory_data_type: MemoryDataType::Bytes,
             length,
             align,
         }
@@ -155,11 +161,11 @@ impl InitedDataEntry {
         }
     }
 
-    pub fn from_raw(data: Vec<u8>, align: u16) -> Self {
+    pub fn from_bytes(data: Vec<u8>, align: u16) -> Self {
         let length = data.len() as u32;
 
         Self {
-            memory_data_type: MemoryDataType::Raw,
+            memory_data_type: MemoryDataType::Bytes,
             data,
             length,
             align,
@@ -167,7 +173,7 @@ impl InitedDataEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct UninitDataEntry {
     pub memory_data_type: MemoryDataType,
     pub length: u32,
@@ -207,9 +213,9 @@ impl UninitDataEntry {
         }
     }
 
-    pub fn from_raw(length: u32, align: u16) -> Self {
+    pub fn from_bytes(length: u32, align: u16) -> Self {
         Self {
-            memory_data_type: MemoryDataType::Raw,
+            memory_data_type: MemoryDataType::Bytes,
             length,
             align,
         }
@@ -247,12 +253,16 @@ impl ExternalFunctionEntry {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportModuleEntry {
-    /*
-    Note that this is the name of module/package,
-    it CANNOT be the sub-module name even if the current image is
-    the object file of a sub-module.
-    it CANNOT be a name path either.
-    */
+    // Note that this is the name of module/package,
+    // it CANNOT be the sub-module name even if the current image is
+    // the object file of a sub-module.
+    // it CANNOT be a name path either.
+    //
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
     pub name: String,
     pub value: Box<ModuleDependency>,
 }
@@ -271,6 +281,12 @@ pub struct ImportFunctionEntry {
     // e.g.
     // the name path of functon 'add' in module 'myapp' is 'add',
     // the name path of function 'add' in submodule 'myapp:utils' is 'utils::add'.
+    //
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
     pub name_path: String,
     pub import_module_index: usize,
     pub type_index: usize, // used for validation when linking
@@ -294,6 +310,12 @@ pub struct ImportDataEntry {
     // e.g.
     // the name path of data 'buf' in module 'myapp' is 'buf',
     // the name path of data 'buf' in submodule 'myapp:utils' is 'utils::buf'.
+    //
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
     pub name_path: String,
     pub import_module_index: usize,
     pub data_section_type: DataSectionType, // for validation when linking
@@ -317,19 +339,25 @@ impl ImportDataEntry {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct FunctionNameEntry {
+pub struct FunctionNamePathEntry {
     // the exported name path,
     // name path includes the submodule name path, but does not include the module name.
     //
     // e.g.
     // the name path of functon 'add' in module 'myapp' is 'add',
     // the name path of function 'add' in submodule 'myapp:utils' is 'utils::add'.
+    //
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
     pub name_path: String,
     // pub function_public_index: usize, // this field is used for bridge function call
     pub export: bool,
 }
 
-impl FunctionNameEntry {
+impl FunctionNamePathEntry {
     pub fn new(name_path: String, /* function_public_index: usize,*/ export: bool) -> Self {
         Self {
             name_path,
@@ -340,19 +368,25 @@ impl FunctionNameEntry {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct DataNameEntry {
+pub struct DataNamePathEntry {
     // the exported name path,
     // name path includes the submodule name path, but does not include the module name.
     //
     // e.g.
     // the name path of data 'buf' in module 'myapp' is 'buf',
     // the name path of data 'buf' in submodule 'myapp:utils' is 'utils::buf'.
+    //
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
     pub name_path: String,
     // pub data_public_index: usize, // this field is used for bridge function call
     pub export: bool,
 }
 
-impl DataNameEntry {
+impl DataNamePathEntry {
     pub fn new(name_path: String, /* data_public_index: usize, */ export: bool) -> Self {
         Self {
             name_path,

@@ -8,43 +8,42 @@
 
 // "function name section" binary layout
 //
-//              |------------------------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                                           |
-//              |------------------------------------------------------------------------------------------------|
-//  item 0 -->  | name offset 0 (u32) | name length 0 (u32) | fn_pub_index 0 (u32) | export 0 (u8) | pad 3 bytes | <-- table
-//  item 1 -->  | name offset 1       | name length 1       | fn_pub_index 1       | export 1      | pad 3 bytes |
-//              | ...                                                                                            |
-//              |------------------------------------------------------------------------------------------------|
-// offset 0 --> | name string 0 (UTF-8)                                                                          | <-- data area
-// offset 1 --> | name string 1                                                                                  |
-//              | ...                                                                                            |
-//              |------------------------------------------------------------------------------------------------|
+//              |----------------------------------------------------------------------------------------------------------|
+//              | item count (u32) | (4 bytes padding)                                                                     |
+//              |----------------------------------------------------------------------------------------------------------|
+//  item 0 -->  | name path offset 0 (u32) | name path length 0 (u32) | fn_pub_index 0 (u32) | export 0 (u8) | pad 3 bytes | <-- table
+//  item 1 -->  | name path offset 1       | name path length 1       | fn_pub_index 1       | export 1      | pad 3 bytes |
+//              | ...                                                                                                      |
+//              |----------------------------------------------------------------------------------------------------------|
+// offset 0 --> | name path string 0 (UTF-8)                                                                               | <-- data area
+// offset 1 --> | name path string 1                                                                                       |
+//              | ...                                                                                                      |
+//              |----------------------------------------------------------------------------------------------------------|
 
 use crate::{
-    entry::FunctionNameEntry,
+    entry::FunctionNamePathEntry,
     module_image::{ModuleSectionId, SectionEntry},
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
-pub struct FunctionNameSection<'a> {
-    pub items: &'a [FunctionNameItem],
-    pub names_data: &'a [u8],
+pub struct FunctionNamePathSection<'a> {
+    pub items: &'a [FunctionNamePathItem],
+    pub name_paths_data: &'a [u8],
 }
 
 // this table only contains the internal functions,
 // imported functions will not be list in this table.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct FunctionNameItem {
-    /*
-     the value of 'name' may be a name path, e.g.
-     "namespace::identifier"
-     note that name path is a path relative to the module,
-     it does not include the name of module.
-    */
-    pub name_offset: u32,
-    pub name_length: u32,
+pub struct FunctionNamePathItem {
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
+    pub name_path_offset: u32,
+    pub name_path_length: u32,
 
     // // pub function_public_index: u32, // this field is used for bridge function call
 
@@ -58,15 +57,15 @@ pub struct FunctionNameItem {
     _padding0: [u8; 3],
 }
 
-impl FunctionNameItem {
+impl FunctionNamePathItem {
     pub fn new(
-        name_offset: u32,
-        name_length: u32,
+        name_path_offset: u32,
+        name_path_length: u32,
         /*function_public_index: u32,*/ export: u8,
     ) -> Self {
         Self {
-            name_offset,
-            name_length,
+            name_path_offset,
+            name_path_length,
             // function_public_index,
             export,
             _padding0: [0, 0, 0],
@@ -74,23 +73,23 @@ impl FunctionNameItem {
     }
 }
 
-impl<'a> SectionEntry<'a> for FunctionNameSection<'a> {
+impl<'a> SectionEntry<'a> for FunctionNamePathSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
-        let (items, names_data) =
-            load_section_with_table_and_data_area::<FunctionNameItem>(section_data);
-        FunctionNameSection { items, names_data }
+        let (items, name_paths_data) =
+            load_section_with_table_and_data_area::<FunctionNamePathItem>(section_data);
+        FunctionNamePathSection { items, name_paths_data }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.names_data, writer)
+        save_section_with_table_and_data_area(self.items, self.name_paths_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::FunctionName
+        ModuleSectionId::FunctionNamePath
     }
 }
 
-impl<'a> FunctionNameSection<'a> {
+impl<'a> FunctionNamePathSection<'a> {
     /// the item index is the `function internal index`
     ///
     /// the function public index is mixed by the following items:
@@ -99,16 +98,16 @@ impl<'a> FunctionNameSection<'a> {
     ///
     /// therefore:
     /// function_public_index = (all import functions) + function_internal_index
-    pub fn get_item_index_and_export(&'a self, expected_name: &str) -> Option<(usize, bool)> {
+    pub fn get_item_index_and_export(&'a self, expected_name_path: &str) -> Option<(usize, bool)> {
         let items = self.items;
-        let names_data = self.names_data;
+        let name_paths_data = self.name_paths_data;
 
-        let expected_name_data = expected_name.as_bytes();
+        let expected_name_path_data = expected_name_path.as_bytes();
 
         let opt_idx = items.iter().position(|item| {
-            let name_data = &names_data
-                [item.name_offset as usize..(item.name_offset + item.name_length) as usize];
-            name_data == expected_name_data
+            let name_path_data = &name_paths_data
+                [item.name_path_offset as usize..(item.name_path_offset + item.name_path_length) as usize];
+            name_path_data == expected_name_path_data
         });
 
         opt_idx.map(|idx| {
@@ -120,8 +119,8 @@ impl<'a> FunctionNameSection<'a> {
         })
     }
 
-    pub fn convert_from_entries(entries: &[FunctionNameEntry]) -> (Vec<FunctionNameItem>, Vec<u8>) {
-        let name_bytes = entries
+    pub fn convert_from_entries(entries: &[FunctionNamePathEntry]) -> (Vec<FunctionNamePathItem>, Vec<u8>) {
+        let name_path_bytes = entries
             .iter()
             .map(|entry| entry.name_path.as_bytes())
             .collect::<Vec<&[u8]>>();
@@ -132,46 +131,46 @@ impl<'a> FunctionNameSection<'a> {
             .iter()
             .enumerate()
             .map(|(idx, entry)| {
-                let name_offset = next_offset;
-                let name_length = name_bytes[idx].len() as u32;
-                next_offset += name_length; // for next offset
+                let name_path_offset = next_offset;
+                let name_path_length = name_path_bytes[idx].len() as u32;
+                next_offset += name_path_length; // for next offset
 
-                FunctionNameItem::new(
-                    name_offset,
-                    name_length,
+                FunctionNamePathItem::new(
+                    name_path_offset,
+                    name_path_length,
                     // entry.function_public_index as u32,
                     if entry.export { 1 } else { 0 },
                 )
             })
-            .collect::<Vec<FunctionNameItem>>();
+            .collect::<Vec<FunctionNamePathItem>>();
 
-        let names_data = name_bytes
+        let name_paths_data = name_path_bytes
             .iter()
             .flat_map(|bytes| bytes.to_vec())
             .collect::<Vec<u8>>();
 
-        (items, names_data)
+        (items, name_paths_data)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        common_sections::function_name_section::{FunctionNameItem, FunctionNameSection},
-        entry::FunctionNameEntry,
+        common_sections::function_name_path_section::{FunctionNamePathItem, FunctionNamePathSection},
+        entry::FunctionNamePathEntry,
         module_image::SectionEntry,
     };
 
     #[test]
     fn test_save_section() {
-        let items: Vec<FunctionNameItem> = vec![
-            FunctionNameItem::new(0, 3, /* 11,*/ 0),
-            FunctionNameItem::new(3, 5, /* 13,*/ 1),
+        let items: Vec<FunctionNamePathItem> = vec![
+            FunctionNamePathItem::new(0, 3, /* 11,*/ 0),
+            FunctionNamePathItem::new(3, 5, /* 13,*/ 1),
         ];
 
-        let section = FunctionNameSection {
+        let section = FunctionNamePathSection {
             items: &items,
-            names_data: "foohello".as_bytes(),
+            name_paths_data: "foohello".as_bytes(),
         };
 
         let mut section_data: Vec<u8> = Vec::new();
@@ -222,25 +221,25 @@ mod tests {
         section_data.extend_from_slice("foo".as_bytes());
         section_data.extend_from_slice("hello".as_bytes());
 
-        let section = FunctionNameSection::load(&section_data);
+        let section = FunctionNamePathSection::load(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(section.items[0], FunctionNameItem::new(0, 3, /*11,*/ 0));
-        assert_eq!(section.items[1], FunctionNameItem::new(3, 5, /*13,*/ 1));
-        assert_eq!(section.names_data, "foohello".as_bytes())
+        assert_eq!(section.items[0], FunctionNamePathItem::new(0, 3, /*11,*/ 0));
+        assert_eq!(section.items[1], FunctionNamePathItem::new(3, 5, /*13,*/ 1));
+        assert_eq!(section.name_paths_data, "foohello".as_bytes())
     }
 
     #[test]
     fn test_convert() {
-        let entries: Vec<FunctionNameEntry> = vec![
-            FunctionNameEntry::new("foo".to_string(), /*11,*/ false),
-            FunctionNameEntry::new("hello".to_string(), /*13,*/ true),
+        let entries: Vec<FunctionNamePathEntry> = vec![
+            FunctionNamePathEntry::new("foo".to_string(), /*11,*/ false),
+            FunctionNamePathEntry::new("hello".to_string(), /*13,*/ true),
         ];
 
-        let (items, names_data) = FunctionNameSection::convert_from_entries(&entries);
-        let section = FunctionNameSection {
+        let (items, names_data) = FunctionNamePathSection::convert_from_entries(&entries);
+        let section = FunctionNamePathSection {
             items: &items,
-            names_data: &names_data,
+            name_paths_data: &names_data,
         };
 
         assert_eq!(

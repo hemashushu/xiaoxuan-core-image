@@ -103,11 +103,11 @@ use anc_isa::{IMAGE_FORMAT_MAJOR_VERSION, IMAGE_FORMAT_MINOR_VERSION};
 use crate::{
     common_sections::{
         common_property_section::CommonPropertySection,
-        data_name_section::DataNameSection,
+        data_name_path_section::DataNamePathSection,
         data_section::{ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection},
         external_function_section::ExternalFunctionSection,
         external_library_section::ExternalLibrarySection,
-        function_name_section::FunctionNameSection,
+        function_name_path_section::FunctionNamePathSection,
         function_section::FunctionSection,
         import_data_section::ImportDataSection,
         import_function_section::ImportFunctionSection,
@@ -197,8 +197,8 @@ pub enum ModuleSectionId {
     // if the feature 'bridge function' is required (i.e.,
     // embed the XiaoXuan Core VM in another Rust applicaton) ,
     // the section 'FunctionName' and 'DataName' are required also.
-    FunctionName = 0x0030, // 0x30
-    DataName,              // 0x31
+    FunctionNamePath = 0x0030, // 0x30
+    DataNamePath,              // 0x31
 
     // optional (for debug and linking)
     ImportModule = 0x0040, // 0x40
@@ -486,15 +486,17 @@ impl<'a> ModuleImage<'a> {
     }
 
     // optional section (for debug and link only), and for bridge function call
-    pub fn get_optional_function_name_section(&'a self) -> Option<FunctionNameSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::FunctionName)
-            .map(FunctionNameSection::load)
+    pub fn get_optional_function_name_path_section(
+        &'a self,
+    ) -> Option<FunctionNamePathSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::FunctionNamePath)
+            .map(FunctionNamePathSection::load)
     }
 
     // optional section (for debug and link only), and for bridge function call
-    pub fn get_optional_data_name_section(&'a self) -> Option<DataNameSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::DataName)
-            .map(DataNameSection::load)
+    pub fn get_optional_data_name_path_section(&'a self) -> Option<DataNamePathSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::DataNamePath)
+            .map(DataNamePathSection::load)
     }
 
     // optional section (for debug and link only)
@@ -653,7 +655,7 @@ mod tests {
                 LocalVariableEntry::from_i32(),
                 LocalVariableEntry::from_i64(),
             ]),
-            LocalVariableListEntry::new(vec![LocalVariableEntry::from_raw(12, 4)]),
+            LocalVariableListEntry::new(vec![LocalVariableEntry::from_bytes(12, 4)]),
         ];
 
         let (local_variable_list_items, local_list_data) =
@@ -917,7 +919,7 @@ mod tests {
 
         assert_eq!(
             local_variable_section_restore.get_local_list(1),
-            &[LocalVariableItem::new(0, 12, MemoryDataType::Raw, 4),]
+            &[LocalVariableItem::new(0, 12, MemoryDataType::Bytes, 4),]
         );
 
         // check function index section

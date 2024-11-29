@@ -5,10 +5,10 @@
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
 use crate::common_sections::common_property_section::CommonPropertySection;
-use crate::common_sections::data_name_section::DataNameSection;
-use crate::common_sections::function_name_section::FunctionNameSection;
+use crate::common_sections::data_name_path_section::DataNamePathSection;
+use crate::common_sections::function_name_path_section::FunctionNamePathSection;
 use crate::entry::{
-    DataNameEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry, FunctionNameEntry,
+    DataNamePathEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry, FunctionNamePathEntry,
     InitedDataEntry, LocalVariableEntry, LocalVariableListEntry, TypeEntry, UninitDataEntry,
 };
 use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
@@ -511,23 +511,23 @@ pub fn helper_build_module_binary(
     };
 
     // function names
-    let (function_name_items, function_name_data) = FunctionNameSection::convert_from_entries(&[
-        FunctionNameEntry::new("func0".to_owned(), true),
-        FunctionNameEntry::new("func1".to_owned(), true),
+    let (function_name_items, function_name_data) = FunctionNamePathSection::convert_from_entries(&[
+        FunctionNamePathEntry::new("func0".to_owned(), true),
+        FunctionNamePathEntry::new("func1".to_owned(), true),
     ]);
-    let function_name_section = FunctionNameSection {
+    let function_name_section = FunctionNamePathSection {
         items: &function_name_items,
-        names_data: &function_name_data,
+        name_paths_data: &function_name_data,
     };
 
     // data names
-    let (data_name_items, data_name_data) = DataNameSection::convert_from_entries(&[
-        DataNameEntry::new("data0".to_owned(), true),
-        DataNameEntry::new("data1".to_owned(), true),
+    let (data_name_items, data_name_data) = DataNamePathSection::convert_from_entries(&[
+        DataNamePathEntry::new("data0".to_owned(), true),
+        DataNamePathEntry::new("data1".to_owned(), true),
     ]);
-    let data_name_section = DataNameSection {
+    let data_name_section = DataNamePathSection {
         items: &data_name_items,
-        names_data: &data_name_data,
+        name_paths_data: &data_name_data,
     };
 
     // build unified external library section
@@ -693,7 +693,7 @@ mod tests {
                 InitedDataEntry::from_i32(0x11),
                 InitedDataEntry::from_i64(0x13),
             ],
-            vec![InitedDataEntry::from_raw(
+            vec![InitedDataEntry::from_bytes(
                 vec![0x17u8, 0x19, 0x23, 0x29, 0x31, 0x37],
                 8,
             )],
@@ -768,7 +768,7 @@ mod tests {
         let rw_section = module_image.get_optional_read_write_data_section().unwrap();
         assert_eq!(
             &rw_section.items[0],
-            &DataItem::new(0, 6, MemoryDataType::Raw, 8)
+            &DataItem::new(0, 6, MemoryDataType::Bytes, 8)
         );
         assert_eq!(
             &rw_section.datas_data[rw_section.items[0].data_offset as usize..][0..6],

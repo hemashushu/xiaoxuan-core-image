@@ -77,13 +77,13 @@ pub struct DataItem {
     //
     // the value of this field depeonds the data type, and it should never be '0'
     //
-    // | type  | size | alignment |
-    // |-------|------|-----------|
-    // | i32   | 4    | 4         |
-    // | i64   | 8    | 8         |
-    // | f32   | 4    | 4         |
-    // | f64   | 8    | 8         |
-    // | raw   | -    | -         |
+    // | type    | size | alignment |
+    // |---------|------|-----------|
+    // | i32     | 4    | 4         |
+    // | i64     | 8    | 8         |
+    // | f32     | 4    | 4         |
+    // | f64     | 8    | 8         |
+    // | bytes   | -    | -         |
     //
     // if the content of data is "struct", the data type "byte" should be used, and
     // the alignment should be speicified.
@@ -301,10 +301,10 @@ mod tests {
     fn test_save_section_read_write_data() {
         let data_entry0 = InitedDataEntry::from_i32(11);
         let data_entry1 = InitedDataEntry::from_i64(13);
-        let data_entry2 = InitedDataEntry::from_raw(b"hello".to_vec(), 1);
+        let data_entry2 = InitedDataEntry::from_bytes(b"hello".to_vec(), 1);
         let data_entry3 = InitedDataEntry::from_f32(std::f32::consts::PI);
         let data_entry4 = InitedDataEntry::from_f64(std::f64::consts::E);
-        let data_entry5 = InitedDataEntry::from_raw(b"foo".to_vec(), 8);
+        let data_entry5 = InitedDataEntry::from_bytes(b"foo".to_vec(), 8);
         let data_entry6 = InitedDataEntry::from_i64(17);
         let data_entry7 = InitedDataEntry::from_i32(19);
 
@@ -507,10 +507,10 @@ mod tests {
             &[
                 DataItem::new(0, 4, MemoryDataType::I32, 4),
                 DataItem::new(8, 8, MemoryDataType::I64, 8),
-                DataItem::new(16, 5, MemoryDataType::Raw, 1),
+                DataItem::new(16, 5, MemoryDataType::Bytes, 1),
                 DataItem::new(24, 4, MemoryDataType::F32, 4),
                 DataItem::new(32, 8, MemoryDataType::F64, 8),
-                DataItem::new(40, 3, MemoryDataType::Raw, 8),
+                DataItem::new(40, 3, MemoryDataType::Bytes, 8),
                 DataItem::new(48, 8, MemoryDataType::I64, 8),
                 DataItem::new(56, 4, MemoryDataType::I32, 4),
             ]
@@ -531,10 +531,10 @@ mod tests {
     fn test_save_section_uninitialized_data() {
         let data_entry0 = UninitDataEntry::from_i32();
         let data_entry1 = UninitDataEntry::from_i64();
-        let data_entry2 = UninitDataEntry::from_raw(5, 1);
+        let data_entry2 = UninitDataEntry::from_bytes(5, 1);
         let data_entry3 = UninitDataEntry::from_f32();
         let data_entry4 = UninitDataEntry::from_f64();
-        let data_entry5 = UninitDataEntry::from_raw(3, 8);
+        let data_entry5 = UninitDataEntry::from_bytes(3, 8);
         let data_entry6 = UninitDataEntry::from_i64();
         let data_entry7 = UninitDataEntry::from_i32();
 
@@ -671,10 +671,10 @@ mod tests {
             &[
                 DataItem::new(0, 4, MemoryDataType::I32, 4),
                 DataItem::new(8, 8, MemoryDataType::I64, 8),
-                DataItem::new(16, 5, MemoryDataType::Raw, 1),
+                DataItem::new(16, 5, MemoryDataType::Bytes, 1),
                 DataItem::new(24, 4, MemoryDataType::F32, 4),
                 DataItem::new(32, 8, MemoryDataType::F64, 8),
-                DataItem::new(40, 3, MemoryDataType::Raw, 8),
+                DataItem::new(40, 3, MemoryDataType::Bytes, 8),
                 DataItem::new(48, 8, MemoryDataType::I64, 8),
                 DataItem::new(56, 4, MemoryDataType::I32, 4),
             ]
