@@ -484,21 +484,21 @@ mod tests {
             ]
         );
 
-//         // 128 bits - 3 params
-//         let code6 = BytecodeWriterHelper::new()
-//             .append_opcode_i32_i32_i32(Opcode::block_alt, 41, 73, 79)
-//             .to_bytes();
-//
-//         assert_eq!(
-//             code6,
-//             vec![
-//                 0xc5, 0x03, // opcode
-//                 0, 0, // padding
-//                 41, 0, 0, 0, // param 0
-//                 73, 0, 0, 0, // param 1
-//                 79, 0, 0, 0 // param 2
-//             ]
-//         );
+        //         // 128 bits - 3 params
+        //         let code6 = BytecodeWriterHelper::new()
+        //             .append_opcode_i32_i32_i32(Opcode::block_alt, 41, 73, 79)
+        //             .to_bytes();
+        //
+        //         assert_eq!(
+        //             code6,
+        //             vec![
+        //                 0xc5, 0x03, // opcode
+        //                 0, 0, // padding
+        //                 41, 0, 0, 0, // param 0
+        //                 73, 0, 0, 0, // param 1
+        //                 79, 0, 0, 0 // param 2
+        //             ]
+        //         );
     }
 
     #[test]
@@ -641,14 +641,14 @@ mod tests {
                     0x02, 0x03, 0x02, 0x00, // add_imm_i32
                     0xc1, 0x03, 0x00, 0x00, 0x23, 0x00, 0x00, 0x00, 0x29, 0x00, 0x00,
                     0x00, // block
-                    //
-                    // 0xc0, 0x02, // eqz_i32
-                    // 0x00, 0x01, // NOP (auto padding)
-                    // 0xc5, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
-                    // 0x00, 0x00, 0x00, // block_alt
-                    // 0x02, 0x03, 0x02, 0x00, // add_imm_i32
-                    // 0xc5, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
-                    // 0x00, 0x00, 0x00, // block_alt
+                          //
+                          // 0xc0, 0x02, // eqz_i32
+                          // 0x00, 0x01, // NOP (auto padding)
+                          // 0xc5, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
+                          // 0x00, 0x00, 0x00, // block_alt
+                          // 0x02, 0x03, 0x02, 0x00, // add_imm_i32
+                          // 0xc5, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
+                          // 0x00, 0x00, 0x00, // block_alt
                 ]
             );
         }

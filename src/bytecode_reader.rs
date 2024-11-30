@@ -371,22 +371,12 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                     continue_read_param_i32_i32(codes, offset_param);
                 (
                     offset_next,
-                    format!(
-                        "type:{:<2}  off:0x{:02x}",
-                        type_idx, offset
-                    ),
+                    format!("type:{:<2}  off:0x{:02x}", type_idx, offset),
                 )
             }
             Opcode::break_alt => {
-                let (offset_next, offset) =
-                    continue_read_param_i32(codes, offset_param);
-                (
-                    offset_next,
-                    format!(
-                        "off:0x{:02x}",
-                        offset
-                    ),
-                )
+                let (offset_next, offset) = continue_read_param_i32(codes, offset_param);
+                (offset_next, format!("off:0x{:02x}", offset))
             }
             Opcode::block_nez => {
                 let (offset_next, local_idx, offset) =
@@ -653,12 +643,11 @@ mod tests {
 0x0030  c0 02 00 01  c1 03 00 00
 0x0038  23 00 00 00  29 00 00 00
 0x0040  02 03 02 00  c1 03 00 00
-0x0048  23 00 00 00  29 00 00 00"
-// 0x0050  c0 02 00 01  c5 03 00 00
-// 0x0058  31 00 00 00  37 00 00 00
-// 0x0060  41 00 00 00  02 03 02 00
-// 0x0068  c5 03 00 00  31 00 00 00
-// 0x0070  37 00 00 00  41 00 00 00"
+0x0048  23 00 00 00  29 00 00 00" // 0x0050  c0 02 00 01  c5 03 00 00
+                                              // 0x0058  31 00 00 00  37 00 00 00
+                                              // 0x0060  41 00 00 00  02 03 02 00
+                                              // 0x0068  c5 03 00 00  31 00 00 00
+                                              // 0x0070  37 00 00 00  41 00 00 00"
         );
     }
 
@@ -707,14 +696,13 @@ mod tests {
         29 00 00 00
 0x0040  02 03 02 00                 add_imm_i32       2
 0x0044  c1 03 00 00  23 00 00 00    block             type:35  local:41
-        29 00 00 00"
-// 0x0050  c0 02                       eqz_i32
-// 0x0052  00 01                       nop
-// 0x0054  c5 03 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
-//         37 00 00 00  41 00 00 00
-// 0x0064  02 03 02 00                 add_imm_i32       2
-// 0x0068  c5 03 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
-//         37 00 00 00  41 00 00 00"
+        29 00 00 00" // 0x0050  c0 02                       eqz_i32
+                                 // 0x0052  00 01                       nop
+                                 // 0x0054  c5 03 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+                                 //         37 00 00 00  41 00 00 00
+                                 // 0x0064  02 03 02 00                 add_imm_i32       2
+                                 // 0x0068  c5 03 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+                                 //         37 00 00 00  41 00 00 00"
         )
     }
 }

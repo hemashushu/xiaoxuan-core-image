@@ -284,7 +284,7 @@ mod tests {
                         reversion: "v1.0.1".to_owned(),
                         path: "/xyz.so.2".to_owned(),
                         values: None,
-                        condition: None
+                        condition: None,
                     },
                 ))),
             ),

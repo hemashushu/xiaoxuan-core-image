@@ -81,7 +81,10 @@ impl<'a> SectionEntry<'a> for DataNamePathSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
             load_section_with_table_and_data_area::<DataNamePathItem>(section_data);
-        DataNamePathSection { items, name_paths_data: names_data }
+        DataNamePathSection {
+            items,
+            name_paths_data: names_data,
+        }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
@@ -118,8 +121,8 @@ impl<'a> DataNamePathSection<'a> {
         let expected_name_path_data = expected_name_path.as_bytes();
 
         let opt_idx = items.iter().position(|item| {
-            let name_path_data = &name_paths_data
-                [item.name_path_offset as usize..(item.name_path_offset + item.name_path_length) as usize];
+            let name_path_data = &name_paths_data[item.name_path_offset as usize
+                ..(item.name_path_offset + item.name_path_length) as usize];
             name_path_data == expected_name_path_data
         });
 

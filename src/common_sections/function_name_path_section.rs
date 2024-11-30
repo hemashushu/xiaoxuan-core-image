@@ -77,7 +77,10 @@ impl<'a> SectionEntry<'a> for FunctionNamePathSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
         let (items, name_paths_data) =
             load_section_with_table_and_data_area::<FunctionNamePathItem>(section_data);
-        FunctionNamePathSection { items, name_paths_data }
+        FunctionNamePathSection {
+            items,
+            name_paths_data,
+        }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
@@ -105,8 +108,8 @@ impl<'a> FunctionNamePathSection<'a> {
         let expected_name_path_data = expected_name_path.as_bytes();
 
         let opt_idx = items.iter().position(|item| {
-            let name_path_data = &name_paths_data
-                [item.name_path_offset as usize..(item.name_path_offset + item.name_path_length) as usize];
+            let name_path_data = &name_paths_data[item.name_path_offset as usize
+                ..(item.name_path_offset + item.name_path_length) as usize];
             name_path_data == expected_name_path_data
         });
 
@@ -119,7 +122,9 @@ impl<'a> FunctionNamePathSection<'a> {
         })
     }
 
-    pub fn convert_from_entries(entries: &[FunctionNamePathEntry]) -> (Vec<FunctionNamePathItem>, Vec<u8>) {
+    pub fn convert_from_entries(
+        entries: &[FunctionNamePathEntry],
+    ) -> (Vec<FunctionNamePathItem>, Vec<u8>) {
         let name_path_bytes = entries
             .iter()
             .map(|entry| entry.name_path.as_bytes())
@@ -156,7 +161,9 @@ impl<'a> FunctionNamePathSection<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        common_sections::function_name_path_section::{FunctionNamePathItem, FunctionNamePathSection},
+        common_sections::function_name_path_section::{
+            FunctionNamePathItem, FunctionNamePathSection,
+        },
         entry::FunctionNamePathEntry,
         module_image::SectionEntry,
     };

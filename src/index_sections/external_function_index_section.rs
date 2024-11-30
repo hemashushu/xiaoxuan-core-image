@@ -46,7 +46,6 @@ pub struct ExternalFunctionIndexSection<'a> {
 #[derive(Debug, PartialEq)]
 pub struct ExternalFunctionIndexItem {
     // pub external_function_index: u32,
-
     pub unified_external_function_index: u32,
     // // copy the type_index from ExternalFuncSection of the specific module,
     // // so that the ExternalFuncSection can be omitted at runtime.

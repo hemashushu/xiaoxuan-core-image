@@ -64,7 +64,10 @@ impl<'a> SectionEntry<'a> for ImportFunctionSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
             load_section_with_table_and_data_area::<ImportFunctionItem>(section_data);
-        ImportFunctionSection { items, name_paths_data: names_data }
+        ImportFunctionSection {
+            items,
+            name_paths_data: names_data,
+        }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
@@ -85,8 +88,8 @@ impl<'a> ImportFunctionSection<'a> {
         let name_paths_data = self.name_paths_data;
 
         let item = &items[idx];
-        let name_path_data =
-            &name_paths_data[item.name_path_offset as usize..(item.name_path_offset + item.name_path_length) as usize];
+        let name_path_data = &name_paths_data[item.name_path_offset as usize
+            ..(item.name_path_offset + item.name_path_length) as usize];
 
         (
             std::str::from_utf8(name_path_data).unwrap(),

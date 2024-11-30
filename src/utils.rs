@@ -8,8 +8,9 @@ use crate::common_sections::common_property_section::CommonPropertySection;
 use crate::common_sections::data_name_path_section::DataNamePathSection;
 use crate::common_sections::function_name_path_section::FunctionNamePathSection;
 use crate::entry::{
-    DataNamePathEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry, FunctionNamePathEntry,
-    InitedDataEntry, LocalVariableEntry, LocalVariableListEntry, TypeEntry, UninitDataEntry,
+    DataNamePathEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
+    FunctionNamePathEntry, InitedDataEntry, LocalVariableEntry, LocalVariableListEntry, TypeEntry,
+    UninitDataEntry,
 };
 use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
 use crate::index_sections::index_property_section::IndexPropertySection;
@@ -511,10 +512,11 @@ pub fn helper_build_module_binary(
     };
 
     // function names
-    let (function_name_items, function_name_data) = FunctionNamePathSection::convert_from_entries(&[
-        FunctionNamePathEntry::new("func0".to_owned(), true),
-        FunctionNamePathEntry::new("func1".to_owned(), true),
-    ]);
+    let (function_name_items, function_name_data) =
+        FunctionNamePathSection::convert_from_entries(&[
+            FunctionNamePathEntry::new("func0".to_owned(), true),
+            FunctionNamePathEntry::new("func1".to_owned(), true),
+        ]);
     let function_name_section = FunctionNamePathSection {
         items: &function_name_items,
         name_paths_data: &function_name_data,
