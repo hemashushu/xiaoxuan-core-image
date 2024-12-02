@@ -152,23 +152,22 @@ impl BytecodeWriter {
         addr
     }
 
-    // DEPRECATED
-    // /// 128-bit instruction
-    // /// opcode 16 + padding 16 + param0 32 + param1 32 + param2 32
-    // pub fn write_opcode_i32_i32_i32(
-    //     &mut self,
-    //     opcode: Opcode,
-    //     param0: u32,
-    //     param1: u32,
-    //     param2: u32,
-    // ) -> usize {
-    //     let addr = self.insert_padding_if_necessary();
-    //     self.put_opcode_with_padding(opcode);
-    //     self.put_i32(param0);
-    //     self.put_i32(param1);
-    //     self.put_i32(param2);
-    //     addr
-    // }
+    /// 128-bit instruction
+    /// opcode 16 + padding 16 + param0 32 + param1 32 + param2 32
+    pub fn write_opcode_i32_i32_i32(
+        &mut self,
+        opcode: Opcode,
+        param0: u32,
+        param1: u32,
+        param2: u32,
+    ) -> usize {
+        let addr = self.insert_padding_if_necessary();
+        self.put_opcode_with_padding(opcode);
+        self.put_i32(param0);
+        self.put_i32(param1);
+        self.put_i32(param2);
+        addr
+    }
 
     /**
      * imm_i64, imm_f32 and imm_f64 are actually pesudo instructions,
@@ -220,25 +219,21 @@ impl BytecodeWriter {
         self.buffer.len()
     }
 
+    /// for instructions 'break', 'break_alt' and 'break_nez'
     pub fn fill_break_stub(&mut self, addr: usize, next_inst_offset: u32) {
         // (opcode:i16 reversed_index:i16, next_inst_offset:i32)
         self.rewrite_buffer(addr + 4, next_inst_offset);
     }
 
+    /// for instructions 'recur' and 'recur_nez'
     pub fn fill_recur_stub(&mut self, addr: usize, start_inst_offset: u32) {
         // (opcode:i16 reversed_index:i16, start_inst_offset:i32)
         self.rewrite_buffer(addr + 4, start_inst_offset);
     }
 
     pub fn fill_block_alt_stub(&mut self, addr: usize, next_inst_offset: u32) {
-        // // (opcode:i16 padding:i16 type_index:i32 local_list_index:i32 next_inst_offset:i32)
-        // (opcode:i16 padding:i16 type_index:i32 next_inst_offset:i32)
-        self.rewrite_buffer(addr + 8, next_inst_offset);
-    }
-
-    pub fn fill_break_alt_stub(&mut self, addr: usize, next_inst_offset: u32) {
-        // (opcode:i16 padding:i16 next_inst_offset:i32)
-        self.rewrite_buffer(addr + 4, next_inst_offset);
+        // (opcode:i16 padding:i16 type_index:i32 local_list_index:i32 next_inst_offset:i32)
+        self.rewrite_buffer(addr + 12, next_inst_offset);
     }
 
     pub fn fill_block_nez_stub(&mut self, addr: usize, next_inst_offset: u32) {
@@ -246,29 +241,13 @@ impl BytecodeWriter {
         self.rewrite_buffer(addr + 8, next_inst_offset);
     }
 
-    pub fn fill_break_nez_stub(&mut self, addr: usize, next_inst_offset: u32) {
-        // (opcode:i16 reversed_index:i16 next_inst_offset:i32)
-        self.rewrite_buffer(addr + 4, next_inst_offset);
-    }
-
-    pub fn fill_recur_nez_stub(&mut self, addr: usize, start_inst_offset: u32) {
-        // (opcode:i16 reversed_index:i16 start_inst_offset:i32)
-        self.rewrite_buffer(addr + 4, start_inst_offset);
-    }
-
+    /// for 'data_load' and 'host_addr_data'
     pub fn rewrite_data_load_data_public_index() {
         todo!()
     }
 
-    pub fn rewrite_host_addr_data_data_public_index() {
-        todo!()
-    }
-
+    /// for instructions 'data_load_extend' and 'host_addr_data_extend'
     pub fn rewrite_data_load_extend_data_public_index() {
-        todo!()
-    }
-
-    pub fn rewrite_host_addr_data_extend_data_public_index() {
         todo!()
     }
 
@@ -292,6 +271,10 @@ impl BytecodeWriter {
         todo!()
     }
 
+    pub fn rewrite_block_alt_local_list_index() {
+        todo!()
+    }
+
     pub fn rewrite_block_nez_local_list_index() {
         todo!()
     }
@@ -300,11 +283,8 @@ impl BytecodeWriter {
         todo!()
     }
 
+    /// for instructions 'pub_index_function' and 'host_addr_function'
     pub fn rewrite_pub_index_function_function_public_index() {
-        todo!()
-    }
-
-    pub fn rewrite_host_addr_function_function_public_index() {
         todo!()
     }
 }
@@ -358,18 +338,17 @@ impl BytecodeWriterHelper {
         self
     }
 
-    // DEPRECATED
-    // pub fn append_opcode_i32_i32_i32(
-    //     mut self,
-    //     opcode: Opcode,
-    //     param0: u32,
-    //     param1: u32,
-    //     param2: u32,
-    // ) -> Self {
-    //     self.writer
-    //         .write_opcode_i32_i32_i32(opcode, param0, param1, param2);
-    //     self
-    // }
+    pub fn append_opcode_i32_i32_i32(
+        mut self,
+        opcode: Opcode,
+        param0: u32,
+        param1: u32,
+        param2: u32,
+    ) -> Self {
+        self.writer
+            .write_opcode_i32_i32_i32(opcode, param0, param1, param2);
+        self
+    }
 
     pub fn append_opcode_i64(mut self, opcode: Opcode, value: u64) -> Self {
         self.writer.write_opcode_i64(opcode, value);
@@ -484,21 +463,21 @@ mod tests {
             ]
         );
 
-        //         // 128 bits - 3 params
-        //         let code6 = BytecodeWriterHelper::new()
-        //             .append_opcode_i32_i32_i32(Opcode::block_alt, 41, 73, 79)
-        //             .to_bytes();
-        //
-        //         assert_eq!(
-        //             code6,
-        //             vec![
-        //                 0xc5, 0x03, // opcode
-        //                 0, 0, // padding
-        //                 41, 0, 0, 0, // param 0
-        //                 73, 0, 0, 0, // param 1
-        //                 79, 0, 0, 0 // param 2
-        //             ]
-        //         );
+        // 128 bits - 3 params
+        let code6 = BytecodeWriterHelper::new()
+            .append_opcode_i32_i32_i32(Opcode::block_alt, 41, 73, 79)
+            .to_bytes();
+
+        assert_eq!(
+            code6,
+            vec![
+                0xc4, 0x03, // opcode
+                0, 0, // padding
+                41, 0, 0, 0, // param 0
+                73, 0, 0, 0, // param 1
+                79, 0, 0, 0 // param 2
+            ]
+        );
     }
 
     #[test]
@@ -613,10 +592,10 @@ mod tests {
                 .append_opcode_i16(Opcode::add_imm_i32, 0x2)
                 .append_opcode_i32_i32(Opcode::block, 0x23, 0x29)
                 //
-                // .append_opcode(Opcode::eqz_i32)
-                // .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
-                // .append_opcode_i16(Opcode::add_imm_i32, 0x2)
-                // .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
+                .append_opcode(Opcode::eqz_i32)
+                .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
+                .append_opcode_i16(Opcode::add_imm_i32, 0x2)
+                .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
                 .to_bytes();
 
             assert_eq!(
@@ -641,14 +620,14 @@ mod tests {
                     0x02, 0x03, 0x02, 0x00, // add_imm_i32
                     0xc1, 0x03, 0x00, 0x00, 0x23, 0x00, 0x00, 0x00, 0x29, 0x00, 0x00,
                     0x00, // block
-                          //
-                          // 0xc0, 0x02, // eqz_i32
-                          // 0x00, 0x01, // NOP (auto padding)
-                          // 0xc5, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
-                          // 0x00, 0x00, 0x00, // block_alt
-                          // 0x02, 0x03, 0x02, 0x00, // add_imm_i32
-                          // 0xc5, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
-                          // 0x00, 0x00, 0x00, // block_alt
+                    //
+                    0xc0, 0x02, // eqz_i32
+                    0x00, 0x01, // NOP (auto padding)
+                    0xc4, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
+                    0x00, 0x00, 0x00, // block_alt
+                    0x02, 0x03, 0x02, 0x00, // add_imm_i32
+                    0xc4, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
+                    0x00, 0x00, 0x00, // block_alt
                 ]
             );
         }

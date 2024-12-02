@@ -232,10 +232,10 @@ pub enum ModuleSectionId {
 #[repr(u32)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ImageType {
-    // `*.anci`
+    // `*.anca`
     Application,
 
-    // `*.ancso`
+    // `*.ancm`
     SharedModule,
 
     // `*.anco`

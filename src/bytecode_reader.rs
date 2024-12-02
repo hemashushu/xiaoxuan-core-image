@@ -367,11 +367,11 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 )
             }
             Opcode::block_alt => {
-                let (offset_next, type_idx, offset) =
-                    continue_read_param_i32_i32(codes, offset_param);
+                let (offset_next, type_idx, local_list_index, offset) =
+                    continue_read_param_i32_i32_i32(codes, offset_param);
                 (
                     offset_next,
-                    format!("type:{:<2}  off:0x{:02x}", type_idx, offset),
+                    format!("type:{:<2}  local:{:<2}  off:0x{:02x}", type_idx, local_list_index, offset),
                 )
             }
             Opcode::break_alt => {
@@ -379,11 +379,11 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (offset_next, format!("off:0x{:02x}", offset))
             }
             Opcode::block_nez => {
-                let (offset_next, local_idx, offset) =
+                let (offset_next, local_list_index, offset) =
                     continue_read_param_i32_i32(codes, offset_param);
                 (
                     offset_next,
-                    format!("local:{:<2}  off:0x{:02x}", local_idx, offset),
+                    format!("local:{:<2}  off:0x{:02x}", local_list_index, offset),
                 )
             }
             Opcode::break_ | Opcode::break_nez | Opcode::recur | Opcode::recur_nez => {
@@ -404,7 +404,6 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (offset_next, format!("idx:{}", idx))
             }
             // host
-            // Opcode::panic => (offset_param, String::new()),
             Opcode::panic => {
                 let (offset_next, code) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("code:{}", code))
@@ -579,21 +578,20 @@ fn continue_read_param_i32_i32(codes: &[u8], offset: usize) -> (usize, u32, u32)
     )
 }
 
-// DEPRECATED
-// // 128 bits instruction parameters
-// // [opcode + padding + i32 + i32 + i32]
-// fn continue_read_param_i32_i32_i32(codes: &[u8], offset: usize) -> (usize, u32, u32, u32) {
-//     let param_data0 = &codes[offset + 2..offset + 6];
-//     let param_data1 = &codes[offset + 6..offset + 10];
-//     let param_data2 = &codes[offset + 10..offset + 14];
-//
-//     (
-//         offset + 14,
-//         u32::from_le_bytes(param_data0.try_into().unwrap()),
-//         u32::from_le_bytes(param_data1.try_into().unwrap()),
-//         u32::from_le_bytes(param_data2.try_into().unwrap()),
-//     )
-// }
+// 128 bits instruction parameters
+// [opcode + padding + i32 + i32 + i32]
+fn continue_read_param_i32_i32_i32(codes: &[u8], offset: usize) -> (usize, u32, u32, u32) {
+    let param_data0 = &codes[offset + 2..offset + 6];
+    let param_data1 = &codes[offset + 6..offset + 10];
+    let param_data2 = &codes[offset + 10..offset + 14];
+
+    (
+        offset + 14,
+        u32::from_le_bytes(param_data0.try_into().unwrap()),
+        u32::from_le_bytes(param_data1.try_into().unwrap()),
+        u32::from_le_bytes(param_data2.try_into().unwrap()),
+    )
+}
 
 #[cfg(test)]
 mod tests {
@@ -623,10 +621,10 @@ mod tests {
             .append_opcode_i16(Opcode::add_imm_i32, 0x2)
             .append_opcode_i32_i32(Opcode::block, 0x23, 0x29)
             //
-            // .append_opcode(Opcode::eqz_i32)
-            // .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
-            // .append_opcode_i16(Opcode::add_imm_i32, 0x2)
-            // .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
+            .append_opcode(Opcode::eqz_i32)
+            .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
+            .append_opcode_i16(Opcode::add_imm_i32, 0x2)
+            .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
             .to_bytes();
 
         let text = format_bytecode_as_binary(&data);
@@ -643,11 +641,12 @@ mod tests {
 0x0030  c0 02 00 01  c1 03 00 00
 0x0038  23 00 00 00  29 00 00 00
 0x0040  02 03 02 00  c1 03 00 00
-0x0048  23 00 00 00  29 00 00 00" // 0x0050  c0 02 00 01  c5 03 00 00
-                                              // 0x0058  31 00 00 00  37 00 00 00
-                                              // 0x0060  41 00 00 00  02 03 02 00
-                                              // 0x0068  c5 03 00 00  31 00 00 00
-                                              // 0x0070  37 00 00 00  41 00 00 00"
+0x0048  23 00 00 00  29 00 00 00
+0x0050  c0 02 00 01  c4 03 00 00
+0x0058  31 00 00 00  37 00 00 00
+0x0060  41 00 00 00  02 03 02 00
+0x0068  c4 03 00 00  31 00 00 00
+0x0070  37 00 00 00  41 00 00 00"
         );
     }
 
@@ -669,10 +668,10 @@ mod tests {
             .append_opcode_i16(Opcode::add_imm_i32, 0x2)
             .append_opcode_i32_i32(Opcode::block, 0x23, 0x29)
             //
-            // .append_opcode(Opcode::eqz_i32)
-            // .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
-            // .append_opcode_i16(Opcode::add_imm_i32, 0x2)
-            // .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
+            .append_opcode(Opcode::eqz_i32)
+            .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
+            .append_opcode_i16(Opcode::add_imm_i32, 0x2)
+            .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
             .to_bytes();
 
         let text = format_bytecode_as_text(&data);
@@ -696,13 +695,14 @@ mod tests {
         29 00 00 00
 0x0040  02 03 02 00                 add_imm_i32       2
 0x0044  c1 03 00 00  23 00 00 00    block             type:35  local:41
-        29 00 00 00" // 0x0050  c0 02                       eqz_i32
-                                 // 0x0052  00 01                       nop
-                                 // 0x0054  c5 03 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
-                                 //         37 00 00 00  41 00 00 00
-                                 // 0x0064  02 03 02 00                 add_imm_i32       2
-                                 // 0x0068  c5 03 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
-                                 //         37 00 00 00  41 00 00 00"
+        29 00 00 00
+0x0050  c0 02                       eqz_i32
+0x0052  00 01                       nop
+0x0054  c4 03 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+        37 00 00 00  41 00 00 00
+0x0064  02 03 02 00                 add_imm_i32       2
+0x0068  c4 03 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+        37 00 00 00  41 00 00 00"
         )
     }
 }
