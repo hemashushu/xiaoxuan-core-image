@@ -118,7 +118,7 @@ pub fn helper_build_module_binary_with_single_function_and_data_sections(
 
     let function_entry = FunctionEntry {
         type_index: 0,
-        local_list_index: 0,
+        local_variable_list_index: 0,
         code,
     };
 
@@ -249,7 +249,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
         .enumerate()
         .map(|(idx, entry)| FunctionEntry {
             type_index: idx,
-            local_list_index: idx,
+            local_variable_list_index: idx,
             code: entry.code.clone(),
         })
         .collect::<Vec<_>>();
@@ -304,7 +304,7 @@ pub fn helper_build_module_binary_with_functions_and_external_functions(
 
             let function_entry = FunctionEntry {
                 type_index: entry.type_index,
-                local_list_index: idx,
+                local_variable_list_index: idx,
                 code: entry.code.clone(),
             };
 
@@ -807,7 +807,7 @@ mod tests {
         assert_eq!(function_section.items.len(), 1);
 
         assert_eq!(
-            function_section.get_item_type_index_and_local_variable_index_and_code(0),
+            function_section.get_item_type_index_and_local_variable_list_index_and_code(0),
             (0, 0, vec![0u8].as_ref())
         );
 
@@ -815,7 +815,7 @@ mod tests {
         let local_variable_section = module_image.get_local_variable_section();
         assert_eq!(local_variable_section.list_items.len(), 1);
         assert_eq!(
-            local_variable_section.get_local_list(0),
+            local_variable_section.get_local_variable_list(0),
             &[
                 LocalVariableItem::new(0, 8, MemoryDataType::I64, 8),
                 LocalVariableItem::new(8, 8, MemoryDataType::I64, 8),

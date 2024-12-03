@@ -232,12 +232,12 @@ impl BytecodeWriter {
     }
 
     pub fn fill_block_alt_stub(&mut self, addr: usize, next_inst_offset: u32) {
-        // (opcode:i16 padding:i16 type_index:i32 local_list_index:i32 next_inst_offset:i32)
+        // (opcode:i16 padding:i16 type_index:i32 local_variable_list_index:i32 next_inst_offset:i32)
         self.rewrite_buffer(addr + 12, next_inst_offset);
     }
 
     pub fn fill_block_nez_stub(&mut self, addr: usize, next_inst_offset: u32) {
-        // (opcode:i16 padding:i16 local_list_index:i32 next_inst_offset:i32)
+        // (opcode:i16 padding:i16 local_variable_list_index:i32 next_inst_offset:i32)
         self.rewrite_buffer(addr + 8, next_inst_offset);
     }
 
@@ -283,7 +283,7 @@ impl BytecodeWriter {
         todo!()
     }
 
-    /// for instructions 'pub_index_function' and 'host_addr_function'
+    /// for instructions 'get_function' and 'host_addr_function'
     pub fn rewrite_pub_index_function_function_public_index() {
         todo!()
     }
@@ -394,7 +394,7 @@ mod tests {
 
         // 32 bits
         let code1 = BytecodeWriterHelper::new()
-            .append_opcode_i16(Opcode::heap_load_i64, 7)
+            .append_opcode_i16(Opcode::memory_load_i64, 7)
             .to_bytes();
 
         assert_eq!(

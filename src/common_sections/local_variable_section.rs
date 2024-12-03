@@ -143,7 +143,7 @@ impl<'a> SectionEntry<'a> for LocalVariableSection<'a> {
 }
 
 impl<'a> LocalVariableSection<'a> {
-    pub fn get_local_list(&'a self, idx: usize) -> &'a [LocalVariableItem] {
+    pub fn get_local_variable_list(&'a self, idx: usize) -> &'a [LocalVariableItem] {
         let list = &self.list_items[idx];
         let offset = list.list_offset as usize;
         let item_count = list.list_item_count as usize;
@@ -157,8 +157,8 @@ impl<'a> LocalVariableSection<'a> {
     }
 
     // for inspect
-    pub fn get_local_list_entry(&self, idx: usize) -> LocalVariableListEntry {
-        let items = self.get_local_list(idx);
+    pub fn get_local_variable_list_entry(&self, idx: usize) -> LocalVariableListEntry {
+        let items = self.get_local_variable_list(idx);
         let variable_entries = items
             .iter()
             .map(|item| LocalVariableEntry {
@@ -616,7 +616,7 @@ mod tests {
 
         // check var items
 
-        let list0 = section.get_local_list(0);
+        let list0 = section.get_local_variable_list(0);
         assert_eq!(
             list0,
             &[
@@ -627,7 +627,7 @@ mod tests {
             ]
         );
 
-        let list1 = section.get_local_list(1);
+        let list1 = section.get_local_variable_list(1);
         assert_eq!(
             list1,
             &[
@@ -640,22 +640,22 @@ mod tests {
             ]
         );
 
-        let list2 = section.get_local_list(2);
+        let list2 = section.get_local_variable_list(2);
         assert_eq!(list2.len(), 0);
 
-        let list3 = section.get_local_list(3);
+        let list3 = section.get_local_variable_list(3);
         assert_eq!(
             list3,
             &[LocalVariableItem::new(0, 1, MemoryDataType::Bytes, 4),]
         );
 
-        let list4 = section.get_local_list(4);
+        let list4 = section.get_local_variable_list(4);
         assert_eq!(list4.len(), 0);
 
-        let list5 = section.get_local_list(5);
+        let list5 = section.get_local_variable_list(5);
         assert_eq!(list5.len(), 0);
 
-        let list6 = section.get_local_list(6);
+        let list6 = section.get_local_variable_list(6);
         assert_eq!(
             list6,
             &[LocalVariableItem::new(0, 4, MemoryDataType::I32, 4),]

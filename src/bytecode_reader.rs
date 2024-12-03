@@ -163,26 +163,26 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (offset_next, format!("idx:{}", index))
             }
             // heap load/store
-            Opcode::heap_load_i64
-            | Opcode::heap_load_i32_s
-            | Opcode::heap_load_i32_u
-            | Opcode::heap_load_i16_s
-            | Opcode::heap_load_i16_u
-            | Opcode::heap_load_i8_s
-            | Opcode::heap_load_i8_u
-            | Opcode::heap_load_f64
-            | Opcode::heap_load_f32
-            | Opcode::heap_store_i64
-            | Opcode::heap_store_i32
-            | Opcode::heap_store_i16
-            | Opcode::heap_store_i8
-            | Opcode::heap_store_f64
-            | Opcode::heap_store_f32 => {
+            Opcode::memory_load_i64
+            | Opcode::memory_load_i32_s
+            | Opcode::memory_load_i32_u
+            | Opcode::memory_load_i16_s
+            | Opcode::memory_load_i16_u
+            | Opcode::memory_load_i8_s
+            | Opcode::memory_load_i8_u
+            | Opcode::memory_load_f64
+            | Opcode::memory_load_f32
+            | Opcode::memory_store_i64
+            | Opcode::memory_store_i32
+            | Opcode::memory_store_i16
+            | Opcode::memory_store_i8
+            | Opcode::memory_store_f64
+            | Opcode::memory_store_f32 => {
                 let (offset_next, offset) = continue_read_param_i16(codes, offset_param);
                 (offset_next, format!("off:0x{:02x}", offset))
             }
             // heap memory
-            Opcode::heap_fill | Opcode::heap_copy | Opcode::heap_capacity | Opcode::heap_resize => {
+            Opcode::memory_fill | Opcode::memory_copy | Opcode::memory_capacity | Opcode::memory_resize => {
                 (offset_param, String::new())
             }
 
@@ -359,19 +359,22 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             // control flow
             Opcode::end => (offset_param, String::new()),
             Opcode::block => {
-                let (offset_next, type_idx, local_list_index) =
+                let (offset_next, type_idx, local_variable_list_index) =
                     continue_read_param_i32_i32(codes, offset_param);
                 (
                     offset_next,
-                    format!("type:{:<2}  local:{}", type_idx, local_list_index),
+                    format!("type:{:<2}  local:{}", type_idx, local_variable_list_index),
                 )
             }
             Opcode::block_alt => {
-                let (offset_next, type_idx, local_list_index, offset) =
+                let (offset_next, type_idx, local_variable_list_index, offset) =
                     continue_read_param_i32_i32_i32(codes, offset_param);
                 (
                     offset_next,
-                    format!("type:{:<2}  local:{:<2}  off:0x{:02x}", type_idx, local_list_index, offset),
+                    format!(
+                        "type:{:<2}  local:{:<2}  off:0x{:02x}",
+                        type_idx, local_variable_list_index, offset
+                    ),
                 )
             }
             Opcode::break_alt => {
@@ -379,11 +382,14 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (offset_next, format!("off:0x{:02x}", offset))
             }
             Opcode::block_nez => {
-                let (offset_next, local_list_index, offset) =
+                let (offset_next, local_variable_list_index, offset) =
                     continue_read_param_i32_i32(codes, offset_param);
                 (
                     offset_next,
-                    format!("local:{:<2}  off:0x{:02x}", local_list_index, offset),
+                    format!(
+                        "local:{:<2}  off:0x{:02x}",
+                        local_variable_list_index, offset
+                    ),
                 )
             }
             Opcode::break_ | Opcode::break_nez | Opcode::recur | Opcode::recur_nez => {
@@ -399,7 +405,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (offset_next, format!("idx:{}", idx))
             }
             Opcode::dyncall | Opcode::syscall => (offset_param, String::new()),
-            Opcode::pub_index_function => {
+            Opcode::get_function => {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", idx))
             }
@@ -429,7 +435,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", idx))
             }
-            Opcode::host_addr_heap => {
+            Opcode::host_addr_memory => {
                 let (offset_next, offset) = continue_read_param_i16(codes, offset_param);
                 (offset_next, format!("off:0x{:02x}", offset))
             }
@@ -437,9 +443,9 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", idx))
             }
-            Opcode::host_copy_heap_to_memory
-            | Opcode::host_copy_memory_to_heap
-            | Opcode::host_memory_copy => (offset_param, String::new()),
+            Opcode::host_copy_from_memory
+            | Opcode::host_copy_to_memory
+            | Opcode::host_external_memory_copy => (offset_param, String::new()),
         };
 
         // format!(...)

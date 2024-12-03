@@ -36,7 +36,7 @@ pub struct FunctionItem {
     pub code_offset: u32,      // the offset of the code in data area
     pub code_length: u32,      // the length (in bytes) of the code in data area
     pub type_index: u32,       // the index of the type (of function)
-    pub local_list_index: u32, // the index of the 'local variable list'
+    pub local_variable_list_index: u32, // the index of the 'local variable list'
 }
 
 impl<'a> SectionEntry<'a> for FunctionSection<'a> {
@@ -56,7 +56,7 @@ impl<'a> SectionEntry<'a> for FunctionSection<'a> {
 }
 
 impl<'a> FunctionSection<'a> {
-    pub fn get_item_type_index_and_local_variable_index_and_code(
+    pub fn get_item_type_index_and_local_variable_list_index_and_code(
         &'a self,
         idx: usize,
     ) -> (usize, usize, &'a [u8]) {
@@ -69,7 +69,7 @@ impl<'a> FunctionSection<'a> {
 
         (
             item.type_index as usize,
-            item.local_list_index as usize,
+            item.local_variable_list_index as usize,
             code_data,
         )
     }
@@ -83,7 +83,7 @@ impl<'a> FunctionSection<'a> {
 
         FunctionEntry {
             type_index: function_item.type_index as usize,
-            local_list_index: function_item.local_list_index as usize,
+            local_variable_list_index: function_item.local_variable_list_index as usize,
             code,
         }
     }
@@ -101,7 +101,7 @@ impl<'a> FunctionSection<'a> {
                     code_offset,
                     code_length,
                     entry.type_index as u32,
-                    entry.local_list_index as u32,
+                    entry.local_variable_list_index as u32,
                 )
             })
             .collect::<Vec<FunctionItem>>();
@@ -116,12 +116,12 @@ impl<'a> FunctionSection<'a> {
 }
 
 impl FunctionItem {
-    pub fn new(code_offset: u32, code_length: u32, type_index: u32, local_list_index: u32) -> Self {
+    pub fn new(code_offset: u32, code_length: u32, type_index: u32, local_variable_list_index: u32) -> Self {
         Self {
             code_offset,
             code_length,
             type_index,
-            local_list_index,
+            local_variable_list_index,
         }
     }
 }
@@ -201,12 +201,12 @@ mod tests {
         let entries = vec![
             FunctionEntry {
                 type_index: 7,
-                local_list_index: 9,
+                local_variable_list_index: 9,
                 code: b"bar".to_vec(),
             },
             FunctionEntry {
                 type_index: 11,
-                local_list_index: 13,
+                local_variable_list_index: 13,
                 code: b"world".to_vec(),
             },
         ];
@@ -218,12 +218,12 @@ mod tests {
         };
 
         assert_eq!(
-            section.get_item_type_index_and_local_variable_index_and_code(0),
+            section.get_item_type_index_and_local_variable_list_index_and_code(0),
             (7, 9, b"bar".to_vec().as_ref())
         );
 
         assert_eq!(
-            section.get_item_type_index_and_local_variable_index_and_code(1),
+            section.get_item_type_index_and_local_variable_list_index_and_code(1),
             (11, 13, b"world".to_vec().as_ref())
         );
     }

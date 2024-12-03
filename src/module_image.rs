@@ -632,12 +632,12 @@ mod tests {
         let function_entries = vec![
             FunctionEntry {
                 type_index: 2,
-                local_list_index: 3,
+                local_variable_list_index: 3,
                 code: vec![1u8, 2, 3, 5, 7],
             },
             FunctionEntry {
                 type_index: 5,
-                local_list_index: 7,
+                local_variable_list_index: 7,
                 code: vec![11u8, 13, 17, 19, 23, 29],
             },
         ];
@@ -896,12 +896,12 @@ mod tests {
         assert_eq!(function_section_restore.items.len(), 2);
 
         assert_eq!(
-            function_section_restore.get_item_type_index_and_local_variable_index_and_code(0),
+            function_section_restore.get_item_type_index_and_local_variable_list_index_and_code(0),
             (2, 3, vec![1u8, 2, 3, 5, 7].as_ref(),)
         );
 
         assert_eq!(
-            function_section_restore.get_item_type_index_and_local_variable_index_and_code(1),
+            function_section_restore.get_item_type_index_and_local_variable_list_index_and_code(1),
             (5, 7, vec![11u8, 13, 17, 19, 23, 29].as_ref(),)
         );
 
@@ -910,7 +910,7 @@ mod tests {
         assert_eq!(local_variable_section_restore.list_items.len(), 2);
 
         assert_eq!(
-            local_variable_section_restore.get_local_list(0),
+            local_variable_section_restore.get_local_variable_list(0),
             &[
                 LocalVariableItem::new(0, 4, MemoryDataType::I32, 4),
                 LocalVariableItem::new(8, 8, MemoryDataType::I64, 8),
@@ -918,7 +918,7 @@ mod tests {
         );
 
         assert_eq!(
-            local_variable_section_restore.get_local_list(1),
+            local_variable_section_restore.get_local_variable_list(1),
             &[LocalVariableItem::new(0, 12, MemoryDataType::Bytes, 4),]
         );
 

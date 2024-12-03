@@ -28,6 +28,12 @@ pub struct TypeEntry {
     pub results: Vec<OperandDataType>,
 }
 
+impl TypeEntry {
+    pub fn new(params: Vec<OperandDataType>, results: Vec<OperandDataType>) -> Self{
+        Self { params, results }
+    }
+}
+
 // both function and block can contains a 'local variables list'
 #[derive(Debug, PartialEq, Clone)]
 pub struct LocalVariableListEntry {
@@ -97,8 +103,16 @@ impl LocalVariableEntry {
 #[derive(Debug, PartialEq)]
 pub struct FunctionEntry {
     pub type_index: usize,
-    pub local_list_index: usize,
+    pub local_variable_list_index: usize,
     pub code: Vec<u8>,
+}
+
+impl FunctionEntry {
+    pub fn new(type_index: usize,
+        local_variable_list_index: usize,
+        code: Vec<u8>,) -> Self {
+        Self{ type_index, local_variable_list_index, code }
+        }
 }
 
 #[derive(Debug, PartialEq)]
