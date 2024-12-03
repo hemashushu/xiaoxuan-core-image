@@ -400,7 +400,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                     format!("rev:{:<2}  off:0x{:02x}", reversed_index, offset),
                 )
             }
-            Opcode::call | Opcode::envcall | Opcode::extcall => {
+            Opcode::call | Opcode::extcall | Opcode::envcall  => {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", idx))
             }

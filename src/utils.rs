@@ -35,9 +35,7 @@ use crate::index_sections::external_function_index_section::{
 use crate::index_sections::external_function_section::UnifiedExternalFunctionSection;
 use crate::index_sections::external_library_section::UnifiedExternalLibrarySection;
 use crate::index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection};
-use crate::module_image::{
-    ImageType, ModuleImage, RangeItem, SectionEntry, MODULE_NAME_BUFFER_LENGTH,
-};
+use crate::module_image::{ImageType, ModuleImage, RangeItem, SectionEntry};
 
 /// helper object for unit test
 pub struct HelperFunctionEntryWithCodeAndSignatureAndLocalVariables {
@@ -173,7 +171,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
     // build type entries
 
     // note:
-    // for simplicity, duplicate items are not merged here.
+    // for simplicity, duplicate items would not be merged.
 
     let function_type_entries = helper_function_entries_with_code_and_sig_and_local_variables
         .iter()
@@ -198,7 +196,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
     // build local variables list entries
 
     // note:
-    // for simplicity, duplicate items are not merged here.
+    // for simplicity, duplicate items would be be merged.
 
     let local_list_entries_of_functions =
         helper_function_entries_with_code_and_sig_and_local_variables
@@ -428,26 +426,7 @@ pub fn helper_build_module_binary(
     };
 
     // build common property section
-    let name_bytes = name.as_bytes();
-    let mut module_name_buffer = [0u8; MODULE_NAME_BUFFER_LENGTH];
-
-    unsafe {
-        std::ptr::copy(
-            name_bytes.as_ptr(),
-            module_name_buffer.as_mut_ptr(),
-            name_bytes.len(),
-        )
-    };
-
-    let common_property_section = CommonPropertySection {
-        image_type: ImageType::Application,
-        // constructor_function_public_index: u32::MAX,
-        // destructor_function_public_index: u32::MAX,
-        import_data_count: 0,
-        import_function_count: 0,
-        module_name_length: name_bytes.len() as u32,
-        module_name_buffer,
-    };
+    let common_property_section = CommonPropertySection::new(name, 0, 0);
 
     // build function index
     let function_ranges: Vec<RangeItem> = vec![RangeItem {
@@ -495,15 +474,9 @@ pub fn helper_build_module_binary(
         .iter()
         .enumerate()
         .map(|(idx, _item)| (idx, DataSectionType::Uninit));
-    for (idx, data_section_type) in ro_iter.chain(rw_iter).chain(uninit_iter)
-    // .enumerate()
-    {
-        data_index_items.push(DataIndexItem::new(
-            // total_data_index as u32,
-            0,
-            idx as u32,
-            data_section_type,
-        ));
+
+    for (idx, data_section_type) in ro_iter.chain(rw_iter).chain(uninit_iter) {
+        data_index_items.push(DataIndexItem::new(0, idx as u32, data_section_type));
     }
 
     let data_index_section = DataIndexSection {
@@ -587,7 +560,7 @@ pub fn helper_build_module_binary(
 
     // build module image
     let section_entries: Vec<&dyn SectionEntry> = vec![
-        // common sections
+        /* the following are common sections */
         &common_property_section,
         &type_section,
         &local_variable_section,
@@ -599,7 +572,7 @@ pub fn helper_build_module_binary(
         &data_name_section,
         &external_library_section,
         &external_function_section,
-        // index sections
+        /* the following are index sections */
         &index_property_section,
         &function_index_section,
         &data_index_section,
@@ -611,6 +584,7 @@ pub fn helper_build_module_binary(
 
     let (section_items, sections_data) = ModuleImage::convert_from_entries(&section_entries);
     let module_image = ModuleImage {
+        image_type: ImageType::Application,
         items: &section_items,
         sections_data: &sections_data,
     };
@@ -626,23 +600,9 @@ pub fn helper_load_modules_from_binaries(
     module_binaries: Vec<&[u8]>,
 ) -> Result<Vec<ModuleImage>, BinaryError> {
     let mut module_images: Vec<ModuleImage> = Vec::new();
+
     for binary in module_binaries {
         let module_image = ModuleImage::load(binary)?;
-
-        //         let property_section = module_image.get_property_section();
-        //         let require_runtime_version = ((property_section.runtime_major_version as u32) << 16)
-        //             | (property_section.runtime_minor_version as u32);
-        //         let supported_runtime_version =
-        //             ((RUNTIME_MAJOR_VERSION as u32) << 16) | (RUNTIME_MINOR_VERSION as u32);
-        //
-        //         // a module will only run if its required major and minor
-        //         // versions match the current runtime version 100%.
-        //         if require_runtime_version != supported_runtime_version {
-        //             return Err(BinaryError::new(
-        //                 "The module requires a different version runtime to run.",
-        //             ));
-        //         }
-
         module_images.push(module_image);
     }
 
@@ -722,7 +682,6 @@ mod tests {
 
         assert_eq!(
             data_index_section.items,
-            // 2,1,3
             &[
                 //
                 DataIndexItem::new(0, 0, DataSectionType::ReadOnly,),

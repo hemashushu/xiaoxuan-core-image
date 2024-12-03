@@ -45,8 +45,6 @@ pub struct FunctionNamePathItem {
     pub name_path_offset: u32,
     pub name_path_length: u32,
 
-    // // pub function_public_index: u32, // this field is used for bridge function call
-
     // Used to indicate the visibility of this item when this
     // module is used as a shared module.
     // Note that in the case of static linking, the item is always
@@ -58,15 +56,10 @@ pub struct FunctionNamePathItem {
 }
 
 impl FunctionNamePathItem {
-    pub fn new(
-        name_path_offset: u32,
-        name_path_length: u32,
-        /*function_public_index: u32,*/ export: u8,
-    ) -> Self {
+    pub fn new(name_path_offset: u32, name_path_length: u32, export: u8) -> Self {
         Self {
             name_path_offset,
             name_path_length,
-            // function_public_index,
             export,
             _padding0: [0, 0, 0],
         }
@@ -115,11 +108,19 @@ impl<'a> FunctionNamePathSection<'a> {
 
         opt_idx.map(|idx| {
             let item = &items[idx];
-            (
-                idx,
-                /* item.function_public_index as usize,*/ item.export != 0,
-            )
+            (idx, item.export != 0)
         })
+    }
+
+    pub fn get_item_name_and_export(&self, function_internal_index: usize) -> (&str, bool) {
+        let items = self.items;
+        let name_paths_data = self.name_paths_data;
+
+        let item = &items[function_internal_index];
+        let name_path_data = &name_paths_data[item.name_path_offset as usize
+            ..(item.name_path_offset + item.name_path_length) as usize];
+        let name = unsafe { std::str::from_utf8_unchecked(name_path_data) };
+        (name, item.export != 0)
     }
 
     pub fn convert_from_entries(
@@ -143,7 +144,6 @@ impl<'a> FunctionNamePathSection<'a> {
                 FunctionNamePathItem::new(
                     name_path_offset,
                     name_path_length,
-                    // entry.function_public_index as u32,
                     if entry.export { 1 } else { 0 },
                 )
             })
@@ -171,8 +171,8 @@ mod tests {
     #[test]
     fn test_save_section() {
         let items: Vec<FunctionNamePathItem> = vec![
-            FunctionNamePathItem::new(0, 3, /* 11,*/ 0),
-            FunctionNamePathItem::new(3, 5, /* 13,*/ 1),
+            FunctionNamePathItem::new(0, 3, 0),
+            FunctionNamePathItem::new(3, 5, 1),
         ];
 
         let section = FunctionNamePathSection {
@@ -189,13 +189,11 @@ mod tests {
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
-            // 11, 0, 0, 0, // function pub index
             0, // export
             0, 0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
-            // 13, 0, 0, 0, // function pub index
             1, // export
             0, 0, 0, // padding
         ];
@@ -214,13 +212,11 @@ mod tests {
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
-            // 11, 0, 0, 0, // function pub index
             0, // export
             0, 0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
-            // 13, 0, 0, 0, // function pub index
             1, // export
             0, 0, 0, // padding
         ];
@@ -249,16 +245,11 @@ mod tests {
             name_paths_data: &names_data,
         };
 
-        assert_eq!(
-            section.get_item_index_and_export("foo"),
-            Some((0, /*11,*/ false))
-        );
-
-        assert_eq!(
-            section.get_item_index_and_export("hello"),
-            Some((1, /*13,*/ true))
-        );
-
+        assert_eq!(section.get_item_index_and_export("foo"), Some((0, false)));
+        assert_eq!(section.get_item_index_and_export("hello"), Some((1, true)));
         assert_eq!(section.get_item_index_and_export("bar"), None);
+
+        assert_eq!(section.get_item_name_and_export(0), ("foo", false));
+        assert_eq!(section.get_item_name_and_export(1), ("hello", true));
     }
 }

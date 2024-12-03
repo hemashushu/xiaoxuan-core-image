@@ -219,6 +219,15 @@ impl BytecodeWriter {
         self.buffer.len()
     }
 
+    pub fn get_addr_with_align(&self) -> usize {
+        let addr_of_next_inst = self.get_addr();
+        if addr_of_next_inst % 4 != 0 {
+            addr_of_next_inst + 2
+        } else {
+            addr_of_next_inst
+        }
+    }
+
     /// for instructions 'break', 'break_alt' and 'break_nez'
     pub fn fill_break_stub(&mut self, addr: usize, next_inst_offset: u32) {
         // (opcode:i16 reversed_index:i16, next_inst_offset:i32)

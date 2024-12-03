@@ -49,8 +49,6 @@ pub struct DataNamePathItem {
     pub name_path_offset: u32,
     pub name_path_length: u32,
 
-    // // pub data_public_index: u32, // this field is used for bridge function call
-
     // Used to indicate the visibility of this item when this
     // module is used as a shared module.
     // Note that in the case of static linking, the item is always
@@ -62,15 +60,10 @@ pub struct DataNamePathItem {
 }
 
 impl DataNamePathItem {
-    pub fn new(
-        name_path_offset: u32,
-        name_path_length: u32,
-        /* data_public_index: u32, */ export: u8,
-    ) -> Self {
+    pub fn new(name_path_offset: u32, name_path_length: u32, export: u8) -> Self {
         Self {
             name_path_offset,
             name_path_length,
-            // data_public_index,
             export,
             _padding0: [0, 0, 0],
         }
@@ -104,7 +97,7 @@ impl<'a> DataNamePathSection<'a> {
     /// 2. internal read-write data
     /// 3. internal uninit data
     ///
-    /// and the data public index is mixed the following items:
+    /// note that the data public index is mixed the following items:
     /// - imported read-only data items
     /// - imported read-write data items
     /// - imported uninitilized data items
@@ -128,11 +121,20 @@ impl<'a> DataNamePathSection<'a> {
 
         opt_idx.map(|idx| {
             let item = &items[idx];
-            (
-                idx,
-                /* item.data_public_index as usize, */ item.export != 0,
-            )
+            (idx, item.export != 0)
         })
+    }
+
+    /// the item index is the 'mixed data internal index'
+    pub fn get_item_name_and_export(&self, data_internal_index: usize) -> (&str, bool) {
+        let items = self.items;
+        let name_paths_data = self.name_paths_data;
+
+        let item = &items[data_internal_index];
+        let name_path_data = &name_paths_data[item.name_path_offset as usize
+            ..(item.name_path_offset + item.name_path_length) as usize];
+        let name = unsafe { std::str::from_utf8_unchecked(name_path_data) };
+        (name, item.export != 0)
     }
 
     pub fn convert_from_entries(entries: &[DataNamePathEntry]) -> (Vec<DataNamePathItem>, Vec<u8>) {
@@ -154,7 +156,6 @@ impl<'a> DataNamePathSection<'a> {
                 DataNamePathItem::new(
                     name_path_offset,
                     name_path_length,
-                    // entry.data_public_index as u32,
                     if entry.export { 1 } else { 0 },
                 )
             })
@@ -180,8 +181,8 @@ mod tests {
     #[test]
     fn test_save_section() {
         let items: Vec<DataNamePathItem> = vec![
-            DataNamePathItem::new(0, 3, /* 11, */ 0),
-            DataNamePathItem::new(3, 5, /* 13, */ 1),
+            DataNamePathItem::new(0, 3, 0),
+            DataNamePathItem::new(3, 5, 1),
         ];
 
         let section = DataNamePathSection {
@@ -198,13 +199,11 @@ mod tests {
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
-            // 11, 0, 0, 0, // data pub index
             0, // export
             0, 0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
-            // 13, 0, 0, 0, // data pub index
             1, // export
             0, 0, 0, // padding
         ];
@@ -223,13 +222,11 @@ mod tests {
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
-            // 11, 0, 0, 0, // data pub index
             0, // export
             0, 0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
-            // 13, 0, 0, 0, // data pub index
             1, // export
             0, 0, 0, // padding
         ];
@@ -240,16 +237,16 @@ mod tests {
         let section = DataNamePathSection::load(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(section.items[0], DataNamePathItem::new(0, 3, /* 11, */ 0));
-        assert_eq!(section.items[1], DataNamePathItem::new(3, 5, /* 13, */ 1));
+        assert_eq!(section.items[0], DataNamePathItem::new(0, 3, 0));
+        assert_eq!(section.items[1], DataNamePathItem::new(3, 5, 1));
         assert_eq!(section.name_paths_data, "foohello".as_bytes())
     }
 
     #[test]
     fn test_convert() {
         let entries: Vec<DataNamePathEntry> = vec![
-            DataNamePathEntry::new("foo".to_string(), /* 11,*/ false),
-            DataNamePathEntry::new("hello".to_string(), /* 13,*/ true),
+            DataNamePathEntry::new("foo".to_string(), false),
+            DataNamePathEntry::new("hello".to_string(), true),
         ];
 
         let (items, names_data) = DataNamePathSection::convert_from_entries(&entries);
@@ -258,16 +255,11 @@ mod tests {
             name_paths_data: &names_data,
         };
 
-        assert_eq!(
-            section.get_item_index_and_export("foo"),
-            Some((0, /*11,*/ false))
-        );
-
-        assert_eq!(
-            section.get_item_index_and_export("hello"),
-            Some((1, /*13,*/ true))
-        );
-
+        assert_eq!(section.get_item_index_and_export("foo"), Some((0, false)));
+        assert_eq!(section.get_item_index_and_export("hello"), Some((1, true)));
         assert_eq!(section.get_item_index_and_export("bar"), None);
+
+        assert_eq!(section.get_item_name_and_export(0), ("foo", false));
+        assert_eq!(section.get_item_name_and_export(1), ("hello", true));
     }
 }
