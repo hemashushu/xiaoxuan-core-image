@@ -28,7 +28,7 @@ use crate::{
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ExternalLibrarySection<'a> {
     pub items: &'a [ExternalLibraryItem],
     pub items_data: &'a [u8],

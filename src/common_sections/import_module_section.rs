@@ -28,7 +28,7 @@ use crate::{
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ImportModuleSection<'a> {
     pub items: &'a [ImportModuleItem],
     pub items_data: &'a [u8],

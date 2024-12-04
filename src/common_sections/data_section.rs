@@ -42,19 +42,19 @@ use crate::{
     },
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ReadOnlyDataSection<'a> {
     pub items: &'a [DataItem],
     pub datas_data: &'a [u8],
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ReadWriteDataSection<'a> {
     pub items: &'a [DataItem],
     pub datas_data: &'a [u8],
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct UninitDataSection<'a> {
     pub items: &'a [DataItem],
 }

@@ -292,8 +292,8 @@ pub trait SectionEntry<'a> {
 }
 
 impl<'a> ModuleImage<'a> {
-    pub fn load(image_data: &'a [u8]) -> Result<Self, BinaryError> {
-        let magic_slice = &image_data[0..8];
+    pub fn load(image_binary: &'a [u8]) -> Result<Self, BinaryError> {
+        let magic_slice = &image_binary[0..8];
         if magic_slice != IMAGE_FILE_MAGIC_NUMBER {
             return Err(BinaryError::new("Not a valid module image file."));
         }
@@ -301,11 +301,11 @@ impl<'a> ModuleImage<'a> {
         // there is another safe approach for obtaining the version number:
         //
         // ```rust
-        //     let version_data: [u8;4] = (&image_data[4..8]).try_into().unwrap();
+        //     let version_data: [u8;4] = (&image_binary[4..8]).try_into().unwrap();
         //     let version = u32::from_le_bytes(version_data);
         // ```
 
-        let ptr = image_data.as_ptr();
+        let ptr = image_binary.as_ptr();
 
         let ptr_image_type = unsafe { ptr.offset(8) };
         let image_type = unsafe { std::ptr::read(ptr_image_type as *const ImageType) };
@@ -325,7 +325,7 @@ impl<'a> ModuleImage<'a> {
             ));
         }
 
-        let image_body = &image_data[(header_length as usize)..];
+        let image_body = &image_binary[(header_length as usize)..];
 
         // since the structure of module image and a section are the same,
         // that is, the module image itself can be thought of
@@ -358,14 +358,14 @@ impl<'a> ModuleImage<'a> {
     pub fn convert_from_entries(
         entries: &[&'a dyn SectionEntry<'a>],
     ) -> (Vec<ModuleSectionItem>, Vec<u8>) {
-        let mut image_data: Vec<u8> = Vec::new();
+        let mut image_binary: Vec<u8> = Vec::new();
 
         // len0, len0+1, len0+1+2..., len total
         let mut data_increment_lengths: Vec<usize> = Vec::new();
 
         for entry in entries {
-            entry.save(&mut image_data).unwrap();
-            data_increment_lengths.push(image_data.len());
+            entry.save(&mut image_binary).unwrap();
+            data_increment_lengths.push(image_binary.len());
         }
 
         let mut offsets: Vec<usize> = vec![0];
@@ -386,7 +386,7 @@ impl<'a> ModuleImage<'a> {
             })
             .collect::<Vec<ModuleSectionItem>>();
 
-        (items, image_data)
+        (items, image_binary)
     }
 
     pub fn get_section_index_by_id(&'a self, section_id: ModuleSectionId) -> Option<usize> {
@@ -492,7 +492,7 @@ impl<'a> ModuleImage<'a> {
             .map(UninitDataSection::load)
     }
 
-    // optional section (for debug and link only), and for bridge function call
+    // optional section (for debug, link only and bridge function calling)
     pub fn get_optional_function_name_path_section(
         &'a self,
     ) -> Option<FunctionNamePathSection<'a>> {
@@ -500,7 +500,7 @@ impl<'a> ModuleImage<'a> {
             .map(FunctionNamePathSection::load)
     }
 
-    // optional section (for debug and link only), and for bridge function call
+    // optional section (for debug, link only and bridge function calling)
     pub fn get_optional_data_name_path_section(&'a self) -> Option<DataNamePathSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::DataNamePath)
             .map(DataNamePathSection::load)
@@ -686,18 +686,18 @@ mod tests {
         };
 
         // save
-        let mut image_data: Vec<u8> = Vec::new();
-        module_image.save(&mut image_data).unwrap();
+        let mut image_binary: Vec<u8> = Vec::new();
+        module_image.save(&mut image_binary).unwrap();
 
-        assert_eq!(&image_data[0..8], IMAGE_FILE_MAGIC_NUMBER);
-        assert_eq!(&image_data[8..10], &[2, 0]); // image type
-        assert_eq!(&image_data[10..12], &[16, 0]); // header length
-        assert_eq!(&image_data[12..14], &[0, 0]); // image format minor version number, little endian
-        assert_eq!(&image_data[14..16], &[1, 0]); // image format major version number, little endian
+        assert_eq!(&image_binary[0..8], IMAGE_FILE_MAGIC_NUMBER);
+        assert_eq!(&image_binary[8..10], &[2, 0]); // image type
+        assert_eq!(&image_binary[10..12], &[16, 0]); // header length
+        assert_eq!(&image_binary[12..14], &[0, 0]); // image format minor version number, little endian
+        assert_eq!(&image_binary[14..16], &[1, 0]); // image format major version number, little endian
 
         // body
-        let header_length: u16 = u16::from_le_bytes((&image_data[10..12]).try_into().unwrap());
-        let remains = &image_data[(header_length as usize)..];
+        let header_length: u16 = u16::from_le_bytes((&image_binary[10..12]).try_into().unwrap());
+        let remains = &image_binary[(header_length as usize)..];
 
         // section count
         let (section_count_data, remains) = remains.split_at(8);
@@ -866,7 +866,7 @@ mod tests {
         );
 
         // load
-        let module_image_restore = ModuleImage::load(&image_data).unwrap();
+        let module_image_restore = ModuleImage::load(&image_binary).unwrap();
         assert_eq!(module_image_restore.items.len(), 3);
         assert_eq!(module_image_restore.image_type, ImageType::ObjectFile);
 

@@ -24,7 +24,7 @@ use crate::{
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ImportFunctionSection<'a> {
     pub items: &'a [ImportFunctionItem],
     pub name_paths_data: &'a [u8],
