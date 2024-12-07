@@ -392,7 +392,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                     ),
                 )
             }
-            Opcode::break_ | Opcode::break_nez | Opcode::recur | Opcode::recur_nez => {
+            Opcode::break_ | /* Opcode::break_nez | */ Opcode::recur /* | Opcode::recur_nez */ => {
                 let (offset_next, reversed_index, offset) =
                     continue_read_param_i16_i32(codes, offset_param);
                 (
