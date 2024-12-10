@@ -56,6 +56,22 @@ pub struct TypeItem {
     pub results_offset: u32,
 }
 
+impl TypeItem {
+    pub fn new(
+        params_count: u16,
+        results_count: u16,
+        params_offset: u32,
+        results_offset: u32,
+    ) -> Self {
+        Self {
+            params_count,
+            results_count,
+            params_offset,
+            results_offset,
+        }
+    }
+}
+
 impl<'a> SectionEntry<'a> for UnifiedExternalTypeSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
         let (items, types_data) = load_section_with_table_and_data_area::<TypeItem>(section_data);

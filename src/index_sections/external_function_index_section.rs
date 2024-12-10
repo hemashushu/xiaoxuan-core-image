@@ -42,26 +42,19 @@ pub struct ExternalFunctionIndexSection<'a> {
 }
 
 /// the index of this item is `external_function_index`
+/// mapping external_function_index -> unified_external_function_index
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ExternalFunctionIndexItem {
-    // pub external_function_index: u32,
     pub unified_external_function_index: u32,
-    // // copy the type_index from ExternalFuncSection of the specific module,
-    // // so that the ExternalFuncSection can be omitted at runtime.
-    // pub type_index: u32,
 }
 
 impl ExternalFunctionIndexItem {
     pub fn new(
-        // external_function_index: u32,
         unified_external_function_index: u32,
-        // type_index: u32,
     ) -> Self {
         Self {
-            // external_function_index,
             unified_external_function_index,
-            // type_index,
         }
     }
 }

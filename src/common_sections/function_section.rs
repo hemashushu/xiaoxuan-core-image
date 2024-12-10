@@ -33,10 +33,26 @@ pub struct FunctionSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct FunctionItem {
-    pub code_offset: u32,      // the offset of the code in data area
-    pub code_length: u32,      // the length (in bytes) of the code in data area
-    pub type_index: u32,       // the index of the type (of function)
+    pub code_offset: u32,               // the offset of the code in data area
+    pub code_length: u32,               // the length (in bytes) of the code in data area
+    pub type_index: u32,                // the index of the type (of function)
     pub local_variable_list_index: u32, // the index of the 'local variable list'
+}
+
+impl FunctionItem {
+    pub fn new(
+        code_offset: u32,
+        code_length: u32,
+        type_index: u32,
+        local_variable_list_index: u32,
+    ) -> Self {
+        Self {
+            code_offset,
+            code_length,
+            type_index,
+            local_variable_list_index,
+        }
+    }
 }
 
 impl<'a> SectionEntry<'a> for FunctionSection<'a> {
@@ -112,17 +128,6 @@ impl<'a> FunctionSection<'a> {
             .collect::<Vec<u8>>();
 
         (items, codes_data)
-    }
-}
-
-impl FunctionItem {
-    pub fn new(code_offset: u32, code_length: u32, type_index: u32, local_variable_list_index: u32) -> Self {
-        Self {
-            code_offset,
-            code_length,
-            type_index,
-            local_variable_list_index,
-        }
     }
 }
 

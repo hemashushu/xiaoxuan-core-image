@@ -120,6 +120,16 @@ impl LocalVariableItem {
     }
 }
 
+impl LocalVariableListItem {
+    pub fn new(list_offset: u32, list_item_count: u32, list_allocate_bytes: u32) -> Self {
+        Self {
+            list_offset,
+            list_item_count,
+            list_allocate_bytes,
+        }
+    }
+}
+
 impl<'a> SectionEntry<'a> for LocalVariableSection<'a> {
     fn id(&'a self) -> ModuleSectionId {
         ModuleSectionId::LocalVariable
