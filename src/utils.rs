@@ -8,8 +8,8 @@ use crate::common_sections::common_property_section::CommonPropertySection;
 use crate::common_sections::data_name_section::DataNameSection;
 use crate::common_sections::function_name_section::FunctionNameSection;
 use crate::entry::{
-    DataNamePathEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
-    FunctionNamePathEntry, ImportModuleEntry, InitedDataEntry, LocalVariableEntry,
+    DataNameEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
+    FunctionNameEntry, ImportModuleEntry, InitedDataEntry, LocalVariableEntry,
     LocalVariableListEntry, TypeEntry, UninitDataEntry,
 };
 use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
@@ -415,8 +415,8 @@ pub fn helper_build_module_binary(
     // function name paths (abitray)
     let (function_name_items, function_names_data) =
         FunctionNameSection::convert_from_entries(&[
-            FunctionNamePathEntry::new("func0".to_owned(), true),
-            FunctionNamePathEntry::new("func1".to_owned(), true),
+            FunctionNameEntry::new("func0".to_owned(), true),
+            FunctionNameEntry::new("func1".to_owned(), true),
         ]);
 
     let function_name_section = FunctionNameSection {
@@ -426,8 +426,8 @@ pub fn helper_build_module_binary(
 
     // data name paths
     let (data_name_items, data_names_data) = DataNameSection::convert_from_entries(&[
-        DataNamePathEntry::new("data0".to_owned(), true),
-        DataNamePathEntry::new("data1".to_owned(), true),
+        DataNameEntry::new("data0".to_owned(), true),
+        DataNameEntry::new("data1".to_owned(), true),
     ]);
 
     let data_name_section = DataNameSection {

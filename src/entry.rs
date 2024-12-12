@@ -345,7 +345,7 @@ impl ImportDataEntry {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct FunctionNamePathEntry {
+pub struct FunctionNameEntry {
     // the full name of the exported function
     //
     // about the "full_name" and "name_path"
@@ -361,14 +361,14 @@ pub struct FunctionNamePathEntry {
     pub export: bool,
 }
 
-impl FunctionNamePathEntry {
+impl FunctionNameEntry {
     pub fn new(full_name: String, export: bool) -> Self {
         Self { full_name, export }
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub struct DataNamePathEntry {
+pub struct DataNameEntry {
     // the full name of exported data
     //
     // about the "full_name" and "name_path"
@@ -384,7 +384,7 @@ pub struct DataNamePathEntry {
     pub export: bool,
 }
 
-impl DataNamePathEntry {
+impl DataNameEntry {
     pub fn new(full_name: String, export: bool) -> Self {
         Self { full_name, export }
     }

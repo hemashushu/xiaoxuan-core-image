@@ -21,7 +21,7 @@
 //              |----------------------------------------------------------------------------------------------------------|
 
 use crate::{
-    entry::FunctionNamePathEntry,
+    entry::FunctionNameEntry,
     module_image::{ModuleSectionId, SectionEntry},
     tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
 };
@@ -128,7 +128,7 @@ impl<'a> FunctionNameSection<'a> {
     }
 
     pub fn convert_from_entries(
-        entries: &[FunctionNamePathEntry],
+        entries: &[FunctionNameEntry],
     ) -> (Vec<FunctionNameItem>, Vec<u8>) {
         let full_name_bytes = entries
             .iter()
@@ -168,7 +168,7 @@ mod tests {
         common_sections::function_name_section::{
             FunctionNameItem, FunctionNameSection,
         },
-        entry::FunctionNamePathEntry,
+        entry::FunctionNameEntry,
         module_image::SectionEntry,
     };
 
@@ -238,9 +238,9 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        let entries: Vec<FunctionNamePathEntry> = vec![
-            FunctionNamePathEntry::new("foo".to_string(), /*11,*/ false),
-            FunctionNamePathEntry::new("hello".to_string(), /*13,*/ true),
+        let entries: Vec<FunctionNameEntry> = vec![
+            FunctionNameEntry::new("foo".to_string(), /*11,*/ false),
+            FunctionNameEntry::new("hello".to_string(), /*13,*/ true),
         ];
 
         let (items, names_data) = FunctionNameSection::convert_from_entries(&entries);

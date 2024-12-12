@@ -23,7 +23,7 @@
 //              | ...                                                                               |
 //              |-----------------------------------------------------------------------------------|
 
-use crate::entry::DataNamePathEntry;
+use crate::entry::DataNameEntry;
 
 use crate::{
     module_image::{ModuleSectionId, SectionEntry},
@@ -141,7 +141,7 @@ impl<'a> DataNameSection<'a> {
         (full_name, item.export != 0)
     }
 
-    pub fn convert_from_entries(entries: &[DataNamePathEntry]) -> (Vec<DataNameItem>, Vec<u8>) {
+    pub fn convert_from_entries(entries: &[DataNameEntry]) -> (Vec<DataNameItem>, Vec<u8>) {
         let full_name_bytes = entries
             .iter()
             .map(|entry| entry.full_name.as_bytes())
@@ -178,7 +178,7 @@ impl<'a> DataNameSection<'a> {
 mod tests {
     use crate::{
         common_sections::data_name_section::{DataNameItem, DataNameSection},
-        entry::DataNamePathEntry,
+        entry::DataNameEntry,
         module_image::SectionEntry,
     };
 
@@ -248,9 +248,9 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        let entries: Vec<DataNamePathEntry> = vec![
-            DataNamePathEntry::new("foo".to_string(), false),
-            DataNamePathEntry::new("hello".to_string(), true),
+        let entries: Vec<DataNameEntry> = vec![
+            DataNameEntry::new("foo".to_string(), false),
+            DataNameEntry::new("hello".to_string(), true),
         ];
 
         let (items, names_data) = DataNameSection::convert_from_entries(&entries);
