@@ -6,17 +6,17 @@
 
 // "import data section" binary layout
 //
-//              |------------------------------------------------------------------------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                                                                                           |
-//              |------------------------------------------------------------------------------------------------------------------------------------------------|
-//  item 0 -->  | data name path off 0 (u32) | data name path len 0 (u32) | import module idx 0 (u32) | dat sec type 0 (u8) | mem data type 0 (u8) | pad 2 bytes | <-- table
-//  item 1 -->  | data name path off 1       | data name path len 1       | import module idx 1       | dat sec type 1                                           |
-//              | ...                                                                                                                                            |
-//              |------------------------------------------------------------------------------------------------------------------------------------------------|
-// offset 0 --> | name path string 0 (UTF-8)                                                                                                                     | <-- data area
-// offset 1 --> | name path string 1                                                                                                                             |
-//              | ...                                                                                                                                            |
-//              |------------------------------------------------------------------------------------------------------------------------------------------------|
+//              |--------------------------------------------------------------------------------------------------------------------------------------|
+//              | item count (u32) | (4 bytes padding)                                                                                                 |
+//              |--------------------------------------------------------------------------------------------------------------------------------------|
+//  item 0 -->  | full name off 0 (u32) | full name len 0 (u32) | import module idx 0 (u32) | dat sec type 0 (u8) | mem data type 0 (u8) | pad 2 bytes | <-- table
+//  item 1 -->  | full name off 1       | full name len 1       | import module idx 1       | dat sec type 1                                           |
+//              | ...                                                                                                                                  |
+//              |--------------------------------------------------------------------------------------------------------------------------------------|
+// offset 0 --> | full name string 0 (UTF-8)                                                                                                           | <-- data area
+// offset 1 --> | full name string 1                                                                                                                   |
+//              | ...                                                                                                                                  |
+//              |--------------------------------------------------------------------------------------------------------------------------------------|
 
 use anc_isa::{DataSectionType, MemoryDataType};
 
@@ -29,7 +29,7 @@ use crate::{
 #[derive(Debug, PartialEq)]
 pub struct ImportDataSection<'a> {
     pub items: &'a [ImportDataItem],
-    pub name_paths_data: &'a [u8],
+    pub full_names_data: &'a [u8],
 }
 
 #[repr(C)]
@@ -40,8 +40,12 @@ pub struct ImportDataItem {
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
-    pub name_path_offset: u32, // the offset of the name string in data area
-    pub name_path_length: u32, // the length (in bytes) of the name string in data area
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
+    pub full_name_offset: u32, // the offset of the name string in data area
+    pub full_name_length: u32, // the length (in bytes) of the name string in data area
     pub import_module_index: u32,
     pub data_section_type: DataSectionType,
     pub memory_data_type: MemoryDataType,
@@ -50,15 +54,15 @@ pub struct ImportDataItem {
 
 impl ImportDataItem {
     pub fn new(
-        name_path_offset: u32,
-        name_path_length: u32,
+        full_name_offset: u32,
+        full_name_length: u32,
         import_module_index: u32,
         data_section_type: DataSectionType,
         memory_data_type: MemoryDataType,
     ) -> Self {
         Self {
-            name_path_offset,
-            name_path_length,
+            full_name_offset,
+            full_name_length,
             import_module_index,
             data_section_type,
             memory_data_type,
@@ -69,16 +73,16 @@ impl ImportDataItem {
 
 impl<'a> SectionEntry<'a> for ImportDataSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
-        let (items, name_paths_data) =
+        let (items, full_names_data) =
             load_section_with_table_and_data_area::<ImportDataItem>(section_data);
         ImportDataSection {
             items,
-            name_paths_data,
+            full_names_data,
         }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.name_paths_data, writer)
+        save_section_with_table_and_data_area(self.items, self.full_names_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -87,19 +91,19 @@ impl<'a> SectionEntry<'a> for ImportDataSection<'a> {
 }
 
 impl<'a> ImportDataSection<'a> {
-    pub fn get_item_name_path_and_import_module_index_and_data_section_type_and_memory_data_type(
+    pub fn get_item_full_name_and_import_module_index_and_data_section_type_and_memory_data_type(
         &'a self,
         idx: usize,
     ) -> (&'a str, usize, DataSectionType, MemoryDataType) {
         let items = self.items;
-        let name_paths_data = self.name_paths_data;
+        let full_names_data = self.full_names_data;
 
         let item = &items[idx];
-        let name_data = &name_paths_data[item.name_path_offset as usize
-            ..(item.name_path_offset + item.name_path_length) as usize];
+        let full_name_data = &full_names_data[item.full_name_offset as usize
+            ..(item.full_name_offset + item.full_name_length) as usize];
 
         (
-            std::str::from_utf8(name_data).unwrap(),
+            std::str::from_utf8(full_name_data).unwrap(),
             item.import_module_index as usize,
             item.data_section_type,
             item.memory_data_type,
@@ -107,9 +111,9 @@ impl<'a> ImportDataSection<'a> {
     }
 
     pub fn convert_from_entries(entries: &[ImportDataEntry]) -> (Vec<ImportDataItem>, Vec<u8>) {
-        let name_path_bytes = entries
+        let full_name_bytes = entries
             .iter()
-            .map(|entry| entry.name_path.as_bytes())
+            .map(|entry| entry.full_name.as_bytes())
             .collect::<Vec<&[u8]>>();
 
         let mut next_offset: u32 = 0;
@@ -118,13 +122,13 @@ impl<'a> ImportDataSection<'a> {
             .iter()
             .enumerate()
             .map(|(idx, entry)| {
-                let name_path_offset = next_offset;
-                let name_path_length = name_path_bytes[idx].len() as u32;
-                next_offset += name_path_length; // for next offset
+                let full_name_offset = next_offset;
+                let full_name_length = full_name_bytes[idx].len() as u32;
+                next_offset += full_name_length; // for next offset
 
                 ImportDataItem::new(
-                    name_path_offset,
-                    name_path_length,
+                    full_name_offset,
+                    full_name_length,
                     entry.import_module_index as u32,
                     entry.data_section_type,
                     entry.memory_data_type,
@@ -132,12 +136,12 @@ impl<'a> ImportDataSection<'a> {
             })
             .collect::<Vec<ImportDataItem>>();
 
-        let name_paths_data = name_path_bytes
+        let full_names_data = full_name_bytes
             .iter()
             .flat_map(|bytes| bytes.to_vec())
             .collect::<Vec<u8>>();
 
-        (items, name_paths_data)
+        (items, full_names_data)
     }
 }
 
@@ -186,7 +190,7 @@ mod tests {
             section.items[1],
             ImportDataItem::new(3, 5, 13, DataSectionType::ReadWrite, MemoryDataType::I64,)
         );
-        assert_eq!(section.name_paths_data, "foohello".as_bytes())
+        assert_eq!(section.full_names_data, "foohello".as_bytes())
     }
 
     #[test]
@@ -198,7 +202,7 @@ mod tests {
 
         let section = ImportDataSection {
             items: &items,
-            name_paths_data: b"foohello",
+            full_names_data: b"foohello",
         };
 
         let mut section_data: Vec<u8> = Vec::new();
@@ -249,12 +253,12 @@ mod tests {
         let (items, names_data) = ImportDataSection::convert_from_entries(&entries);
         let section = ImportDataSection {
             items: &items,
-            name_paths_data: &names_data,
+            full_names_data: &names_data,
         };
 
         assert_eq!(
             section
-                .get_item_name_path_and_import_module_index_and_data_section_type_and_memory_data_type(
+                .get_item_full_name_and_import_module_index_and_data_section_type_and_memory_data_type(
                     0
                 ),
             ("foobar", 11, DataSectionType::ReadOnly, MemoryDataType::I32)
@@ -262,7 +266,7 @@ mod tests {
 
         assert_eq!(
             section
-                .get_item_name_path_and_import_module_index_and_data_section_type_and_memory_data_type(
+                .get_item_full_name_and_import_module_index_and_data_section_type_and_memory_data_type(
                     1
                 ),
             (

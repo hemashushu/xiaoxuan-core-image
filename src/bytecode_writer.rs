@@ -169,10 +169,8 @@ impl BytecodeWriter {
         addr
     }
 
-    /**
-     * imm_i64, imm_f32 and imm_f64 are actually pesudo instructions,
-     * because there is no i64/f32/f64 parameters in this ISA.
-     */
+    // imm_i64, imm_f32 and imm_f64 are actually pesudo instructions,
+    // because there is no i64/f32/f64 parameters in this ISA.
 
     /// 96-bit pesudo instruction
     /// opcode 16 + padding 16 + (param0 32 + param1 32)

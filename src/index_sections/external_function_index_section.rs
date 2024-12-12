@@ -76,7 +76,7 @@ impl<'a> SectionEntry<'a> for ExternalFunctionIndexSection<'a> {
     }
 }
 
-impl<'a> ExternalFunctionIndexSection<'a> {
+impl ExternalFunctionIndexSection<'_> {
     pub fn get_item_unified_external_function_index(
         &self,
         module_index: usize,

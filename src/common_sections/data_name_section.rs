@@ -11,17 +11,17 @@
 
 // "data name section" binary layout
 //
-//              |------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                         |
-//              |------------------------------------------------------------------------------|
-//  item 0 -->  | name path offset 0 (u32) | name path length 0 (u32) | export 0 (u8) | pad 3 bytes | <-- table
-//  item 1 -->  | name path offset 1       | name path length 1       | export 1      | pad 3 bytes |
-//              | ...                                                                          |
-//              |------------------------------------------------------------------------------|
-// offset 0 --> | name path string 0 (UTF-8)                                                   | <-- data area
-// offset 1 --> | name path string 1                                                           |
-//              | ...                                                                          |
-//              |------------------------------------------------------------------------------|
+//              |-----------------------------------------------------------------------------------|
+//              | item count (u32) | (4 bytes padding)                                              |
+//              |-----------------------------------------------------------------------------------|
+//  item 0 -->  | full name offset 0 (u32) | full name length 0 (u32) | export 0 (u8) | pad 3 bytes | <-- table
+//  item 1 -->  | full name offset 1       | full name length 1       | export 1      | pad 3 bytes |
+//              | ...                                                                               |
+//              |-----------------------------------------------------------------------------------|
+// offset 0 --> | full name string 0 (UTF-8)                                                        | <-- data area
+// offset 1 --> | full name string 1                                                                |
+//              | ...                                                                               |
+//              |-----------------------------------------------------------------------------------|
 
 use crate::entry::DataNamePathEntry;
 
@@ -31,23 +31,27 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Default)]
-pub struct DataNamePathSection<'a> {
-    pub items: &'a [DataNamePathItem],
-    pub name_paths_data: &'a [u8],
+pub struct DataNameSection<'a> {
+    pub items: &'a [DataNameItem],
+    pub full_names_data: &'a [u8],
 }
 
 // this table only contains the internal data,
 // imported data will not be list in this table.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct DataNamePathItem {
+pub struct DataNameItem {
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
-    pub name_path_offset: u32,
-    pub name_path_length: u32,
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
+    pub full_name_offset: u32,
+    pub full_name_length: u32,
 
     // Used to indicate the visibility of this item when this
     // module is used as a shared module.
@@ -59,37 +63,37 @@ pub struct DataNamePathItem {
     _padding0: [u8; 3],
 }
 
-impl DataNamePathItem {
-    pub fn new(name_path_offset: u32, name_path_length: u32, export: u8) -> Self {
+impl DataNameItem {
+    pub fn new(full_name_offset: u32, full_name_length: u32, export: u8) -> Self {
         Self {
-            name_path_offset,
-            name_path_length,
+            full_name_offset,
+            full_name_length,
             export,
             _padding0: [0, 0, 0],
         }
     }
 }
 
-impl<'a> SectionEntry<'a> for DataNamePathSection<'a> {
+impl<'a> SectionEntry<'a> for DataNameSection<'a> {
     fn load(section_data: &'a [u8]) -> Self {
-        let (items, names_data) =
-            load_section_with_table_and_data_area::<DataNamePathItem>(section_data);
-        DataNamePathSection {
+        let (items, full_names_data) =
+            load_section_with_table_and_data_area::<DataNameItem>(section_data);
+        DataNameSection {
             items,
-            name_paths_data: names_data,
+            full_names_data,
         }
     }
 
     fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.name_paths_data, writer)
+        save_section_with_table_and_data_area(self.items, self.full_names_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::DataNamePath
+        ModuleSectionId::DataName
     }
 }
 
-impl<'a> DataNamePathSection<'a> {
+impl<'a> DataNameSection<'a> {
     /// the item index is the 'mixed data internal index'
     ///
     /// the data names in the `data_name_section` is order by:
@@ -107,16 +111,16 @@ impl<'a> DataNamePathSection<'a> {
     ///
     /// therefore:
     /// data_public_index = (all import datas) + mixed_data_internal_index
-    pub fn get_item_index_and_export(&'a self, expected_name_path: &str) -> Option<(usize, bool)> {
+    pub fn get_item_index_and_export(&'a self, expected_full_name: &str) -> Option<(usize, bool)> {
         let items = self.items;
-        let name_paths_data = self.name_paths_data;
+        let full_name_data = self.full_names_data;
 
-        let expected_name_path_data = expected_name_path.as_bytes();
+        let expected_full_name_data = expected_full_name.as_bytes();
 
         let opt_idx = items.iter().position(|item| {
-            let name_path_data = &name_paths_data[item.name_path_offset as usize
-                ..(item.name_path_offset + item.name_path_length) as usize];
-            name_path_data == expected_name_path_data
+            let full_name_data = &full_name_data[item.full_name_offset as usize
+                ..(item.full_name_offset + item.full_name_length) as usize];
+            full_name_data == expected_full_name_data
         });
 
         opt_idx.map(|idx| {
@@ -126,21 +130,21 @@ impl<'a> DataNamePathSection<'a> {
     }
 
     /// the item index is the 'mixed data internal index'
-    pub fn get_item_name_and_export(&self, data_internal_index: usize) -> (&str, bool) {
+    pub fn get_item_full_name_and_export(&self, data_internal_index: usize) -> (&str, bool) {
         let items = self.items;
-        let name_paths_data = self.name_paths_data;
+        let full_names_data = self.full_names_data;
 
         let item = &items[data_internal_index];
-        let name_path_data = &name_paths_data[item.name_path_offset as usize
-            ..(item.name_path_offset + item.name_path_length) as usize];
-        let name = unsafe { std::str::from_utf8_unchecked(name_path_data) };
-        (name, item.export != 0)
+        let full_name_data = &full_names_data[item.full_name_offset as usize
+            ..(item.full_name_offset + item.full_name_length) as usize];
+        let full_name = unsafe { std::str::from_utf8_unchecked(full_name_data) };
+        (full_name, item.export != 0)
     }
 
-    pub fn convert_from_entries(entries: &[DataNamePathEntry]) -> (Vec<DataNamePathItem>, Vec<u8>) {
-        let name_path_bytes = entries
+    pub fn convert_from_entries(entries: &[DataNamePathEntry]) -> (Vec<DataNameItem>, Vec<u8>) {
+        let full_name_bytes = entries
             .iter()
-            .map(|entry| entry.name_path.as_bytes())
+            .map(|entry| entry.full_name.as_bytes())
             .collect::<Vec<&[u8]>>();
 
         let mut next_offset: u32 = 0;
@@ -149,45 +153,45 @@ impl<'a> DataNamePathSection<'a> {
             .iter()
             .enumerate()
             .map(|(idx, entry)| {
-                let name_path_offset = next_offset;
-                let name_path_length = name_path_bytes[idx].len() as u32;
-                next_offset += name_path_length; // for next offset
+                let full_name_offset = next_offset;
+                let full_name_length = full_name_bytes[idx].len() as u32;
+                next_offset += full_name_length; // for next offset
 
-                DataNamePathItem::new(
-                    name_path_offset,
-                    name_path_length,
+                DataNameItem::new(
+                    full_name_offset,
+                    full_name_length,
                     if entry.export { 1 } else { 0 },
                 )
             })
-            .collect::<Vec<DataNamePathItem>>();
+            .collect::<Vec<DataNameItem>>();
 
-        let name_paths_data = name_path_bytes
+        let full_names_data = full_name_bytes
             .iter()
             .flat_map(|bytes| bytes.to_vec())
             .collect::<Vec<u8>>();
 
-        (items, name_paths_data)
+        (items, full_names_data)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        common_sections::data_name_path_section::{DataNamePathItem, DataNamePathSection},
+        common_sections::data_name_section::{DataNameItem, DataNameSection},
         entry::DataNamePathEntry,
         module_image::SectionEntry,
     };
 
     #[test]
     fn test_save_section() {
-        let items: Vec<DataNamePathItem> = vec![
-            DataNamePathItem::new(0, 3, 0),
-            DataNamePathItem::new(3, 5, 1),
+        let items: Vec<DataNameItem> = vec![
+            DataNameItem::new(0, 3, 0),
+            DataNameItem::new(3, 5, 1),
         ];
 
-        let section = DataNamePathSection {
+        let section = DataNameSection {
             items: &items,
-            name_paths_data: "foohello".as_bytes(),
+            full_names_data: "foohello".as_bytes(),
         };
 
         let mut section_data: Vec<u8> = Vec::new();
@@ -234,12 +238,12 @@ mod tests {
         section_data.extend_from_slice("foo".as_bytes());
         section_data.extend_from_slice("hello".as_bytes());
 
-        let section = DataNamePathSection::load(&section_data);
+        let section = DataNameSection::load(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(section.items[0], DataNamePathItem::new(0, 3, 0));
-        assert_eq!(section.items[1], DataNamePathItem::new(3, 5, 1));
-        assert_eq!(section.name_paths_data, "foohello".as_bytes())
+        assert_eq!(section.items[0], DataNameItem::new(0, 3, 0));
+        assert_eq!(section.items[1], DataNameItem::new(3, 5, 1));
+        assert_eq!(section.full_names_data, "foohello".as_bytes())
     }
 
     #[test]
@@ -249,17 +253,17 @@ mod tests {
             DataNamePathEntry::new("hello".to_string(), true),
         ];
 
-        let (items, names_data) = DataNamePathSection::convert_from_entries(&entries);
-        let section = DataNamePathSection {
+        let (items, names_data) = DataNameSection::convert_from_entries(&entries);
+        let section = DataNameSection {
             items: &items,
-            name_paths_data: &names_data,
+            full_names_data: &names_data,
         };
 
         assert_eq!(section.get_item_index_and_export("foo"), Some((0, false)));
         assert_eq!(section.get_item_index_and_export("hello"), Some((1, true)));
         assert_eq!(section.get_item_index_and_export("bar"), None);
 
-        assert_eq!(section.get_item_name_and_export(0), ("foo", false));
-        assert_eq!(section.get_item_name_and_export(1), ("hello", true));
+        assert_eq!(section.get_item_full_name_and_export(0), ("foo", false));
+        assert_eq!(section.get_item_full_name_and_export(1), ("hello", true));
     }
 }

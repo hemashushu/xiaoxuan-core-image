@@ -5,8 +5,8 @@
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
 use crate::common_sections::common_property_section::CommonPropertySection;
-use crate::common_sections::data_name_path_section::DataNamePathSection;
-use crate::common_sections::function_name_path_section::FunctionNamePathSection;
+use crate::common_sections::data_name_section::DataNameSection;
+use crate::common_sections::function_name_section::FunctionNameSection;
 use crate::entry::{
     DataNamePathEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
     FunctionNamePathEntry, ImportModuleEntry, InitedDataEntry, LocalVariableEntry,
@@ -413,26 +413,26 @@ pub fn helper_build_module_binary(
     };
 
     // function name paths (abitray)
-    let (function_name_path_items, function_name_path_data) =
-        FunctionNamePathSection::convert_from_entries(&[
+    let (function_name_items, function_names_data) =
+        FunctionNameSection::convert_from_entries(&[
             FunctionNamePathEntry::new("func0".to_owned(), true),
             FunctionNamePathEntry::new("func1".to_owned(), true),
         ]);
 
-    let function_name_path_section = FunctionNamePathSection {
-        items: &function_name_path_items,
-        name_paths_data: &function_name_path_data,
+    let function_name_section = FunctionNameSection {
+        items: &function_name_items,
+        full_names_data: &function_names_data,
     };
 
     // data name paths
-    let (data_name_path_items, data_name_path_data) = DataNamePathSection::convert_from_entries(&[
+    let (data_name_items, data_names_data) = DataNameSection::convert_from_entries(&[
         DataNamePathEntry::new("data0".to_owned(), true),
         DataNamePathEntry::new("data1".to_owned(), true),
     ]);
 
-    let data_name_path_section = DataNamePathSection {
-        items: &data_name_path_items,
-        name_paths_data: &data_name_path_data,
+    let data_name_section = DataNameSection {
+        items: &data_name_items,
+        full_names_data: &data_names_data,
     };
 
     // build external library section
@@ -588,8 +588,8 @@ pub fn helper_build_module_binary(
         &ro_data_section,
         &rw_data_section,
         &uninit_data_section,
-        &function_name_path_section,
-        &data_name_path_section,
+        &function_name_section,
+        &data_name_section,
         /* these sections are empty: import_module, import_function, import_data */
         &external_library_section,
         &external_function_section,

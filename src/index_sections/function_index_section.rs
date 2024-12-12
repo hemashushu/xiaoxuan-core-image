@@ -100,7 +100,7 @@ impl<'a> SectionEntry<'a> for FunctionIndexSection<'a> {
     }
 }
 
-impl<'a> FunctionIndexSection<'a> {
+impl FunctionIndexSection<'_> {
     pub fn get_item_target_module_index_and_function_internal_index(
         &self,
         module_index: usize,

@@ -5,11 +5,11 @@
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
 pub mod common_property_section;
-pub mod data_name_path_section;
+pub mod data_name_section;
 pub mod data_section;
 pub mod external_function_section;
 pub mod external_library_section;
-pub mod function_name_path_section;
+pub mod function_name_section;
 pub mod function_section;
 pub mod import_data_section;
 pub mod import_function_section;

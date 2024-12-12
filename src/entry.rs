@@ -4,19 +4,7 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-//! Entries are used to simplify the creation and parsing of
-//! sections.
-//!
-//! Sections are based on binary, and Entries are based
-//! on general data types. Compiler and unit tests
-//! access Sections through Entries, but Entries are not need
-//! at runtime, which accesses the binary image directly.
-//!
-//! about the "full_name" and "name_path"
-//! -------------------------------------
-//! - "full_name" = "module_name::name_path"
-//! - "name_path" = "namespace::identifier"
-//! - "namespace" = "sub_module_name"{0,N}
+//! Entries are used to simplify the creation and parsing of sections.
 
 use anc_isa::{
     DataSectionType, ExternalLibraryDependency, MemoryDataType, ModuleDependency, OperandDataType,
@@ -270,15 +258,18 @@ impl ExternalFunctionEntry {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportModuleEntry {
     // Note that this is the name of module/package,
-    // it CANNOT be the sub-module name even if the current image is
-    // the object file of a sub-module.
-    // it CANNOT be a name path either.
+    // it CANNOT be the name of submodule even if the current image is
+    // a "object module", it also CANNOT be the full name or name path.
     //
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
     pub name: String,
     pub value: Box<ModuleDependency>,
 }
@@ -291,27 +282,27 @@ impl ImportModuleEntry {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportFunctionEntry {
-    // the exported name path,
-    // name path includes the submodule name path, but does not include the module name.
+    // the full name of imported function
     //
-    // e.g.
-    // the name path of functon 'add' in module 'myapp' is 'add',
-    // the name path of function 'add' in submodule 'myapp:utils' is 'utils::add'.
     //
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
-    pub name_path: String,
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
+    pub full_name: String,
     pub import_module_index: usize,
     pub type_index: usize, // used for validation when linking
 }
 
 impl ImportFunctionEntry {
-    pub fn new(name_path: String, import_module_index: usize, type_index: usize) -> Self {
+    pub fn new(full_name: String, import_module_index: usize, type_index: usize) -> Self {
         Self {
-            name_path,
+            full_name,
             import_module_index,
             type_index,
         }
@@ -320,19 +311,18 @@ impl ImportFunctionEntry {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportDataEntry {
-    // the exported name path,
-    // name path includes the submodule name path, but does not include the module name.
-    //
-    // e.g.
-    // the name path of data 'buf' in module 'myapp' is 'buf',
-    // the name path of data 'buf' in submodule 'myapp:utils' is 'utils::buf'.
+    // the full name of imported data
     //
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
-    pub name_path: String,
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
+    pub full_name: String,
     pub import_module_index: usize,
     pub data_section_type: DataSectionType, // for validation when linking
     pub memory_data_type: MemoryDataType,   // for validation when linking
@@ -340,13 +330,13 @@ pub struct ImportDataEntry {
 
 impl ImportDataEntry {
     pub fn new(
-        name_path: String,
+        full_name: String,
         import_module_index: usize,
         data_section_type: DataSectionType,
         memory_data_type: MemoryDataType,
     ) -> Self {
         Self {
-            name_path,
+            full_name,
             import_module_index,
             data_section_type,
             memory_data_type,
@@ -356,49 +346,47 @@ impl ImportDataEntry {
 
 #[derive(Debug, PartialEq)]
 pub struct FunctionNamePathEntry {
-    // the exported name path,
-    // name path includes the submodule name path, but does not include the module name.
-    //
-    // e.g.
-    // the name path of functon 'add' in module 'myapp' is 'add',
-    // the name path of function 'add' in submodule 'myapp:utils' is 'utils::add'.
+    // the full name of the exported function
     //
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
-    pub name_path: String,
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
+    pub full_name: String,
     pub export: bool,
 }
 
 impl FunctionNamePathEntry {
-    pub fn new(name_path: String, export: bool) -> Self {
-        Self { name_path, export }
+    pub fn new(full_name: String, export: bool) -> Self {
+        Self { full_name, export }
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct DataNamePathEntry {
-    // the exported name path,
-    // name path includes the submodule name path, but does not include the module name.
-    //
-    // e.g.
-    // the name path of data 'buf' in module 'myapp' is 'buf',
-    // the name path of data 'buf' in submodule 'myapp:utils' is 'utils::buf'.
+    // the full name of exported data
     //
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
-    pub name_path: String,
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
+    pub full_name: String,
     pub export: bool,
 }
 
 impl DataNamePathEntry {
-    pub fn new(name_path: String, export: bool) -> Self {
-        Self { name_path, export }
+    pub fn new(full_name: String, export: bool) -> Self {
+        Self { full_name, export }
     }
 }
 

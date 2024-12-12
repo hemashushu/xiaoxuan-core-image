@@ -122,7 +122,7 @@ impl<'a> SectionEntry<'a> for DataIndexSection<'a> {
     }
 }
 
-impl<'a> DataIndexSection<'a> {
+impl DataIndexSection<'_> {
     pub fn get_item_target_module_index_and_data_internal_index_and_data_section_type(
         &self,
         module_index: usize,

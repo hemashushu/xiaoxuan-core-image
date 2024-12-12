@@ -23,15 +23,18 @@ pub struct CommonPropertySection {
     pub import_function_count: u32,
 
     // Note that this is the name of module/package,
-    // it CANNOT be the sub-module name even if the current image is
-    // the object file of a sub-module.
-    // it CANNOT be a name path either.
+    // it CANNOT be the name of submodule even if the current image is
+    // a "object module", it also CANNOT be the full name or name path.
     //
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
     pub module_name_length: u32,
     pub module_name_buffer: [u8; 256],
 }

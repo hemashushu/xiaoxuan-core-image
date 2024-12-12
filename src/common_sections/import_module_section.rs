@@ -136,6 +136,7 @@ impl<'a> ImportModuleSection<'a> {
                     ModuleDependency::Remote(_) => ModuleDependencyType::Remote,
                     ModuleDependency::Share(_) => ModuleDependencyType::Share,
                     ModuleDependency::Runtime => ModuleDependencyType::Runtime,
+                    ModuleDependency::Object(_) => ModuleDependencyType::Object,
                 };
 
                 ImportModuleItem::new(

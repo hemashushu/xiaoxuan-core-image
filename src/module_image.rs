@@ -103,11 +103,11 @@ use anc_isa::{IMAGE_FORMAT_MAJOR_VERSION, IMAGE_FORMAT_MINOR_VERSION};
 use crate::{
     common_sections::{
         common_property_section::CommonPropertySection,
-        data_name_path_section::DataNamePathSection,
+        data_name_section::DataNameSection,
         data_section::{ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection},
         external_function_section::ExternalFunctionSection,
         external_library_section::ExternalLibrarySection,
-        function_name_path_section::FunctionNamePathSection,
+        function_name_section::FunctionNameSection,
         function_section::FunctionSection,
         import_data_section::ImportDataSection,
         import_function_section::ImportFunctionSection,
@@ -195,8 +195,8 @@ pub enum ModuleSectionId {
     // if the feature 'bridge function' is required (i.e.,
     // embed the XiaoXuan Core VM in another Rust applicaton) ,
     // the section 'FunctionName' and 'DataName' are required also.
-    FunctionNamePath = 0x0030, // 0x30
-    DataNamePath,              // 0x31
+    FunctionName = 0x0030, // 0x30
+    DataName,              // 0x31
 
     // optional (for debug and linking)
     ImportModule = 0x0040, // 0x40
@@ -493,17 +493,17 @@ impl<'a> ModuleImage<'a> {
     }
 
     // optional section (for debug, link only and bridge function calling)
-    pub fn get_optional_function_name_path_section(
+    pub fn get_optional_function_name_section(
         &'a self,
-    ) -> Option<FunctionNamePathSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::FunctionNamePath)
-            .map(FunctionNamePathSection::load)
+    ) -> Option<FunctionNameSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::FunctionName)
+            .map(FunctionNameSection::load)
     }
 
     // optional section (for debug, link only and bridge function calling)
-    pub fn get_optional_data_name_path_section(&'a self) -> Option<DataNamePathSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::DataNamePath)
-            .map(DataNamePathSection::load)
+    pub fn get_optional_data_name_section(&'a self) -> Option<DataNameSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::DataName)
+            .map(DataNameSection::load)
     }
 
     // optional section (for debug and link only)
