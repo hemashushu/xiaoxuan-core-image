@@ -23,7 +23,7 @@
 use crate::{
     entry::FunctionNameEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -71,17 +71,17 @@ impl FunctionNameItem {
 }
 
 impl<'a> SectionEntry<'a> for FunctionNameSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let (items, full_names_data) =
-            load_section_with_table_and_data_area::<FunctionNameItem>(section_data);
+            read_section_with_table_and_data_area::<FunctionNameItem>(section_data);
         FunctionNameSection {
             items,
             full_names_data,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.full_names_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.full_names_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -123,13 +123,27 @@ impl<'a> FunctionNameSection<'a> {
         let item = &items[function_internal_index];
         let full_name_data = &full_names_data[item.full_name_offset as usize
             ..(item.full_name_offset + item.full_name_length) as usize];
-        let full_name = unsafe { std::str::from_utf8_unchecked(full_name_data) };
+        let full_name = std::str::from_utf8(full_name_data).unwrap();
         (full_name, item.export != 0)
     }
 
-    pub fn convert_from_entries(
-        entries: &[FunctionNameEntry],
-    ) -> (Vec<FunctionNameItem>, Vec<u8>) {
+    pub fn convert_to_entries(&self) -> Vec<FunctionNameEntry> {
+        let items = self.items;
+        let full_names_data = self.full_names_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let full_name_data = &full_names_data[item.full_name_offset as usize
+                    ..(item.full_name_offset + item.full_name_length) as usize];
+
+                let full_name = std::str::from_utf8(full_name_data).unwrap().to_owned();
+                FunctionNameEntry::new(full_name.to_owned(), item.export != 0)
+            })
+            .collect()
+    }
+
+    pub fn convert_from_entries(entries: &[FunctionNameEntry]) -> (Vec<FunctionNameItem>, Vec<u8>) {
         let full_name_bytes = entries
             .iter()
             .map(|entry| entry.full_name.as_bytes())
@@ -165,15 +179,13 @@ impl<'a> FunctionNameSection<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        common_sections::function_name_section::{
-            FunctionNameItem, FunctionNameSection,
-        },
+        common_sections::function_name_section::{FunctionNameItem, FunctionNameSection},
         entry::FunctionNameEntry,
         module_image::SectionEntry,
     };
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items: Vec<FunctionNameItem> = vec![
             FunctionNameItem::new(0, 3, 0),
             FunctionNameItem::new(3, 5, 1),
@@ -185,7 +197,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
@@ -209,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -228,7 +240,7 @@ mod tests {
         section_data.extend_from_slice("foo".as_bytes());
         section_data.extend_from_slice("hello".as_bytes());
 
-        let section = FunctionNameSection::load(&section_data);
+        let section = FunctionNameSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(section.items[0], FunctionNameItem::new(0, 3, /*11,*/ 0));
@@ -255,5 +267,8 @@ mod tests {
 
         assert_eq!(section.get_item_full_name_and_export(0), ("foo", false));
         assert_eq!(section.get_item_full_name_and_export(1), ("hello", true));
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries, entries_restore);
     }
 }

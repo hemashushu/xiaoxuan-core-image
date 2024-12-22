@@ -21,7 +21,7 @@
 use crate::{
     entry::ExternalFunctionEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -56,14 +56,14 @@ impl ExternalFunctionItem {
 }
 
 impl<'a> SectionEntry<'a> for ExternalFunctionSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
-            load_section_with_table_and_data_area::<ExternalFunctionItem>(section_data);
+            read_section_with_table_and_data_area::<ExternalFunctionItem>(section_data);
         ExternalFunctionSection { items, names_data }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.names_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.names_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -88,6 +88,26 @@ impl<'a> ExternalFunctionSection<'a> {
             item.external_library_index as usize,
             item.type_index as usize,
         )
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<ExternalFunctionEntry> {
+        let items = self.items;
+        let names_data = self.names_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let name_data = &names_data
+                    [item.name_offset as usize..(item.name_offset + item.name_length) as usize];
+
+                let name = std::str::from_utf8(name_data).unwrap().to_owned();
+                ExternalFunctionEntry::new(
+                    name,
+                    item.external_library_index as usize,
+                    item.type_index as usize,
+                )
+            })
+            .collect()
     }
 
     pub fn convert_from_entries(
@@ -137,7 +157,7 @@ mod tests {
     };
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -156,7 +176,7 @@ mod tests {
         section_data.extend_from_slice(b"foo");
         section_data.extend_from_slice(b"hello");
 
-        let section = ExternalFunctionSection::load(&section_data);
+        let section = ExternalFunctionSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(section.items[0], ExternalFunctionItem::new(0, 3, 11, 13,));
@@ -165,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items = vec![
             ExternalFunctionItem::new(0, 3, 11, 13),
             ExternalFunctionItem::new(3, 5, 15, 17),
@@ -177,7 +197,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
@@ -222,5 +242,8 @@ mod tests {
             section.get_item_name_and_external_library_index_and_type_index(1),
             ("helloworld", 23, 29)
         );
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries, entries_restore);
     }
 }

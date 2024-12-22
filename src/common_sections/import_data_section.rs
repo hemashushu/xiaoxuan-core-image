@@ -23,10 +23,10 @@ use anc_isa::{DataSectionType, MemoryDataType};
 use crate::{
     entry::ImportDataEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ImportDataSection<'a> {
     pub items: &'a [ImportDataItem],
     pub full_names_data: &'a [u8],
@@ -72,17 +72,17 @@ impl ImportDataItem {
 }
 
 impl<'a> SectionEntry<'a> for ImportDataSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let (items, full_names_data) =
-            load_section_with_table_and_data_area::<ImportDataItem>(section_data);
+            read_section_with_table_and_data_area::<ImportDataItem>(section_data);
         ImportDataSection {
             items,
             full_names_data,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.full_names_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.full_names_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -108,6 +108,26 @@ impl<'a> ImportDataSection<'a> {
             item.data_section_type,
             item.memory_data_type,
         )
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<ImportDataEntry> {
+        let items = self.items;
+        let full_names_data = self.full_names_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let full_name_data = &full_names_data[item.full_name_offset as usize
+                    ..(item.full_name_offset + item.full_name_length) as usize];
+                let full_name = std::str::from_utf8(full_name_data).unwrap().to_owned();
+                ImportDataEntry::new(
+                    full_name,
+                    item.import_module_index as usize,
+                    item.data_section_type,
+                    item.memory_data_type,
+                )
+            })
+            .collect()
     }
 
     pub fn convert_from_entries(entries: &[ImportDataEntry]) -> (Vec<ImportDataItem>, Vec<u8>) {
@@ -156,7 +176,7 @@ mod tests {
     };
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -179,7 +199,7 @@ mod tests {
         section_data.extend_from_slice(b"foo");
         section_data.extend_from_slice(b"hello");
 
-        let section = ImportDataSection::load(&section_data);
+        let section = ImportDataSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(
@@ -194,7 +214,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items = vec![
             ImportDataItem::new(0, 3, 11, DataSectionType::ReadOnly, MemoryDataType::I32),
             ImportDataItem::new(3, 5, 13, DataSectionType::ReadWrite, MemoryDataType::I64),
@@ -206,7 +226,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
@@ -276,5 +296,8 @@ mod tests {
                 MemoryDataType::I64
             )
         );
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries, entries_restore);
     }
 }

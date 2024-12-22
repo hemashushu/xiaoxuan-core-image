@@ -105,7 +105,7 @@ impl FunctionEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct InitedDataEntry {
     pub memory_data_type: MemoryDataType,
     pub data: Vec<u8>,
@@ -177,7 +177,7 @@ impl InitedDataEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct UninitDataEntry {
     pub memory_data_type: MemoryDataType,
     pub length: u32,
@@ -344,7 +344,7 @@ impl ImportDataEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionNameEntry {
     // the full name of the exported function
     //
@@ -367,7 +367,7 @@ impl FunctionNameEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DataNameEntry {
     // the full name of exported data
     //

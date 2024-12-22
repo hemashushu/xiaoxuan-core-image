@@ -28,7 +28,7 @@ use anc_isa::{ModuleDependency, ModuleDependencyType};
 use crate::{
     entry::ImportModuleEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -68,17 +68,17 @@ impl ModuleListItem {
 }
 
 impl<'a> SectionEntry<'a> for ModuleListSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
-            load_section_with_table_and_data_area::<ModuleListItem>(section_data);
+            read_section_with_table_and_data_area::<ModuleListItem>(section_data);
         ModuleListSection {
             items,
             items_data: names_data,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.items_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.items_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -139,7 +139,7 @@ impl<'a> ModuleListSection<'a> {
                     ModuleDependency::Remote(_) => ModuleDependencyType::Remote,
                     ModuleDependency::Share(_) => ModuleDependencyType::Share,
                     ModuleDependency::Runtime => ModuleDependencyType::Runtime,
-                    ModuleDependency::Object(_) => ModuleDependencyType::Object,
+                    ModuleDependency::Current => ModuleDependencyType::Current,
                 };
 
                 ModuleListItem::new(
@@ -168,8 +168,6 @@ impl<'a> ModuleListSection<'a> {
 #[cfg(test)]
 mod tests {
 
-    use core::str;
-
     use anc_isa::{DependencyLocal, DependencyRemote, ModuleDependency, ModuleDependencyType};
 
     use crate::{
@@ -179,7 +177,7 @@ mod tests {
     };
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -204,7 +202,7 @@ mod tests {
         section_data.extend_from_slice(b".bar");
         section_data.extend_from_slice(b".world");
 
-        let section = ModuleListSection::load(&section_data);
+        let section = ModuleListSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(
@@ -219,7 +217,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items = vec![
             ModuleListItem::new(0, 3, 3, 5, ModuleDependencyType::Local),
             ModuleListItem::new(8, 4, 12, 6, ModuleDependencyType::Remote),
@@ -231,7 +229,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
@@ -297,12 +295,10 @@ mod tests {
         assert_eq!((name0, type0), ("foobar", ModuleDependencyType::Local));
         assert_eq!((name1, type1), ("helloworld", ModuleDependencyType::Remote));
 
-        let v0: ModuleDependency =
-            ason::from_str(unsafe { str::from_utf8_unchecked(value0) }).unwrap();
+        let v0: ModuleDependency = ason::from_reader(value0).unwrap();
         assert_eq!(&v0, entries[0].value.as_ref());
 
-        let v1: ModuleDependency =
-            ason::from_str(unsafe { str::from_utf8_unchecked(value1) }).unwrap();
+        let v1: ModuleDependency = ason::from_reader(value1).unwrap();
         assert_eq!(&v1, entries[1].value.as_ref());
     }
 }

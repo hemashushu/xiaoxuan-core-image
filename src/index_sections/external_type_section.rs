@@ -30,7 +30,7 @@ use anc_isa::OperandDataType;
 use crate::{
     entry::TypeEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -73,13 +73,13 @@ impl TypeItem {
 }
 
 impl<'a> SectionEntry<'a> for UnifiedExternalTypeSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
-        let (items, types_data) = load_section_with_table_and_data_area::<TypeItem>(section_data);
+    fn read(section_data: &'a [u8]) -> Self {
+        let (items, types_data) = read_section_with_table_and_data_area::<TypeItem>(section_data);
         UnifiedExternalTypeSection { items, types_data }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.types_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.types_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -181,7 +181,7 @@ mod tests {
     };
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let section_data = vec![
             3u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -209,7 +209,7 @@ mod tests {
             1, // result types 2
         ];
 
-        let section = TypeSection::load(&section_data);
+        let section = TypeSection::read(&section_data);
 
         assert_eq!(section.items.len(), 3);
         assert_eq!(
@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items = vec![
             TypeItem {
                 params_count: 2,
@@ -277,7 +277,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         assert_eq!(
             section_data,

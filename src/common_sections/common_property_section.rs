@@ -40,12 +40,7 @@ pub struct CommonPropertySection {
 }
 
 impl CommonPropertySection {
-    pub fn new(
-        module_name: &str,
-        // image_type: ImageType,
-        import_data_count: u32,
-        import_function_count: u32,
-    ) -> Self {
+    pub fn new(module_name: &str, import_data_count: u32, import_function_count: u32) -> Self {
         let module_name_src = module_name.as_bytes();
         let mut module_name_dest = [0u8; MODULE_NAME_BUFFER_LENGTH];
 
@@ -58,7 +53,6 @@ impl CommonPropertySection {
         };
 
         Self {
-            // image_type,
             import_data_count,
             import_function_count,
             module_name_length: module_name_src.len() as u32,
@@ -67,16 +61,12 @@ impl CommonPropertySection {
     }
 
     pub fn get_module_name(&self) -> &str {
-        unsafe {
-            std::str::from_utf8_unchecked(
-                &self.module_name_buffer[..(self.module_name_length as usize)],
-            )
-        }
+        std::str::from_utf8(&self.module_name_buffer[..(self.module_name_length as usize)]).unwrap()
     }
 }
 
 impl<'a> SectionEntry<'a> for CommonPropertySection {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let property_section_ptr = unsafe {
             std::mem::transmute::<*const u8, *const CommonPropertySection>(section_data.as_ptr())
         };
@@ -84,13 +74,13 @@ impl<'a> SectionEntry<'a> for CommonPropertySection {
         unsafe { *property_section_ptr }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        let mut data = [0u8; std::mem::size_of::<CommonPropertySection>()];
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        let mut section_data = [0u8; std::mem::size_of::<CommonPropertySection>()];
         let src = self as *const CommonPropertySection as *const u8;
-        let dst = data.as_mut_ptr();
-        unsafe { std::ptr::copy(src, dst, data.len()) };
+        let dst = section_data.as_mut_ptr();
+        unsafe { std::ptr::copy(src, dst, section_data.len()) };
 
-        writer.write_all(&data)
+        writer.write_all(&section_data)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -105,11 +95,11 @@ mod tests {
     use super::CommonPropertySection;
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let section = CommonPropertySection::new("bar", 17, 19);
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             // 1, 0, 0, 0, // image type
@@ -125,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             // 1, 0, 0, 0, // image type
             17, 0, 0, 0, // import data count
@@ -136,7 +126,7 @@ mod tests {
 
         section_data.resize(std::mem::size_of::<CommonPropertySection>(), 0);
 
-        let section = CommonPropertySection::load(&section_data);
+        let section = CommonPropertySection::read(&section_data);
         // assert_eq!(section.image_type, ImageType::SharedModule);
         assert_eq!(section.import_data_count, 17);
         assert_eq!(section.import_function_count, 19);

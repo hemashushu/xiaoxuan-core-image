@@ -21,7 +21,7 @@
 use crate::{
     entry::ImportFunctionEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -65,17 +65,17 @@ impl ImportFunctionItem {
 }
 
 impl<'a> SectionEntry<'a> for ImportFunctionSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let (items, full_names_data) =
-            load_section_with_table_and_data_area::<ImportFunctionItem>(section_data);
+            read_section_with_table_and_data_area::<ImportFunctionItem>(section_data);
         ImportFunctionSection {
             items,
             full_names_data,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.full_names_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.full_names_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -100,6 +100,25 @@ impl<'a> ImportFunctionSection<'a> {
             item.import_module_index as usize,
             item.type_index as usize,
         )
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<ImportFunctionEntry> {
+        let items = self.items;
+        let full_names_data = self.full_names_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let full_name_data = &full_names_data[item.full_name_offset as usize
+                    ..(item.full_name_offset + item.full_name_length) as usize];
+                let full_name = std::str::from_utf8(full_name_data).unwrap().to_owned();
+                ImportFunctionEntry::new(
+                    full_name,
+                    item.import_module_index as usize,
+                    item.type_index as usize,
+                )
+            })
+            .collect()
     }
 
     pub fn convert_from_entries(
@@ -147,7 +166,7 @@ mod tests {
     };
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -166,7 +185,7 @@ mod tests {
         section_data.extend_from_slice(b"foo");
         section_data.extend_from_slice(b"hello");
 
-        let section = ImportFunctionSection::load(&section_data);
+        let section = ImportFunctionSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(section.items[0], ImportFunctionItem::new(0, 3, 11, 13,));
@@ -175,7 +194,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items = vec![
             ImportFunctionItem::new(0, 3, 11, 13),
             ImportFunctionItem::new(3, 5, 15, 17),
@@ -187,7 +206,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
@@ -232,5 +251,8 @@ mod tests {
             section.get_item_full_name_and_import_module_index_and_type_index(1),
             ("helloworld", 23, 29)
         );
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries, entries_restore);
     }
 }

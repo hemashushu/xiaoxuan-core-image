@@ -27,7 +27,7 @@ use anc_isa::OperandDataType;
 use crate::{
     entry::TypeEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -70,13 +70,13 @@ impl TypeItem {
 }
 
 impl<'a> SectionEntry<'a> for TypeSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
-        let (items, types_data) = load_section_with_table_and_data_area::<TypeItem>(section_data);
+    fn read(section_data: &'a [u8]) -> Self {
+        let (items, types_data) = read_section_with_table_and_data_area::<TypeItem>(section_data);
         TypeSection { items, types_data }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.types_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.types_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -116,13 +116,47 @@ impl<'a> TypeSection<'a> {
         (params_slice, results_slice)
     }
 
-    // for inspect
-    pub fn get_type_entry(&self, idx: usize) -> TypeEntry {
-        let (params, results) = self.get_item_params_and_results(idx);
-        TypeEntry {
-            params: params.to_vec(),
-            results: results.to_vec(),
-        }
+    // // for inspect
+    // pub fn get_type_entry(&self, idx: usize) -> TypeEntry {
+    //     let (params, results) = self.get_item_params_and_results(idx);
+    //     TypeEntry {
+    //         params: params.to_vec(),
+    //         results: results.to_vec(),
+    //     }
+    // }
+
+    pub fn convert_to_entries(&self) -> Vec<TypeEntry> {
+        let items = &self.items;
+        let types_data = &self.types_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let params_data = &types_data[(item.params_offset as usize)
+                    ..(item.params_offset as usize + item.params_count as usize)];
+                let results_data = &types_data[(item.results_offset as usize)
+                    ..(item.results_offset as usize + item.results_count as usize)];
+
+                let params_slice = unsafe {
+                    &*slice_from_raw_parts(
+                        params_data.as_ptr() as *const OperandDataType,
+                        item.params_count as usize,
+                    )
+                };
+
+                let results_slice = unsafe {
+                    &*slice_from_raw_parts(
+                        results_data.as_ptr() as *const OperandDataType,
+                        item.results_count as usize,
+                    )
+                };
+
+                TypeEntry {
+                    params: params_slice.to_vec(),
+                    results: results_slice.to_vec(),
+                }
+            })
+            .collect()
     }
 
     pub fn convert_from_entries(entries: &[TypeEntry]) -> (Vec<TypeItem>, Vec<u8>) {
@@ -178,7 +212,7 @@ mod tests {
     };
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let section_data = vec![
             3u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -206,7 +240,7 @@ mod tests {
             1, // result types 2
         ];
 
-        let section = TypeSection::load(&section_data);
+        let section = TypeSection::read(&section_data);
 
         assert_eq!(section.items.len(), 3);
         assert_eq!(
@@ -239,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items = vec![
             TypeItem {
                 params_count: 2,
@@ -274,7 +308,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         assert_eq!(
             section_data,
@@ -361,5 +395,8 @@ mod tests {
             section.get_item_params_and_results(3),
             ([].as_ref(), [].as_ref())
         );
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries, entries_restore);
     }
 }

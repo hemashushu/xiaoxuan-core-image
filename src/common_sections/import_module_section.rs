@@ -25,7 +25,7 @@ use anc_isa::{ModuleDependency, ModuleDependencyType};
 use crate::{
     entry::ImportModuleEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -65,17 +65,17 @@ impl ImportModuleItem {
 }
 
 impl<'a> SectionEntry<'a> for ImportModuleSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
-            load_section_with_table_and_data_area::<ImportModuleItem>(section_data);
+            read_section_with_table_and_data_area::<ImportModuleItem>(section_data);
         ImportModuleSection {
             items,
             items_data: names_data,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.items_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.items_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -102,6 +102,25 @@ impl<'a> ImportModuleSection<'a> {
             item.module_dependent_type,
             value_data,
         )
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<ImportModuleEntry> {
+        let items = self.items;
+        let items_data = self.items_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let name_data = &items_data
+                    [item.name_offset as usize..(item.name_offset + item.name_length) as usize];
+                let value_data = &items_data
+                    [item.value_offset as usize..(item.value_offset + item.value_length) as usize];
+
+                let name = std::str::from_utf8(name_data).unwrap().to_owned();
+                let module_dependency: ModuleDependency = ason::from_reader(value_data).unwrap();
+                ImportModuleEntry::new(name, Box::new(module_dependency))
+            })
+            .collect()
     }
 
     pub fn convert_from_entries(entries: &[ImportModuleEntry]) -> (Vec<ImportModuleItem>, Vec<u8>) {
@@ -136,7 +155,7 @@ impl<'a> ImportModuleSection<'a> {
                     ModuleDependency::Remote(_) => ModuleDependencyType::Remote,
                     ModuleDependency::Share(_) => ModuleDependencyType::Share,
                     ModuleDependency::Runtime => ModuleDependencyType::Runtime,
-                    ModuleDependency::Object(_) => ModuleDependencyType::Object,
+                    ModuleDependency::Current => ModuleDependencyType::Current,
                 };
 
                 ImportModuleItem::new(
@@ -165,8 +184,6 @@ impl<'a> ImportModuleSection<'a> {
 #[cfg(test)]
 mod tests {
 
-    use core::str;
-
     use anc_isa::{DependencyLocal, DependencyRemote, ModuleDependency, ModuleDependencyType};
 
     use crate::{
@@ -176,7 +193,7 @@ mod tests {
     };
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -201,7 +218,7 @@ mod tests {
         section_data.extend_from_slice(b".bar");
         section_data.extend_from_slice(b".world");
 
-        let section = ImportModuleSection::load(&section_data);
+        let section = ImportModuleSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(
@@ -216,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items = vec![
             ImportModuleItem::new(0, 3, 3, 5, ModuleDependencyType::Local),
             ImportModuleItem::new(8, 4, 12, 6, ModuleDependencyType::Remote),
@@ -228,7 +245,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
@@ -294,12 +311,13 @@ mod tests {
         assert_eq!((name0, type0), ("foobar", ModuleDependencyType::Local));
         assert_eq!((name1, type1), ("helloworld", ModuleDependencyType::Remote));
 
-        let v0: ModuleDependency =
-            ason::from_str(unsafe { str::from_utf8_unchecked(value0) }).unwrap();
+        let v0: ModuleDependency = ason::from_reader(value0).unwrap();
         assert_eq!(&v0, entries[0].value.as_ref());
 
-        let v1: ModuleDependency =
-            ason::from_str(unsafe { str::from_utf8_unchecked(value1) }).unwrap();
+        let v1: ModuleDependency = ason::from_reader(value1).unwrap();
         assert_eq!(&v1, entries[1].value.as_ref());
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries, entries_restore);
     }
 }

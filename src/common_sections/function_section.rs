@@ -21,7 +21,7 @@
 use crate::{
     entry::FunctionEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -56,14 +56,14 @@ impl FunctionItem {
 }
 
 impl<'a> SectionEntry<'a> for FunctionSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let (items, codes_data) =
-            load_section_with_table_and_data_area::<FunctionItem>(section_data);
+            read_section_with_table_and_data_area::<FunctionItem>(section_data);
         FunctionSection { items, codes_data }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.codes_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.codes_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -90,18 +90,38 @@ impl<'a> FunctionSection<'a> {
         )
     }
 
-    // for inspect
-    pub fn get_function_entry(&self, idx: usize) -> FunctionEntry {
-        let function_item = &self.items[idx];
-        let code = self.codes_data[function_item.code_offset as usize
-            ..(function_item.code_offset + function_item.code_length) as usize]
-            .to_vec();
+    //     // for inspect
+    //     pub fn get_function_entry(&self, idx: usize) -> FunctionEntry {
+    //         let item = &self.items[idx];
+    //         let code = self.codes_data
+    //             [item.code_offset as usize..(item.code_offset + item.code_length) as usize]
+    //             .to_vec();
+    //
+    //         FunctionEntry {
+    //             type_index: item.type_index as usize,
+    //             local_variable_list_index: item.local_variable_list_index as usize,
+    //             code,
+    //         }
+    //     }
 
-        FunctionEntry {
-            type_index: function_item.type_index as usize,
-            local_variable_list_index: function_item.local_variable_list_index as usize,
-            code,
-        }
+    pub fn convert_to_entries(&self) -> Vec<FunctionEntry> {
+        let items = self.items;
+        let codes_data = self.codes_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let code = codes_data
+                    [item.code_offset as usize..(item.code_offset + item.code_length) as usize]
+                    .to_vec();
+
+                FunctionEntry::new(
+                    item.type_index as usize,
+                    item.local_variable_list_index as usize,
+                    code,
+                )
+            })
+            .collect()
     }
 
     pub fn convert_from_entries(entries: &[FunctionEntry]) -> (Vec<FunctionItem>, Vec<u8>) {
@@ -140,7 +160,7 @@ mod tests {
     };
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -158,7 +178,7 @@ mod tests {
 
         section_data.extend_from_slice(b"hello0123456789a");
 
-        let section = FunctionSection::load(&section_data);
+        let section = FunctionSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(section.items[0], FunctionItem::new(3, 5, 7, 11));
@@ -167,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let items = vec![
             FunctionItem::new(3, 5, 7, 11),
             FunctionItem::new(13, 17, 19, 23),
@@ -179,7 +199,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
@@ -231,5 +251,8 @@ mod tests {
             section.get_item_type_index_and_local_variable_list_index_and_code(1),
             (11, 13, b"world".to_vec().as_ref())
         );
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries, entries_restore);
     }
 }

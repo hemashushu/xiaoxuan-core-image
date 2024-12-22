@@ -15,7 +15,7 @@ use crate::entry::{
 use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
 use crate::index_sections::index_property_section::IndexPropertySection;
 use crate::index_sections::module_list_section::ModuleListSection;
-use crate::BinaryError;
+use crate::ImageError;
 use anc_isa::{
     DataSectionType, DependencyLocal, ModuleDependency, OperandDataType, RUNTIME_MAJOR_VERSION,
     RUNTIME_MINOR_VERSION,
@@ -381,7 +381,7 @@ pub fn helper_build_module_binary(
     let (local_lists, local_list_data) =
         LocalVariableSection::convert_from_entries(&local_list_entries);
     let local_variable_section = LocalVariableSection {
-        list_items: &local_lists,
+        lists: &local_lists,
         list_data: &local_list_data,
     };
 
@@ -604,7 +604,7 @@ pub fn helper_build_module_binary(
         &external_function_index_section,
     ];
 
-    let (section_items, sections_data) = ModuleImage::convert_from_entries(&section_entries);
+    let (section_items, sections_data) = ModuleImage::convert_from_section_entries(&section_entries);
     let module_image = ModuleImage {
         image_type: ImageType::Application,
         items: &section_items,
@@ -613,17 +613,17 @@ pub fn helper_build_module_binary(
 
     // build module image binary
     let mut image_binary: Vec<u8> = Vec::new();
-    module_image.save(&mut image_binary).unwrap();
+    module_image.write(&mut image_binary).unwrap();
     image_binary
 }
 
 pub fn helper_load_modules_from_binaries(
     module_binaries: Vec<&[u8]>,
-) -> Result<Vec<ModuleImage>, BinaryError> {
+) -> Result<Vec<ModuleImage>, ImageError> {
     let mut module_images: Vec<ModuleImage> = Vec::new();
 
     for binary in module_binaries {
-        let module_image = ModuleImage::load(binary)?;
+        let module_image = ModuleImage::read(binary)?;
         module_images.push(module_image);
     }
 
@@ -794,7 +794,7 @@ mod tests {
 
         // check local variable section
         let local_variable_section = module_image.get_local_variable_section();
-        assert_eq!(local_variable_section.list_items.len(), 1);
+        assert_eq!(local_variable_section.lists.len(), 1);
         assert_eq!(
             local_variable_section.get_local_variable_list(0),
             &[
@@ -904,7 +904,7 @@ mod tests {
             {
                 let vv = unified_external_library_section
                     .get_item_name_and_external_library_dependent_type_and_value(0);
-                let s = unsafe { str::from_utf8_unchecked(vv.2) };
+                let s = str::from_utf8(vv.2).unwrap();
                 (
                     vv.0,
                     vv.1,
@@ -922,7 +922,7 @@ mod tests {
             {
                 let vv = unified_external_library_section
                     .get_item_name_and_external_library_dependent_type_and_value(1);
-                let s = unsafe { str::from_utf8_unchecked(vv.2) };
+                let s = str::from_utf8(vv.2).unwrap();
                 (
                     vv.0,
                     vv.1,
@@ -945,7 +945,7 @@ mod tests {
             {
                 let vv = unified_external_library_section
                     .get_item_name_and_external_library_dependent_type_and_value(2);
-                let s = unsafe { str::from_utf8_unchecked(vv.2) };
+                let s = str::from_utf8(vv.2).unwrap();
                 (
                     vv.0,
                     vv.1,
@@ -1031,7 +1031,7 @@ mod tests {
             {
                 let vv = external_library_section
                     .get_item_name_and_external_library_dependent_type_and_value(0);
-                let s = unsafe { str::from_utf8_unchecked(vv.2) };
+                let s = str::from_utf8(vv.2).unwrap();
                 (
                     vv.0,
                     vv.1,
@@ -1049,7 +1049,7 @@ mod tests {
             {
                 let vv = external_library_section
                     .get_item_name_and_external_library_dependent_type_and_value(1);
-                let s = unsafe { str::from_utf8_unchecked(vv.2) };
+                let s = str::from_utf8(vv.2).unwrap();
                 (
                     vv.0,
                     vv.1,
@@ -1072,7 +1072,7 @@ mod tests {
             {
                 let vv = external_library_section
                     .get_item_name_and_external_library_dependent_type_and_value(2);
-                let s = unsafe { str::from_utf8_unchecked(vv.2) };
+                let s = str::from_utf8(vv.2).unwrap();
                 (
                     vv.0,
                     vv.1,

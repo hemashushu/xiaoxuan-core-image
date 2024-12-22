@@ -124,8 +124,8 @@ use crate::{
         function_index_section::FunctionIndexSection, index_property_section::IndexPropertySection,
         module_list_section::ModuleListSection,
     },
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
-    BinaryError,
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
+    ImageError,
 };
 
 // the "module image file" binary layout:
@@ -285,17 +285,17 @@ pub trait SectionEntry<'a> {
     // ```
 
     fn id(&'a self) -> ModuleSectionId;
-    fn load(section_data: &'a [u8]) -> Self
+    fn read(section_data: &'a [u8]) -> Self
     where
         Self: Sized;
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()>;
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()>;
 }
 
 impl<'a> ModuleImage<'a> {
-    pub fn load(image_binary: &'a [u8]) -> Result<Self, BinaryError> {
+    pub fn read(image_binary: &'a [u8]) -> Result<Self, ImageError> {
         let magic_slice = &image_binary[0..8];
         if magic_slice != IMAGE_FILE_MAGIC_NUMBER {
-            return Err(BinaryError::new("Not a valid module image file."));
+            return Err(ImageError::new("Not a valid module image file."));
         }
 
         // there is another safe approach for obtaining the version number:
@@ -320,7 +320,7 @@ impl<'a> ModuleImage<'a> {
         let supported_module_format_image_version =
             ((IMAGE_FORMAT_MAJOR_VERSION as u32) << 16) | (IMAGE_FORMAT_MINOR_VERSION as u32); // supported version 1.0
         if declared_module_image_version > supported_module_format_image_version {
-            return Err(BinaryError::new(
+            return Err(ImageError::new(
                 "The module image format requires a newer version runtime to read.",
             ));
         }
@@ -333,7 +333,7 @@ impl<'a> ModuleImage<'a> {
         // so we can load module by reusing function
         // `load_section_with_table_and_data_area` as well.
         let (items, sections_data) =
-            load_section_with_table_and_data_area::<ModuleSectionItem>(image_body);
+            read_section_with_table_and_data_area::<ModuleSectionItem>(image_body);
 
         Ok(Self {
             image_type,
@@ -342,7 +342,7 @@ impl<'a> ModuleImage<'a> {
         })
     }
 
-    pub fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+    pub fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         const DEFAULT_MODULE_HEADER_LENGTH: u16 = 16;
 
         // write header
@@ -352,10 +352,10 @@ impl<'a> ModuleImage<'a> {
         writer.write_all(&IMAGE_FORMAT_MINOR_VERSION.to_le_bytes())?;
         writer.write_all(&IMAGE_FORMAT_MAJOR_VERSION.to_le_bytes())?;
 
-        save_section_with_table_and_data_area(self.items, self.sections_data, writer)
+        write_section_with_table_and_data_area(self.items, self.sections_data, writer)
     }
 
-    pub fn convert_from_entries(
+    pub fn convert_from_section_entries(
         entries: &[&'a dyn SectionEntry<'a>],
     ) -> (Vec<ModuleSectionItem>, Vec<u8>) {
         let mut image_binary: Vec<u8> = Vec::new();
@@ -364,7 +364,7 @@ impl<'a> ModuleImage<'a> {
         let mut data_increment_lengths: Vec<usize> = Vec::new();
 
         for entry in entries {
-            entry.save(&mut image_binary).unwrap();
+            entry.write(&mut image_binary).unwrap();
             data_increment_lengths.push(image_binary.len());
         }
 
@@ -416,7 +416,7 @@ impl<'a> ModuleImage<'a> {
         self.get_section_data_by_id(ModuleSectionId::CommonProperty)
             .map_or_else(
                 || panic!("Can not find the common property section."),
-                CommonPropertySection::load,
+                CommonPropertySection::read,
             )
     }
 
@@ -425,7 +425,7 @@ impl<'a> ModuleImage<'a> {
         self.get_section_data_by_id(ModuleSectionId::Type)
             .map_or_else(
                 || panic!("Can not find the type section."),
-                TypeSection::load,
+                TypeSection::read,
             )
     }
 
@@ -434,7 +434,7 @@ impl<'a> ModuleImage<'a> {
         self.get_section_data_by_id(ModuleSectionId::LocalVariable)
             .map_or_else(
                 || panic!("Can not find the local variable section."),
-                LocalVariableSection::load,
+                LocalVariableSection::read,
             )
     }
 
@@ -443,7 +443,7 @@ impl<'a> ModuleImage<'a> {
         self.get_section_data_by_id(ModuleSectionId::Function)
             .map_or_else(
                 || panic!("Can not find the function section."),
-                FunctionSection::load,
+                FunctionSection::read,
             )
     }
 
@@ -452,7 +452,7 @@ impl<'a> ModuleImage<'a> {
         self.get_section_data_by_id(ModuleSectionId::IndexProperty)
             .map_or_else(
                 || panic!("Can not find the index property section."),
-                IndexPropertySection::load,
+                IndexPropertySection::read,
             )
     }
 
@@ -461,7 +461,7 @@ impl<'a> ModuleImage<'a> {
         self.get_section_data_by_id(ModuleSectionId::ModuleList)
             .map_or_else(
                 || panic!("Can not find the index property section."),
-                ModuleListSection::load,
+                ModuleListSection::read,
             )
     }
 
@@ -470,76 +470,74 @@ impl<'a> ModuleImage<'a> {
         self.get_section_data_by_id(ModuleSectionId::FunctionIndex)
             .map_or_else(
                 || panic!("Can not find the function index section."),
-                FunctionIndexSection::load,
+                FunctionIndexSection::read,
             )
     }
 
     // optional section
     pub fn get_optional_read_only_data_section(&'a self) -> Option<ReadOnlyDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ReadOnlyData)
-            .map(ReadOnlyDataSection::load)
+            .map(ReadOnlyDataSection::read)
     }
 
     // optional section
     pub fn get_optional_read_write_data_section(&'a self) -> Option<ReadWriteDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ReadWriteData)
-            .map(ReadWriteDataSection::load)
+            .map(ReadWriteDataSection::read)
     }
 
     // optional section
     pub fn get_optional_uninit_data_section(&'a self) -> Option<UninitDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::UninitData)
-            .map(UninitDataSection::load)
+            .map(UninitDataSection::read)
     }
 
     // optional section (for debug, link only and bridge function calling)
-    pub fn get_optional_function_name_section(
-        &'a self,
-    ) -> Option<FunctionNameSection<'a>> {
+    pub fn get_optional_function_name_section(&'a self) -> Option<FunctionNameSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::FunctionName)
-            .map(FunctionNameSection::load)
+            .map(FunctionNameSection::read)
     }
 
     // optional section (for debug, link only and bridge function calling)
     pub fn get_optional_data_name_section(&'a self) -> Option<DataNameSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::DataName)
-            .map(DataNameSection::load)
+            .map(DataNameSection::read)
     }
 
     // optional section (for debug and link only)
     pub fn get_optional_import_module_section(&'a self) -> Option<ImportModuleSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ImportModule)
-            .map(ImportModuleSection::load)
+            .map(ImportModuleSection::read)
     }
 
     // optional section (for debug and link only)
     pub fn get_optional_import_function_section(&'a self) -> Option<ImportFunctionSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ImportFunction)
-            .map(ImportFunctionSection::load)
+            .map(ImportFunctionSection::read)
     }
 
     // optional section (for debug and link only)
     pub fn get_optional_import_data_section(&'a self) -> Option<ImportDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ImportData)
-            .map(ImportDataSection::load)
+            .map(ImportDataSection::read)
     }
 
     // optional section (for debug and link only)
     pub fn get_optional_external_library_section(&'a self) -> Option<ExternalLibrarySection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExternalLibrary)
-            .map(ExternalLibrarySection::load)
+            .map(ExternalLibrarySection::read)
     }
 
     // optional section (for debug and link only)
     pub fn get_optional_external_function_section(&'a self) -> Option<ExternalFunctionSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExternalFunction)
-            .map(ExternalFunctionSection::load)
+            .map(ExternalFunctionSection::read)
     }
 
     // optional section (application only)
     pub fn get_optional_data_index_section(&'a self) -> Option<DataIndexSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::DataIndex)
-            .map(DataIndexSection::load)
+            .map(DataIndexSection::read)
     }
 
     // optional section (application only)
@@ -547,7 +545,7 @@ impl<'a> ModuleImage<'a> {
         &'a self,
     ) -> Option<UnifiedExternalTypeSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::UnifiedExternalType)
-            .map(UnifiedExternalTypeSection::load)
+            .map(UnifiedExternalTypeSection::read)
     }
 
     // optional section (application only)
@@ -555,7 +553,7 @@ impl<'a> ModuleImage<'a> {
         &'a self,
     ) -> Option<UnifiedExternalLibrarySection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::UnifiedExternalLibrary)
-            .map(UnifiedExternalLibrarySection::load)
+            .map(UnifiedExternalLibrarySection::read)
     }
 
     // optional section (application only)
@@ -563,7 +561,7 @@ impl<'a> ModuleImage<'a> {
         &'a self,
     ) -> Option<UnifiedExternalFunctionSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::UnifiedExternalFunction)
-            .map(UnifiedExternalFunctionSection::load)
+            .map(UnifiedExternalFunctionSection::read)
     }
 
     // optional section (application only)
@@ -571,7 +569,7 @@ impl<'a> ModuleImage<'a> {
         &'a self,
     ) -> Option<ExternalFunctionIndexSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExternalFunctionIndex)
-            .map(ExternalFunctionIndexSection::load)
+            .map(ExternalFunctionIndexSection::read)
     }
 }
 
@@ -590,7 +588,7 @@ mod tests {
     };
 
     #[test]
-    fn test_module_image_save_and_load() {
+    fn test_module_image_read_and_write() {
         // build common property section
         let common_property_section = CommonPropertySection::new("bar", 17, 19);
 
@@ -644,11 +642,11 @@ mod tests {
             LocalVariableListEntry::new(vec![LocalVariableEntry::from_bytes(12, 4)]),
         ];
 
-        let (local_variable_list_items, local_list_data) =
+        let (local_variable_lists, local_variable_list_data) =
             LocalVariableSection::convert_from_entries(&local_variable_list_entries);
         let local_variable_section = LocalVariableSection {
-            list_items: &local_variable_list_items,
-            list_data: &local_list_data,
+            lists: &local_variable_lists,
+            list_data: &local_variable_list_data,
         };
 
         //         // build FuncIndexSection instance
@@ -678,7 +676,8 @@ mod tests {
             &common_property_section,
         ];
 
-        let (section_items, sections_data) = ModuleImage::convert_from_entries(&section_entries);
+        let (section_items, sections_data) =
+            ModuleImage::convert_from_section_entries(&section_entries);
         let module_image = ModuleImage {
             image_type: ImageType::ObjectFile,
             items: &section_items,
@@ -687,7 +686,7 @@ mod tests {
 
         // save
         let mut image_binary: Vec<u8> = Vec::new();
-        module_image.save(&mut image_binary).unwrap();
+        module_image.write(&mut image_binary).unwrap();
 
         assert_eq!(&image_binary[0..8], IMAGE_FILE_MAGIC_NUMBER);
         assert_eq!(&image_binary[8..10], &[2, 0]); // image type
@@ -866,7 +865,7 @@ mod tests {
         );
 
         // load
-        let module_image_restore = ModuleImage::load(&image_binary).unwrap();
+        let module_image_restore = ModuleImage::read(&image_binary).unwrap();
         assert_eq!(module_image_restore.items.len(), 3);
         assert_eq!(module_image_restore.image_type, ImageType::ObjectFile);
 
@@ -905,7 +904,7 @@ mod tests {
         // check local variable list section
 
         let local_variable_section_restore = module_image_restore.get_local_variable_section();
-        assert_eq!(local_variable_section_restore.list_items.len(), 2);
+        assert_eq!(local_variable_section_restore.lists.len(), 2);
 
         assert_eq!(
             local_variable_section_restore.get_local_variable_list(0),

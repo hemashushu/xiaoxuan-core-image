@@ -15,7 +15,7 @@ pub struct IndexPropertySection {
 }
 
 impl<'a> SectionEntry<'a> for IndexPropertySection {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let property_section_ptr = unsafe {
             std::mem::transmute::<*const u8, *const IndexPropertySection>(section_data.as_ptr())
         };
@@ -23,13 +23,13 @@ impl<'a> SectionEntry<'a> for IndexPropertySection {
         unsafe { *property_section_ptr }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        let mut data = [0u8; std::mem::size_of::<IndexPropertySection>()];
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        let mut section_data = [0u8; std::mem::size_of::<IndexPropertySection>()];
         let src = self as *const IndexPropertySection as *const u8;
-        let dst = data.as_mut_ptr();
-        unsafe { std::ptr::copy(src, dst, data.len()) };
+        let dst = section_data.as_mut_ptr();
+        unsafe { std::ptr::copy(src, dst, section_data.len()) };
 
-        writer.write_all(&data)
+        writer.write_all(&section_data)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -44,7 +44,7 @@ mod tests {
     use super::IndexPropertySection;
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let section = IndexPropertySection {
             runtime_major_version: 11,
             runtime_minor_version: 13,
@@ -52,7 +52,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             11, 0, // major runtime version
@@ -66,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             11, 0, // major runtime version
             13, 0, // minor runtime version
@@ -75,7 +75,7 @@ mod tests {
 
         section_data.resize(std::mem::size_of::<IndexPropertySection>(), 0);
 
-        let section = IndexPropertySection::load(&section_data);
+        let section = IndexPropertySection::read(&section_data);
         assert_eq!(section.runtime_major_version, 11);
         assert_eq!(section.runtime_minor_version, 13);
         assert_eq!(section.entry_function_public_index, 17);

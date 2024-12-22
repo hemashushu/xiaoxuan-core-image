@@ -13,19 +13,19 @@
 //  item 1 -->  | list offset 1       | list item count 1       | list allocate bytes 1       |
 //              | ...                                                                         |
 //              |-----------------------------------------------------------------------------|
-// offset 0 --> | list 0                                                                      | <-- data area
-// offset 1 --> | list 1                                                                      |
+// offset 0 --> | list data 0                                                                 | <-- data area
+// offset 1 --> | list data 1                                                                 |
 //              | ...                                                                         |
 //              |-----------------------------------------------------------------------------|
 //
 //
 // the "list" is also a table, the layout of "list":
 //
-//                        |----------------------------------------------------------------------------------------------------------|
-//          | item 0 -->  | var offset 0 (u32) | var actual length 0 (u32) | mem data type 0 (u8) | pad (1 byte) | var align 0 (u16) |
-// list0 -> | item 1 -->  | var offset 1       | var actual length 1       | mem data type 1      |              | var align 1       |
-//          | item N -->  | ...                                                                                                      |
-//                        |----------------------------------------------------------------------------------------------------------|
+//          |--------|     |----------------------------------------------------------------------------------------------------------|
+// list     | item 0 | --> | var offset 0 (u32) | var actual length 0 (u32) | mem data type 0 (u8) | pad (1 byte) | var align 0 (u16) |
+// data0 -> | item 1 | --> | var offset 1       | var actual length 1       | mem data type 1      |              | var align 1       |
+//          | ...    |     | ...                                                                                                      |
+//          |--------|     |----------------------------------------------------------------------------------------------------------|
 //
 // note:
 // - all variables in the 'local variable area' MUST be 8-byte aligned,
@@ -45,19 +45,19 @@ use anc_isa::{MemoryDataType, OPERAND_SIZE_IN_BYTES};
 use crate::{
     entry::{LocalVariableEntry, LocalVariableListEntry},
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
 pub struct LocalVariableSection<'a> {
-    pub list_items: &'a [LocalVariableListItem],
+    pub lists: &'a [LocalVariableList],
     pub list_data: &'a [u8],
 }
 
 // a list per function
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct LocalVariableListItem {
+pub struct LocalVariableList {
     pub list_offset: u32,
     pub list_item_count: u32,
 
@@ -120,7 +120,7 @@ impl LocalVariableItem {
     }
 }
 
-impl LocalVariableListItem {
+impl LocalVariableList {
     pub fn new(list_offset: u32, list_item_count: u32, list_allocate_bytes: u32) -> Self {
         Self {
             list_offset,
@@ -135,57 +135,89 @@ impl<'a> SectionEntry<'a> for LocalVariableSection<'a> {
         ModuleSectionId::LocalVariable
     }
 
-    fn load(section_data: &'a [u8]) -> Self
+    fn read(section_data: &'a [u8]) -> Self
     where
         Self: Sized,
     {
-        let (items, datas) =
-            load_section_with_table_and_data_area::<LocalVariableListItem>(section_data);
+        let (lists, datas) =
+            read_section_with_table_and_data_area::<LocalVariableList>(section_data);
         LocalVariableSection {
-            list_items: items,
+            lists,
             list_data: datas,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.list_items, self.list_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.lists, self.list_data, writer)
     }
 }
 
 impl<'a> LocalVariableSection<'a> {
     pub fn get_local_variable_list(&'a self, idx: usize) -> &'a [LocalVariableItem] {
-        let list = &self.list_items[idx];
-        let offset = list.list_offset as usize;
+        let list = &self.lists[idx];
+
+        let list_offset = list.list_offset as usize;
         let item_count = list.list_item_count as usize;
-
         let items_data =
-            &self.list_data[offset..(offset + item_count * size_of::<LocalVariableItem>())];
-
+            &self.list_data[list_offset..(list_offset + item_count * size_of::<LocalVariableItem>())];
         let items_ptr = items_data.as_ptr() as *const LocalVariableItem;
         let items = std::ptr::slice_from_raw_parts(items_ptr, item_count);
         unsafe { &*items }
     }
 
-    // for inspect
-    pub fn get_local_variable_list_entry(&self, idx: usize) -> LocalVariableListEntry {
-        let items = self.get_local_variable_list(idx);
-        let variable_entries = items
+//     // for inspect
+//     pub fn get_local_variable_list_entry(&self, idx: usize) -> LocalVariableListEntry {
+//         let items = self.get_local_variable_list(idx);
+//
+//         let local_variable_entries = items
+//             .iter()
+//             .map(|item| LocalVariableEntry {
+//                 memory_data_type: item.memory_data_type,
+//                 length: item.var_actual_length,
+//                 align: item.var_align,
+//             })
+//             .collect::<Vec<_>>();
+//
+//         LocalVariableListEntry {
+//             local_variable_entries,
+//         }
+//     }
+
+    pub fn convert_to_entries(&self) -> Vec<LocalVariableListEntry> {
+        let lists = &self.lists;
+        let list_data = &self.list_data;
+
+        lists
             .iter()
-            .map(|item| LocalVariableEntry {
-                memory_data_type: item.memory_data_type,
-                length: item.var_actual_length,
-                align: item.var_align,
+            .map(|list| {
+                let list_offset = list.list_offset as usize;
+                let item_count = list.list_item_count as usize;
+                let items_data =
+                    &list_data[list_offset..(list_offset + item_count * size_of::<LocalVariableItem>())];
+                let items_ptr = items_data.as_ptr() as *const LocalVariableItem;
+                let items = std::ptr::slice_from_raw_parts(items_ptr, item_count);
+                let items_ref = unsafe { &*items };
+
+                let local_variable_entries = items_ref
+                    .iter()
+                    .map(|item| LocalVariableEntry {
+                        memory_data_type: item.memory_data_type,
+                        length: item.var_actual_length,
+                        align: item.var_align,
+                    })
+                    .collect();
+
+                LocalVariableListEntry {
+                    local_variable_entries,
+                }
             })
-            .collect::<Vec<_>>();
-        LocalVariableListEntry {
-            local_variable_entries: variable_entries,
-        }
+            .collect()
     }
 
     pub fn convert_from_entries(
         entiress: &[LocalVariableListEntry],
-    ) -> (Vec<LocalVariableListItem>, Vec<u8>) {
-        let var_item_length_in_bytes = size_of::<LocalVariableItem>();
+    ) -> (Vec<LocalVariableList>, Vec<u8>) {
+        const LOCAL_VARIABLE_ITEM_LENGTH_IN_BYTES:usize = size_of::<LocalVariableItem>();
 
         // generate a list of (list, list_allocate_bytes)
         let list_with_allocate_bytes = entiress
@@ -236,22 +268,22 @@ impl<'a> LocalVariableSection<'a> {
             .map(|(list, list_allocate_bytes)| {
                 let list_offset = next_offset;
                 let list_item_count = list.len() as u32;
-                next_offset += list_item_count * var_item_length_in_bytes as u32;
+                next_offset += list_item_count * LOCAL_VARIABLE_ITEM_LENGTH_IN_BYTES as u32;
 
-                LocalVariableListItem {
+                LocalVariableList {
                     list_offset,
                     list_item_count,
                     list_allocate_bytes: *list_allocate_bytes,
                 }
             })
-            .collect::<Vec<LocalVariableListItem>>();
+            .collect::<Vec<LocalVariableList>>();
 
         // make data
         let list_data = list_with_allocate_bytes
             .iter()
             .flat_map(|(list, _list_allocate_bytes)| {
                 let list_item_count = list.len();
-                let total_length_in_bytes = list_item_count * var_item_length_in_bytes;
+                let total_length_in_bytes = list_item_count * LOCAL_VARIABLE_ITEM_LENGTH_IN_BYTES;
 
                 // let mut buf: Vec<u8> = vec![0u8; total_length_in_bytes];
                 let mut buf: Vec<u8> = Vec::with_capacity(total_length_in_bytes);
@@ -277,14 +309,14 @@ mod tests {
 
     use crate::{
         common_sections::local_variable_section::{
-            LocalVariableItem, LocalVariableListItem, LocalVariableSection,
+            LocalVariableItem, LocalVariableList, LocalVariableSection,
         },
         entry::{LocalVariableEntry, LocalVariableListEntry},
         module_image::SectionEntry,
     };
 
     #[test]
-    fn test_save_section() {
+    fn test_write_section() {
         let entries = vec![
             LocalVariableListEntry::new(vec![
                 LocalVariableEntry::from_i32(),
@@ -310,12 +342,12 @@ mod tests {
         let (lists, list_data) = LocalVariableSection::convert_from_entries(&entries);
 
         let section = LocalVariableSection {
-            list_items: &lists,
+            lists: &lists,
             list_data: &list_data,
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         assert_eq!(
             section_data,
@@ -438,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let section_data = vec![
             //
             // header
@@ -555,15 +587,15 @@ mod tests {
             4, 0, // align
         ];
 
-        let section = LocalVariableSection::load(&section_data);
+        let section = LocalVariableSection::read(&section_data);
 
-        assert_eq!(section.list_items.len(), 7);
+        assert_eq!(section.lists.len(), 7);
 
         // check lists
 
         assert_eq!(
-            section.list_items[0],
-            LocalVariableListItem {
+            section.lists[0],
+            LocalVariableList {
                 list_offset: 0,
                 list_item_count: 4,
                 list_allocate_bytes: 32
@@ -571,8 +603,8 @@ mod tests {
         );
 
         assert_eq!(
-            section.list_items[1],
-            LocalVariableListItem {
+            section.lists[1],
+            LocalVariableList {
                 list_offset: 48,
                 list_item_count: 6,
                 list_allocate_bytes: 56
@@ -580,8 +612,8 @@ mod tests {
         );
 
         assert_eq!(
-            section.list_items[2],
-            LocalVariableListItem {
+            section.lists[2],
+            LocalVariableList {
                 list_offset: 120,
                 list_item_count: 0,
                 list_allocate_bytes: 0
@@ -589,8 +621,8 @@ mod tests {
         );
 
         assert_eq!(
-            section.list_items[3],
-            LocalVariableListItem {
+            section.lists[3],
+            LocalVariableList {
                 list_offset: 120,
                 list_item_count: 1,
                 list_allocate_bytes: 8
@@ -598,8 +630,8 @@ mod tests {
         );
 
         assert_eq!(
-            section.list_items[4],
-            LocalVariableListItem {
+            section.lists[4],
+            LocalVariableList {
                 list_offset: 132,
                 list_item_count: 0,
                 list_allocate_bytes: 0
@@ -607,8 +639,8 @@ mod tests {
         );
 
         assert_eq!(
-            section.list_items[5],
-            LocalVariableListItem {
+            section.lists[5],
+            LocalVariableList {
                 list_offset: 132,
                 list_item_count: 0,
                 list_allocate_bytes: 0
@@ -616,8 +648,8 @@ mod tests {
         );
 
         assert_eq!(
-            section.list_items[6],
-            LocalVariableListItem {
+            section.lists[6],
+            LocalVariableList {
                 list_offset: 132,
                 list_item_count: 1,
                 list_allocate_bytes: 8

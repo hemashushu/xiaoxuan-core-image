@@ -37,8 +37,8 @@ use crate::{
     entry::{InitedDataEntry, UninitDataEntry},
     module_image::{ModuleSectionId, SectionEntry},
     tableaccess::{
-        load_section_with_one_table, load_section_with_table_and_data_area,
-        save_section_with_one_table, save_section_with_table_and_data_area,
+        read_section_with_one_table, read_section_with_table_and_data_area,
+        write_section_with_one_table, write_section_with_table_and_data_area,
     },
 };
 
@@ -112,19 +112,19 @@ impl<'a> SectionEntry<'a> for ReadOnlyDataSection<'a> {
         ModuleSectionId::ReadOnlyData
     }
 
-    fn load(section_data: &'a [u8]) -> Self
+    fn read(section_data: &'a [u8]) -> Self
     where
         Self: Sized,
     {
-        let (items, datas) = load_section_with_table_and_data_area::<DataItem>(section_data);
+        let (items, datas) = read_section_with_table_and_data_area::<DataItem>(section_data);
         ReadOnlyDataSection {
             items,
             datas_data: datas,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.datas_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.datas_data, writer)
     }
 }
 
@@ -133,19 +133,19 @@ impl<'a> SectionEntry<'a> for ReadWriteDataSection<'a> {
         ModuleSectionId::ReadWriteData
     }
 
-    fn load(section_data: &'a [u8]) -> Self
+    fn read(section_data: &'a [u8]) -> Self
     where
         Self: Sized,
     {
-        let (items, datas) = load_section_with_table_and_data_area::<DataItem>(section_data);
+        let (items, datas) = read_section_with_table_and_data_area::<DataItem>(section_data);
         ReadWriteDataSection {
             items,
             datas_data: datas,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.datas_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.datas_data, writer)
     }
 }
 
@@ -154,34 +154,61 @@ impl<'a> SectionEntry<'a> for UninitDataSection<'a> {
         ModuleSectionId::UninitData
     }
 
-    fn load(section_data: &'a [u8]) -> Self
+    fn read(section_data: &'a [u8]) -> Self
     where
         Self: Sized,
     {
-        let items = load_section_with_one_table::<DataItem>(section_data);
+        let items = read_section_with_one_table::<DataItem>(section_data);
         UninitDataSection { items }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_one_table(self.items, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_one_table(self.items, writer)
     }
 }
 
 impl ReadOnlyDataSection<'_> {
+    pub fn convert_to_entries(&self) -> Vec<InitedDataEntry> {
+        let items = self.items;
+        let datas = self.datas_data;
+        convert_to_inited_data_entries(items, datas)
+    }
+
     pub fn convert_from_entries(entries: &[InitedDataEntry]) -> (Vec<DataItem>, Vec<u8>) {
-        convert_inited_data_entries_into_data_items_and_datas(entries)
+        convert_from_inited_data_entries(entries)
     }
 }
 
 impl ReadWriteDataSection<'_> {
+    pub fn convert_to_entries(&self) -> Vec<InitedDataEntry> {
+        let items = self.items;
+        let datas = self.datas_data;
+        convert_to_inited_data_entries(items, datas)
+    }
+
     pub fn convert_from_entries(entries: &[InitedDataEntry]) -> (Vec<DataItem>, Vec<u8>) {
-        convert_inited_data_entries_into_data_items_and_datas(entries)
+        convert_from_inited_data_entries(entries)
     }
 }
 
-fn convert_inited_data_entries_into_data_items_and_datas(
-    entries: &[InitedDataEntry],
-) -> (Vec<DataItem>, Vec<u8>) {
+fn convert_to_inited_data_entries(items: &[DataItem], datas: &[u8]) -> Vec<InitedDataEntry> {
+    items
+        .iter()
+        .map(|item| {
+            let data =
+                &datas[item.data_offset as usize..(item.data_offset + item.data_length) as usize];
+
+            InitedDataEntry {
+                memory_data_type: item.memory_data_type,
+                data: data.to_vec(),
+                length: item.data_length,
+                align: item.data_align,
+            }
+        })
+        .collect()
+}
+
+fn convert_from_inited_data_entries(entries: &[InitedDataEntry]) -> (Vec<DataItem>, Vec<u8>) {
     // | type  | size | alignment |
     // |-------|------|-----------|
     // | i32   | 4    | 4         |
@@ -238,6 +265,19 @@ fn convert_inited_data_entries_into_data_items_and_datas(
 }
 
 impl UninitDataSection<'_> {
+    pub fn convert_to_entries(&self) -> Vec<UninitDataEntry> {
+        self.items
+            .iter()
+            .map(|item| {
+                UninitDataEntry {
+                    memory_data_type: item.memory_data_type,
+                    length: item.data_length,
+                    align: item.data_align,
+                }
+            })
+            .collect()
+    }
+
     pub fn convert_from_entries(entries: &[UninitDataEntry]) -> Vec<DataItem> {
         // | type  | size | alignment |
         // |-------|------|-----------|
@@ -325,7 +365,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let expect_data = vec![
             8u8, 0, 0, 0, // item count
@@ -500,7 +540,7 @@ mod tests {
             19, 0, 0, 0, // data 7
         ];
 
-        let section = ReadWriteDataSection::load(&section_data);
+        let section = ReadWriteDataSection::read(&section_data);
 
         assert_eq!(
             section.items,
@@ -552,7 +592,7 @@ mod tests {
         let section = UninitDataSection { items: &items };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let expect_data = vec![
             8u8, 0, 0, 0, // item count
@@ -665,7 +705,7 @@ mod tests {
             4, 0, // align
         ];
 
-        let section = UninitDataSection::load(&section_data);
+        let section = UninitDataSection::read(&section_data);
         assert_eq!(
             section.items,
             &[
@@ -679,5 +719,15 @@ mod tests {
                 DataItem::new(56, 4, MemoryDataType::I32, 4),
             ]
         );
+    }
+
+    #[test]
+    fn test_convert_inited() {
+        // todo
+    }
+
+    #[test]
+    fn test_convert_uninit() {
+        // todo
     }
 }

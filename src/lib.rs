@@ -20,11 +20,11 @@ pub mod utils;
 use std::fmt::Display;
 
 #[derive(Debug)]
-pub struct BinaryError {
+pub struct ImageError {
     message: String,
 }
 
-impl BinaryError {
+impl ImageError {
     pub fn new(message: &str) -> Self {
         Self {
             message: message.to_owned(),
@@ -32,10 +32,10 @@ impl BinaryError {
     }
 }
 
-impl Display for BinaryError {
+impl Display for ImageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Binary error: {}", self.message)
     }
 }
 
-impl std::error::Error for BinaryError {}
+impl std::error::Error for ImageError {}

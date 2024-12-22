@@ -27,7 +27,7 @@ use crate::entry::DataNameEntry;
 
 use crate::{
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{load_section_with_table_and_data_area, save_section_with_table_and_data_area},
+    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -75,17 +75,17 @@ impl DataNameItem {
 }
 
 impl<'a> SectionEntry<'a> for DataNameSection<'a> {
-    fn load(section_data: &'a [u8]) -> Self {
+    fn read(section_data: &'a [u8]) -> Self {
         let (items, full_names_data) =
-            load_section_with_table_and_data_area::<DataNameItem>(section_data);
+            read_section_with_table_and_data_area::<DataNameItem>(section_data);
         DataNameSection {
             items,
             full_names_data,
         }
     }
 
-    fn save(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        save_section_with_table_and_data_area(self.items, self.full_names_data, writer)
+    fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        write_section_with_table_and_data_area(self.items, self.full_names_data, writer)
     }
 
     fn id(&'a self) -> ModuleSectionId {
@@ -137,8 +137,22 @@ impl<'a> DataNameSection<'a> {
         let item = &items[data_internal_index];
         let full_name_data = &full_names_data[item.full_name_offset as usize
             ..(item.full_name_offset + item.full_name_length) as usize];
-        let full_name = unsafe { std::str::from_utf8_unchecked(full_name_data) };
+        let full_name = std::str::from_utf8(full_name_data).unwrap();
         (full_name, item.export != 0)
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<DataNameEntry> {
+        let items = self.items;
+        let full_names_data = self.full_names_data;
+        items
+            .iter()
+            .map(|item| {
+                let full_name_data = &full_names_data[item.full_name_offset as usize
+                    ..(item.full_name_offset + item.full_name_length) as usize];
+                let full_name = std::str::from_utf8(full_name_data).unwrap();
+                DataNameEntry::new(full_name.to_owned(), item.export != 0)
+            })
+            .collect()
     }
 
     pub fn convert_from_entries(entries: &[DataNameEntry]) -> (Vec<DataNameItem>, Vec<u8>) {
@@ -183,11 +197,8 @@ mod tests {
     };
 
     #[test]
-    fn test_save_section() {
-        let items: Vec<DataNameItem> = vec![
-            DataNameItem::new(0, 3, 0),
-            DataNameItem::new(3, 5, 1),
-        ];
+    fn test_write_section() {
+        let items: Vec<DataNameItem> = vec![DataNameItem::new(0, 3, 0), DataNameItem::new(3, 5, 1)];
 
         let section = DataNameSection {
             items: &items,
@@ -195,7 +206,7 @@ mod tests {
         };
 
         let mut section_data: Vec<u8> = Vec::new();
-        section.save(&mut section_data).unwrap();
+        section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
@@ -219,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_section() {
+    fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
             0, 0, 0, 0, // 4 bytes padding
@@ -238,7 +249,7 @@ mod tests {
         section_data.extend_from_slice("foo".as_bytes());
         section_data.extend_from_slice("hello".as_bytes());
 
-        let section = DataNameSection::load(&section_data);
+        let section = DataNameSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(section.items[0], DataNameItem::new(0, 3, 0));
@@ -265,5 +276,8 @@ mod tests {
 
         assert_eq!(section.get_item_full_name_and_export(0), ("foo", false));
         assert_eq!(section.get_item_full_name_and_export(1), ("hello", true));
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries, entries_restore);
     }
 }
