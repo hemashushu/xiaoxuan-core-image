@@ -268,12 +268,10 @@ impl UninitDataSection<'_> {
     pub fn convert_to_entries(&self) -> Vec<UninitDataEntry> {
         self.items
             .iter()
-            .map(|item| {
-                UninitDataEntry {
-                    memory_data_type: item.memory_data_type,
-                    length: item.data_length,
-                    align: item.data_align,
-                }
+            .map(|item| UninitDataEntry {
+                memory_data_type: item.memory_data_type,
+                length: item.data_length,
+                align: item.data_align,
             })
             .collect()
     }
@@ -348,7 +346,7 @@ mod tests {
         let data_entry6 = InitedDataEntry::from_i64(17);
         let data_entry7 = InitedDataEntry::from_i32(19);
 
-        let (items, datas) = ReadWriteDataSection::convert_from_entries(&[
+        let entries = vec![
             data_entry0,
             data_entry1,
             data_entry2,
@@ -357,8 +355,9 @@ mod tests {
             data_entry5,
             data_entry6,
             data_entry7,
-        ]);
+        ];
 
+        let (items, datas) = ReadWriteDataSection::convert_from_entries(&entries);
         let section = ReadWriteDataSection {
             items: &items,
             datas_data: &datas,
@@ -578,7 +577,7 @@ mod tests {
         let data_entry6 = UninitDataEntry::from_i64();
         let data_entry7 = UninitDataEntry::from_i32();
 
-        let items = UninitDataSection::convert_from_entries(&[
+        let entries = vec![
             data_entry0,
             data_entry1,
             data_entry2,
@@ -587,8 +586,9 @@ mod tests {
             data_entry5,
             data_entry6,
             data_entry7,
-        ]);
+        ];
 
+        let items = UninitDataSection::convert_from_entries(&entries);
         let section = UninitDataSection { items: &items };
 
         let mut section_data: Vec<u8> = vec![];
@@ -723,11 +723,62 @@ mod tests {
 
     #[test]
     fn test_convert_inited() {
-        // todo
+        let data_entry0 = InitedDataEntry::from_i32(11);
+        let data_entry1 = InitedDataEntry::from_i64(13);
+        let data_entry2 = InitedDataEntry::from_bytes(b"hello".to_vec(), 1);
+        let data_entry3 = InitedDataEntry::from_f32(std::f32::consts::PI);
+        let data_entry4 = InitedDataEntry::from_f64(std::f64::consts::E);
+        let data_entry5 = InitedDataEntry::from_bytes(b"foo".to_vec(), 8);
+        let data_entry6 = InitedDataEntry::from_i64(17);
+        let data_entry7 = InitedDataEntry::from_i32(19);
+
+        let entries = vec![
+            data_entry0,
+            data_entry1,
+            data_entry2,
+            data_entry3,
+            data_entry4,
+            data_entry5,
+            data_entry6,
+            data_entry7,
+        ];
+
+        let (items, datas) = ReadWriteDataSection::convert_from_entries(&entries);
+        let section = ReadWriteDataSection {
+            items: &items,
+            datas_data: &datas,
+        };
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 
     #[test]
     fn test_convert_uninit() {
-        // todo
+        let data_entry0 = UninitDataEntry::from_i32();
+        let data_entry1 = UninitDataEntry::from_i64();
+        let data_entry2 = UninitDataEntry::from_bytes(5, 1);
+        let data_entry3 = UninitDataEntry::from_f32();
+        let data_entry4 = UninitDataEntry::from_f64();
+        let data_entry5 = UninitDataEntry::from_bytes(3, 8);
+        let data_entry6 = UninitDataEntry::from_i64();
+        let data_entry7 = UninitDataEntry::from_i32();
+
+        let entries = vec![
+            data_entry0,
+            data_entry1,
+            data_entry2,
+            data_entry3,
+            data_entry4,
+            data_entry5,
+            data_entry6,
+            data_entry7,
+        ];
+
+        let items = UninitDataSection::convert_from_entries(&entries);
+        let section = UninitDataSection { items: &items };
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 }

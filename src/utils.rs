@@ -839,7 +839,7 @@ mod tests {
                     ))),
                 ),
                 ExternalLibraryEntry::new(
-                    "libz".to_owned(),
+                    "zlib".to_owned(),
                     Box::new(ExternalLibraryDependency::Local(Box::new(
                         DependencyLocal {
                             path: "libz.so.1".to_owned(),
@@ -953,7 +953,7 @@ mod tests {
                 )
             },
             (
-                "libz",
+                "zlib",
                 ExternalLibraryDependencyType::Local,
                 ExternalLibraryDependency::Local(Box::new(DependencyLocal {
                     path: "libz.so.1".to_owned(),
@@ -1080,7 +1080,7 @@ mod tests {
                 )
             },
             (
-                "libz",
+                "zlib",
                 ExternalLibraryDependencyType::Local,
                 ExternalLibraryDependency::Local(Box::new(DependencyLocal {
                     path: "libz.so.1".to_owned(),

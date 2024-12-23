@@ -226,16 +226,46 @@ impl BytecodeWriter {
         }
     }
 
-    /// for instructions 'break', 'break_alt' and 'break_nez'
+    // About the stubs
+    // ---------------
+    //
+    // the following instructions contain the "next_inst_offset" parameter:
+    //
+    // - block_alt (param type_index:i32, next_inst_offset:i32)
+    // - block_nez (param local_variable_list_index:i32, next_inst_offset:i32)
+    // - break (param reversed_index:i16, next_inst_offset:i32)
+    // - break_alt (param next_inst_offset:i32)
+    //
+    // When emitting the byte code for these instructions, the value of
+    // this parameter is UNKNOWN and it can be only determined when the "end"
+    // instruction is generated.
+    //
+    // Therefore, when the assembler generates the byte code for these
+    // instructions, it first fills the parameter with the number `0`
+    // (these blank spaces are called "stubs") and records the addresses (positions)
+    // of these instructions. Then, when generating the "end"
+    // instruction, the `0` in the stub is replaced with the actual number.
+    //
+    // The structure "ControlFlowStack" is designed to implement the above purpose.
+    //
+    // Note:
+    //
+    // 1. Generating the "recur" instruction does not require
+    //    inserting stubs because the value of the parameter "start_inst_offset" can
+    //    be obtained immediately through the structure "ControlFlowStack".
+    //
+    // 2. If the target layer of "break" is "function", no stub needs to be inserted,
+    //    and the "ControlFlowStack" is not needed because the "next_inst_offset" in
+    //    this case is directly ignored by the VM.
+    //
+    // 3. If the target layer of "recur" is "function", no stub needs to be inserted,
+    //    and the "ControlFlowStack" is not needed because the "start_inst_offset" in
+    //    this case is directly ignored by the VM.
+    //
     pub fn fill_break_stub(&mut self, addr: usize, next_inst_offset: u32) {
         // (opcode:i16 reversed_index:i16, next_inst_offset:i32)
+        // also for instruction 'break_alt'
         self.rewrite_buffer(addr + 4, next_inst_offset);
-    }
-
-    /// for instructions 'recur' and 'recur_nez'
-    pub fn fill_recur_stub(&mut self, addr: usize, start_inst_offset: u32) {
-        // (opcode:i16 reversed_index:i16, start_inst_offset:i32)
-        self.rewrite_buffer(addr + 4, start_inst_offset);
     }
 
     pub fn fill_block_alt_stub(&mut self, addr: usize, next_inst_offset: u32) {
@@ -246,53 +276,6 @@ impl BytecodeWriter {
     pub fn fill_block_nez_stub(&mut self, addr: usize, next_inst_offset: u32) {
         // (opcode:i16 padding:i16 local_variable_list_index:i32 next_inst_offset:i32)
         self.rewrite_buffer(addr + 8, next_inst_offset);
-    }
-
-    /// for 'data_load' and 'host_addr_data'
-    pub fn rewrite_data_load_data_public_index() {
-        todo!()
-    }
-
-    /// for instructions 'data_load_extend' and 'host_addr_data_extend'
-    pub fn rewrite_data_load_extend_data_public_index() {
-        todo!()
-    }
-
-    pub fn rewrite_data_store_data_public_index() {
-        todo!()
-    }
-
-    pub fn rewrite_data_store_extend_data_public_index() {
-        todo!()
-    }
-
-    pub fn rewrite_block_type_index() {
-        todo!()
-    }
-
-    pub fn rewrite_block_local_list_index() {
-        todo!()
-    }
-
-    pub fn rewrite_block_alt_type_index() {
-        todo!()
-    }
-
-    pub fn rewrite_block_alt_local_list_index() {
-        todo!()
-    }
-
-    pub fn rewrite_block_nez_local_list_index() {
-        todo!()
-    }
-
-    pub fn rewrite_call_function_public_index() {
-        todo!()
-    }
-
-    /// for instructions 'get_function' and 'host_addr_function'
-    pub fn rewrite_pub_index_function_function_public_index() {
-        todo!()
     }
 }
 

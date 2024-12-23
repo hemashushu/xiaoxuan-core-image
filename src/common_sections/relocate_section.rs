@@ -29,46 +29,9 @@
 
 use crate::{
     entry::{RelocateEntry, RelocateListEntry},
-    module_image::{ModuleSectionId, SectionEntry},
+    module_image::{ModuleSectionId, RelocateType, SectionEntry},
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
-
-// there are some index in the instructions need to re-locate (re-map) when linking
-//
-// ## type_index and local_variable_list_index
-//
-// - block                   (param type_index:i32, local_variable_list_index:i32) NO_RETURN
-// - block_alt               (param type_index:i32, local_variable_list_index:i32, next_inst_offset:i32) NO_RETURN
-// - block_nez               (param local_variable_list_index:i32, next_inst_offset:i32) NO_RETURN
-//
-// ## function_public_index
-//
-// - call                    (param function_public_index:i32) (operand args...) -> (values)
-// - get_function            (param function_public_index:i32) -> i32
-// - host_addr_function      (param function_public_index:i32) -> i64
-//
-// ## external_function_index
-//
-// - extcall                 (param external_function_index:i32) (operand args...) -> return_value:void/i32/i64/f32/f64
-//
-// ## data_public_index
-//
-// - data_load_*             (param offset_bytes:i16 data_public_index:i32) -> i64
-// - data_store_*            (param offset_bytes:i16 data_public_index:i32) (operand value:i64) -> (remain_values)
-// - data_load_extend_*      (param data_public_index:i32) (operand offset_bytes:i64) -> i64
-// - data_store_extend_*     (param data_public_index:i32) (operand offset_bytes:i64 value:i64) -> (remain_values)
-// - host_addr_data          (param offset_bytes:i16 data_public_index:i32) -> i64
-// - host_addr_data_extend   (param data_public_index:i32) (operand offset_bytes:i64) -> i64
-//
-#[repr(u8)]
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum RelocateType {
-    TypeIndex,
-    LocalVariableListIndex,
-    FunctionPublicIndex,
-    ExternalFunctionIndex,
-    DataPublicIndex,
-}
 
 #[derive(Debug, PartialEq)]
 pub struct RelocateSection<'a> {
@@ -241,10 +204,10 @@ mod tests {
     use crate::{
         common_sections::relocate_section::{RelocateItem, RelocateList},
         entry::{RelocateEntry, RelocateListEntry},
-        module_image::SectionEntry,
+        module_image::{RelocateType, SectionEntry},
     };
 
-    use super::{RelocateSection, RelocateType};
+    use super::RelocateSection;
 
     #[test]
     fn test_write_section() {
@@ -570,6 +533,39 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        // todo
+        let entries = vec![
+            RelocateListEntry::new(vec![
+                RelocateEntry::new(11, RelocateType::TypeIndex),
+                RelocateEntry::new(13, RelocateType::LocalVariableListIndex),
+                RelocateEntry::new(17, RelocateType::FunctionPublicIndex),
+                RelocateEntry::new(19, RelocateType::DataPublicIndex),
+            ]),
+            RelocateListEntry::new(vec![
+                RelocateEntry::new(23, RelocateType::ExternalFunctionIndex),
+                RelocateEntry::new(29, RelocateType::FunctionPublicIndex),
+            ]),
+            RelocateListEntry::new(vec![]),
+            RelocateListEntry::new(vec![
+                RelocateEntry::new(31, RelocateType::DataPublicIndex),
+                RelocateEntry::new(37, RelocateType::FunctionPublicIndex),
+            ]),
+            RelocateListEntry::new(vec![]),
+            RelocateListEntry::new(vec![]),
+            RelocateListEntry::new(vec![
+                RelocateEntry::new(41, RelocateType::TypeIndex),
+                RelocateEntry::new(43, RelocateType::LocalVariableListIndex),
+                RelocateEntry::new(47, RelocateType::DataPublicIndex),
+            ]),
+        ];
+
+        let (lists, list_data) = RelocateSection::convert_from_entries(&entries);
+
+        let section = RelocateSection {
+            lists: &lists,
+            list_data: &list_data,
+        };
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 }

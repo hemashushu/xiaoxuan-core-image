@@ -114,6 +114,7 @@ use crate::{
         import_function_section::ImportFunctionSection,
         import_module_section::ImportModuleSection,
         local_variable_section::LocalVariableSection,
+        relocate_section::RelocateSection,
         type_section::TypeSection,
     },
     index_sections::{
@@ -239,6 +240,46 @@ pub enum ImageType {
 
     // `*.anco`
     ObjectFile,
+}
+
+// About re-locating
+// -----------------
+//
+// there are indices in the instructions need to re-locate (re-map) when linking
+//
+// ## type_index and local_variable_list_index
+//
+// - block                   (param type_index:i32, local_variable_list_index:i32) NO_RETURN
+// - block_alt               (param type_index:i32, local_variable_list_index:i32, next_inst_offset:i32) NO_RETURN
+// - block_nez               (param local_variable_list_index:i32, next_inst_offset:i32) NO_RETURN
+//
+// ## function_public_index
+//
+// - call                    (param function_public_index:i32) (operand args...) -> (values)
+// - get_function            (param function_public_index:i32) -> i32
+// - host_addr_function      (param function_public_index:i32) -> i64
+//
+// ## external_function_index
+//
+// - extcall                 (param external_function_index:i32) (operand args...) -> return_value:void/i32/i64/f32/f64
+//
+// ## data_public_index
+//
+// - data_load_*             (param offset_bytes:i16 data_public_index:i32) -> i64
+// - data_store_*            (param offset_bytes:i16 data_public_index:i32) (operand value:i64) -> (remain_values)
+// - host_addr_data          (param offset_bytes:i16 data_public_index:i32) -> i64
+// - data_load_extend_*      (param data_public_index:i32) (operand offset_bytes:i64) -> i64
+// - data_store_extend_*     (param data_public_index:i32) (operand offset_bytes:i64 value:i64) -> (remain_values)
+// - host_addr_data_extend   (param data_public_index:i32) (operand offset_bytes:i64) -> i64
+//
+#[repr(u8)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum RelocateType {
+    TypeIndex,
+    LocalVariableListIndex,
+    FunctionPublicIndex,
+    ExternalFunctionIndex,
+    DataPublicIndex,
 }
 
 // `RangeItem` is used for data index section and function index section
@@ -503,6 +544,12 @@ impl<'a> ModuleImage<'a> {
     pub fn get_optional_data_name_section(&'a self) -> Option<DataNameSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::DataName)
             .map(DataNameSection::read)
+    }
+
+    // optional section (for debug and link only)
+    pub fn get_optional_relocate_section(&'a self) -> Option<RelocateSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::Relocate)
+            .map(RelocateSection::read)
     }
 
     // optional section (for debug and link only)

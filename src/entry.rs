@@ -10,7 +10,7 @@ use anc_isa::{
     DataSectionType, ExternalLibraryDependency, MemoryDataType, ModuleDependency, OperandDataType,
 };
 
-use crate::common_sections::relocate_section::RelocateType;
+use crate::module_image::RelocateType;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeEntry {
@@ -412,12 +412,83 @@ pub struct RelocateEntry {
     pub relocate_type: RelocateType,
 }
 
+// About re-locating
+// -----------------
+//
+// there are indices in the instructions need to re-locate (re-map) when linking
+//
+// ## type_index and local_variable_list_index
+//
+// - block                   (param type_index:i32, local_variable_list_index:i32) NO_RETURN
+// - block_alt               (param type_index:i32, local_variable_list_index:i32, next_inst_offset:i32) NO_RETURN
+// - block_nez               (param local_variable_list_index:i32, next_inst_offset:i32) NO_RETURN
+//
+// ## function_public_index
+//
+// - call                    (param function_public_index:i32) (operand args...) -> (values)
+// - get_function            (param function_public_index:i32) -> i32
+// - host_addr_function      (param function_public_index:i32) -> i64
+//
+// ## external_function_index
+//
+// - extcall                 (param external_function_index:i32) (operand args...) -> return_value:void/i32/i64/f32/f64
+//
+// ## data_public_index
+//
+// - data_load_*             (param offset_bytes:i16 data_public_index:i32) -> i64
+// - data_store_*            (param offset_bytes:i16 data_public_index:i32) (operand value:i64) -> (remain_values)
+// - host_addr_data          (param offset_bytes:i16 data_public_index:i32) -> i64
+// - data_load_extend_*      (param data_public_index:i32) (operand offset_bytes:i64) -> i64
+// - data_store_extend_*     (param data_public_index:i32) (operand offset_bytes:i64 value:i64) -> (remain_values)
+// - host_addr_data_extend   (param data_public_index:i32) (operand offset_bytes:i64) -> i64
+//
 impl RelocateEntry {
     pub fn new(code_offset: usize, relocate_type: RelocateType) -> Self {
         Self {
             code_offset,
             relocate_type,
         }
+    }
+
+    // for instructions:
+    // - data_load_*
+    // - data_store_*
+    // - host_addr_data
+    // - data_load_extend_*
+    // - data_store_extend_*
+    // - host_addr_data_extend
+    pub fn from_data_public_index(inst_addr: usize) -> Self {
+        RelocateEntry::new(inst_addr + 4, RelocateType::DataPublicIndex)
+    }
+
+    // for instructions:
+    // - call
+    // - get_function
+    // - host_addr_function
+    pub fn from_function_public_index(inst_addr: usize) -> Self {
+        RelocateEntry::new(inst_addr + 4, RelocateType::FunctionPublicIndex)
+    }
+
+    // for instruction:
+    // - extcall
+    pub fn from_external_function_index(inst_addr: usize) -> Self {
+        RelocateEntry::new(inst_addr + 4, RelocateType::ExternalFunctionIndex)
+    }
+
+    // for instructions:
+    // - block
+    // - block_alt
+    pub fn from_block_with_type_and_local_variables(inst_addr: usize) -> Vec<Self> {
+        vec![
+            RelocateEntry::new(inst_addr + 4, RelocateType::TypeIndex),
+            RelocateEntry::new(inst_addr + 8, RelocateType::LocalVariableListIndex),
+        ]
+    }
+
+    // for instruction:
+    // - block_nez
+    pub fn from_block_with_local_variables(inst_addr: usize) -> Self {
+        RelocateEntry::new(inst_addr + 4, RelocateType::LocalVariableListIndex)
     }
 }
 

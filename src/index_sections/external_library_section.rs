@@ -269,7 +269,7 @@ mod tests {
                 "foobar".to_owned(),
                 Box::new(ExternalLibraryDependency::Local(Box::new(
                     DependencyLocal {
-                        path: "hello.so.1".to_owned(),
+                        path: "libhello.so.1".to_owned(),
                         condition: None,
                         values: None,
                     },

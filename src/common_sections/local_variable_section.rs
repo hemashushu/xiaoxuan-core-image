@@ -158,30 +158,30 @@ impl<'a> LocalVariableSection<'a> {
 
         let list_offset = list.list_offset as usize;
         let item_count = list.list_item_count as usize;
-        let items_data =
-            &self.list_data[list_offset..(list_offset + item_count * size_of::<LocalVariableItem>())];
+        let items_data = &self.list_data
+            [list_offset..(list_offset + item_count * size_of::<LocalVariableItem>())];
         let items_ptr = items_data.as_ptr() as *const LocalVariableItem;
         let items = std::ptr::slice_from_raw_parts(items_ptr, item_count);
         unsafe { &*items }
     }
 
-//     // for inspect
-//     pub fn get_local_variable_list_entry(&self, idx: usize) -> LocalVariableListEntry {
-//         let items = self.get_local_variable_list(idx);
-//
-//         let local_variable_entries = items
-//             .iter()
-//             .map(|item| LocalVariableEntry {
-//                 memory_data_type: item.memory_data_type,
-//                 length: item.var_actual_length,
-//                 align: item.var_align,
-//             })
-//             .collect::<Vec<_>>();
-//
-//         LocalVariableListEntry {
-//             local_variable_entries,
-//         }
-//     }
+    //     // for inspect
+    //     pub fn get_local_variable_list_entry(&self, idx: usize) -> LocalVariableListEntry {
+    //         let items = self.get_local_variable_list(idx);
+    //
+    //         let local_variable_entries = items
+    //             .iter()
+    //             .map(|item| LocalVariableEntry {
+    //                 memory_data_type: item.memory_data_type,
+    //                 length: item.var_actual_length,
+    //                 align: item.var_align,
+    //             })
+    //             .collect::<Vec<_>>();
+    //
+    //         LocalVariableListEntry {
+    //             local_variable_entries,
+    //         }
+    //     }
 
     pub fn convert_to_entries(&self) -> Vec<LocalVariableListEntry> {
         let lists = &self.lists;
@@ -192,8 +192,8 @@ impl<'a> LocalVariableSection<'a> {
             .map(|list| {
                 let list_offset = list.list_offset as usize;
                 let item_count = list.list_item_count as usize;
-                let items_data =
-                    &list_data[list_offset..(list_offset + item_count * size_of::<LocalVariableItem>())];
+                let items_data = &list_data
+                    [list_offset..(list_offset + item_count * size_of::<LocalVariableItem>())];
                 let items_ptr = items_data.as_ptr() as *const LocalVariableItem;
                 let items = std::ptr::slice_from_raw_parts(items_ptr, item_count);
                 let items_ref = unsafe { &*items };
@@ -217,7 +217,7 @@ impl<'a> LocalVariableSection<'a> {
     pub fn convert_from_entries(
         entiress: &[LocalVariableListEntry],
     ) -> (Vec<LocalVariableList>, Vec<u8>) {
-        const LOCAL_VARIABLE_ITEM_LENGTH_IN_BYTES:usize = size_of::<LocalVariableItem>();
+        const LOCAL_VARIABLE_ITEM_LENGTH_IN_BYTES: usize = size_of::<LocalVariableItem>();
 
         // generate a list of (list, vars_allocate_bytes)
         let items_list_with_vars_allocate_bytes = entiress
@@ -706,6 +706,36 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        // todo
+        let entries = vec![
+            LocalVariableListEntry::new(vec![
+                LocalVariableEntry::from_i32(),
+                LocalVariableEntry::from_i64(),
+                LocalVariableEntry::from_f32(),
+                LocalVariableEntry::from_f64(),
+            ]),
+            LocalVariableListEntry::new(vec![
+                LocalVariableEntry::from_i32(),
+                LocalVariableEntry::from_bytes(1, 2),
+                LocalVariableEntry::from_i32(),
+                LocalVariableEntry::from_bytes(6, 12),
+                LocalVariableEntry::from_bytes(12, 16),
+                LocalVariableEntry::from_i32(),
+            ]),
+            LocalVariableListEntry::new(vec![]),
+            LocalVariableListEntry::new(vec![LocalVariableEntry::from_bytes(1, 4)]),
+            LocalVariableListEntry::new(vec![]),
+            LocalVariableListEntry::new(vec![]),
+            LocalVariableListEntry::new(vec![LocalVariableEntry::from_i32()]),
+        ];
+
+        let (lists, list_data) = LocalVariableSection::convert_from_entries(&entries);
+
+        let section = LocalVariableSection {
+            lists: &lists,
+            list_data: &list_data,
+        };
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 }

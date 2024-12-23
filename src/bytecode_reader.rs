@@ -182,9 +182,10 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (offset_next, format!("off:0x{:02x}", offset))
             }
             // heap memory
-            Opcode::memory_fill | Opcode::memory_copy | Opcode::memory_capacity | Opcode::memory_resize => {
-                (offset_param, String::new())
-            }
+            Opcode::memory_fill
+            | Opcode::memory_copy
+            | Opcode::memory_capacity
+            | Opcode::memory_resize => (offset_param, String::new()),
 
             // conversion
             Opcode::truncate_i64_to_i32
@@ -392,7 +393,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                     ),
                 )
             }
-            Opcode::break_ | /* Opcode::break_nez | */ Opcode::recur /* | Opcode::recur_nez */ => {
+            Opcode::break_ | Opcode::recur => {
                 let (offset_next, reversed_index, offset) =
                     continue_read_param_i16_i32(codes, offset_param);
                 (
@@ -400,7 +401,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                     format!("rev:{:<2}  off:0x{:02x}", reversed_index, offset),
                 )
             }
-            Opcode::call | Opcode::extcall | Opcode::envcall  => {
+            Opcode::call | Opcode::extcall | Opcode::envcall => {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", idx))
             }

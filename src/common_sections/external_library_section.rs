@@ -281,10 +281,10 @@ mod tests {
     fn test_convert() {
         let entries = vec![
             ExternalLibraryEntry::new(
-                "foobar".to_owned(),
+                "hello".to_owned(),
                 Box::new(ExternalLibraryDependency::Local(Box::new(
                     DependencyLocal {
-                        path: "hello.so.1".to_owned(),
+                        path: "libhello.so.1".to_owned(),
                         values: None,
                         condition: None,
                     },
@@ -317,7 +317,7 @@ mod tests {
 
         assert_eq!(
             (name0, type0),
-            ("foobar", ExternalLibraryDependencyType::Local)
+            ("hello", ExternalLibraryDependencyType::Local)
         );
         assert_eq!(
             (name1, type1),

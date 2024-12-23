@@ -50,9 +50,7 @@ pub struct ExternalFunctionIndexItem {
 }
 
 impl ExternalFunctionIndexItem {
-    pub fn new(
-        unified_external_function_index: u32,
-    ) -> Self {
+    pub fn new(unified_external_function_index: u32) -> Self {
         Self {
             unified_external_function_index,
         }
@@ -135,6 +133,7 @@ impl ExternalFunctionIndexSection<'_> {
 #[cfg(test)]
 mod tests {
     use crate::{
+        entry::{ExternalFunctionIndexEntry, ExternalFunctionIndexListEntry},
         index_sections::external_function_index_section::{
             ExternalFunctionIndexItem, ExternalFunctionIndexSection,
         },
@@ -228,6 +227,30 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        // todo
+        let entries = vec![
+            ExternalFunctionIndexListEntry::new(vec![
+                ExternalFunctionIndexEntry::new(11),
+                ExternalFunctionIndexEntry::new(13),
+                ExternalFunctionIndexEntry::new(17),
+            ]),
+            ExternalFunctionIndexListEntry::new(vec![
+                ExternalFunctionIndexEntry::new(23),
+                ExternalFunctionIndexEntry::new(29),
+            ]),
+        ];
+
+        let (ranges, items) = ExternalFunctionIndexSection::convert_from_entries(&entries);
+
+        let section = ExternalFunctionIndexSection {
+            ranges: &ranges,
+            items: &items,
+        };
+
+        assert_eq!(section.get_item_unified_external_function_index(0, 0), 11);
+        assert_eq!(section.get_item_unified_external_function_index(0, 1), 13);
+        assert_eq!(section.get_item_unified_external_function_index(0, 2), 17);
+
+        assert_eq!(section.get_item_unified_external_function_index(1, 0), 23);
+        assert_eq!(section.get_item_unified_external_function_index(1, 1), 29);
     }
 }
