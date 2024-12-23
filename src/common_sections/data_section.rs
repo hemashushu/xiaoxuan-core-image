@@ -364,7 +364,7 @@ mod tests {
             datas_data: &datas,
         };
 
-        let mut section_data: Vec<u8> = Vec::new();
+        let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
 
         let expect_data = vec![
@@ -591,7 +591,7 @@ mod tests {
 
         let section = UninitDataSection { items: &items };
 
-        let mut section_data: Vec<u8> = Vec::new();
+        let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
 
         let expect_data = vec![

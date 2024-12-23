@@ -10,6 +10,8 @@ use anc_isa::{
     DataSectionType, ExternalLibraryDependency, MemoryDataType, ModuleDependency, OperandDataType,
 };
 
+use crate::common_sections::relocate_section::RelocateType;
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeEntry {
     pub params: Vec<OperandDataType>,
@@ -387,6 +389,35 @@ pub struct DataNameEntry {
 impl DataNameEntry {
     pub fn new(full_name: String, export: bool) -> Self {
         Self { full_name, export }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RelocateListEntry {
+    pub relocate_entries: Vec<RelocateEntry>,
+}
+
+impl RelocateListEntry {
+    pub fn new(relocate_entries: Vec<RelocateEntry>) -> Self {
+        Self { relocate_entries }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RelocateEntry {
+    // offset in functions
+    // this 'code_offset' is different from the 'code_offset' in the FunctionItem, which
+    // is the offset in the function bytecode area.
+    pub code_offset: usize,
+    pub relocate_type: RelocateType,
+}
+
+impl RelocateEntry {
+    pub fn new(code_offset: usize, relocate_type: RelocateType) -> Self {
+        Self {
+            code_offset,
+            relocate_type,
+        }
     }
 }
 

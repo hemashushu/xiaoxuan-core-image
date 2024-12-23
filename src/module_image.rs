@@ -24,6 +24,7 @@
 // - import data section
 // - function name section
 // - data name section
+// - relocate section
 // - external library section
 // - external function section
 // - common property section
@@ -197,6 +198,7 @@ pub enum ModuleSectionId {
     // the section 'FunctionName' and 'DataName' are required also.
     FunctionName = 0x0030, // 0x30
     DataName,              // 0x31
+    Relocate,              // 0x32
 
     // optional (for debug and linking)
     ImportModule = 0x0040, // 0x40
@@ -209,9 +211,8 @@ pub enum ModuleSectionId {
      essential (application only)
     */
     IndexProperty = 0x0080, // 0x80
-    // this section is used by the module loader
-    ModuleList,    // 0x81
-    FunctionIndex, // 0x82
+    ModuleList,             // 0x81, this section is used by the module loader
+    FunctionIndex,          // 0x82
 
     /*
     optional (application only)
@@ -358,10 +359,10 @@ impl<'a> ModuleImage<'a> {
     pub fn convert_from_section_entries(
         entries: &[&'a dyn SectionEntry<'a>],
     ) -> (Vec<ModuleSectionItem>, Vec<u8>) {
-        let mut image_binary: Vec<u8> = Vec::new();
+        let mut image_binary: Vec<u8> = vec![];
 
         // len0, len0+1, len0+1+2..., len total
-        let mut data_increment_lengths: Vec<usize> = Vec::new();
+        let mut data_increment_lengths: Vec<usize> = vec![];
 
         for entry in entries {
             entry.write(&mut image_binary).unwrap();
@@ -685,7 +686,7 @@ mod tests {
         };
 
         // save
-        let mut image_binary: Vec<u8> = Vec::new();
+        let mut image_binary: Vec<u8> = vec![];
         module_image.write(&mut image_binary).unwrap();
 
         assert_eq!(&image_binary[0..8], IMAGE_FILE_MAGIC_NUMBER);

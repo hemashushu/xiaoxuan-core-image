@@ -98,7 +98,7 @@ mod tests {
     fn test_write_section() {
         let section = CommonPropertySection::new("bar", 17, 19);
 
-        let mut section_data: Vec<u8> = Vec::new();
+        let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![

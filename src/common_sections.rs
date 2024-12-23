@@ -15,4 +15,5 @@ pub mod import_data_section;
 pub mod import_function_section;
 pub mod import_module_section;
 pub mod local_variable_section;
+pub mod relocate_section;
 pub mod type_section;

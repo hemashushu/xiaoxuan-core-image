@@ -198,7 +198,7 @@ mod tests {
             codes_data: b"hello0123456789a",
         };
 
-        let mut section_data: Vec<u8> = Vec::new();
+        let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![

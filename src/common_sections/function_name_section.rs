@@ -196,7 +196,7 @@ mod tests {
             full_names_data: "foohello".as_bytes(),
         };
 
-        let mut section_data: Vec<u8> = Vec::new();
+        let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![

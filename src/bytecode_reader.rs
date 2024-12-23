@@ -49,7 +49,7 @@ pub fn format_bytecode_as_binary(codes: &[u8]) -> String {
 // 0x0002  00 04 02 00                 heap.load       off:0x02
 // 0x0006  08 04 03 00                 heap.store      off:0x03
 pub fn format_bytecode_as_text(codes: &[u8]) -> String {
-    let mut lines: Vec<String> = Vec::new();
+    let mut lines: Vec<String> = vec![];
 
     let code_length = codes.len(); // in bytes
     let mut offset = 0; // in bytes

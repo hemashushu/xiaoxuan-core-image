@@ -155,7 +155,7 @@ impl<'a> UnifiedExternalTypeSection<'a> {
         let types_data = entries
             .iter()
             .flat_map(|entry| {
-                let mut bytes: Vec<u8> = Vec::new();
+                let mut bytes: Vec<u8> = vec![];
                 let params_bytes =
                     slice_from_raw_parts(entry.params.as_ptr() as *const u8, entry.params.len());
                 let results_bytes =
@@ -276,7 +276,7 @@ mod tests {
             ],
         };
 
-        let mut section_data: Vec<u8> = Vec::new();
+        let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
 
         assert_eq!(

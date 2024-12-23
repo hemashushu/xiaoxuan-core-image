@@ -240,7 +240,7 @@ mod tests {
             items: &items,
         };
 
-        let mut section_data: Vec<u8> = Vec::new();
+        let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
 
         assert_eq!(

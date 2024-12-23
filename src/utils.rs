@@ -99,7 +99,7 @@ pub fn helper_build_module_binary_with_single_function_and_data(
         .map(|data_type| convert_operand_data_type_to_local_variable_entry(*data_type))
         .collect::<Vec<_>>();
 
-    let mut local_variables = Vec::new();
+    let mut local_variables = vec![];
     local_variables.extend_from_slice(&params_as_local_variables);
     local_variables.extend_from_slice(&local_variable_entries_without_function_args);
 
@@ -174,7 +174,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
         })
         .collect::<Vec<_>>();
 
-    let mut type_entries = Vec::new();
+    let mut type_entries = vec![];
     type_entries.extend_from_slice(&function_type_entries);
     type_entries.extend_from_slice(&block_type_entries);
 
@@ -194,7 +194,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
                 })
                 .collect::<Vec<_>>();
 
-            let mut local_variables = Vec::new();
+            let mut local_variables = vec![];
             local_variables.extend_from_slice(&params_as_local_variables);
             local_variables.extend_from_slice(&entry.local_variable_item_entries_without_args);
 
@@ -215,7 +215,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
                 })
                 .collect::<Vec<_>>();
 
-            let mut local_variables = Vec::new();
+            let mut local_variables = vec![];
             local_variables.extend_from_slice(&params_as_local_variables);
             local_variables.extend_from_slice(&entry.local_variable_item_entries_without_args);
 
@@ -225,7 +225,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
         })
         .collect::<Vec<_>>();
 
-    let mut local_list_entries = Vec::new();
+    let mut local_list_entries = vec![];
     local_list_entries.extend_from_slice(&local_list_entries_of_functions);
     local_list_entries.extend_from_slice(&local_list_entries_of_blocks);
 
@@ -290,7 +290,7 @@ pub fn helper_build_module_binary_with_functions_and_data_and_external_functions
         })
         .collect::<Vec<_>>();
 
-    let mut type_entries = Vec::new();
+    let mut type_entries = vec![];
     type_entries.extend_from_slice(&function_type_entries);
     type_entries.extend_from_slice(&external_function_type_entries);
 
@@ -310,7 +310,7 @@ pub fn helper_build_module_binary_with_functions_and_data_and_external_functions
                 })
                 .collect::<Vec<_>>();
 
-            let mut local_variables = Vec::new();
+            let mut local_variables = vec![];
             local_variables.extend_from_slice(&params_as_local_variables);
             local_variables.extend_from_slice(&entry.local_variable_item_entries_without_args);
 
@@ -486,7 +486,7 @@ pub fn helper_build_module_binary(
         count: (ro_items.len() + rw_items.len() + uninit_items.len()) as u32,
     }];
 
-    let mut data_index_items: Vec<DataIndexItem> = Vec::new();
+    let mut data_index_items: Vec<DataIndexItem> = vec![];
 
     let ro_iter = ro_items
         .iter()
@@ -612,7 +612,7 @@ pub fn helper_build_module_binary(
     };
 
     // build module image binary
-    let mut image_binary: Vec<u8> = Vec::new();
+    let mut image_binary: Vec<u8> = vec![];
     module_image.write(&mut image_binary).unwrap();
     image_binary
 }
@@ -620,7 +620,7 @@ pub fn helper_build_module_binary(
 pub fn helper_load_modules_from_binaries(
     module_binaries: Vec<&[u8]>,
 ) -> Result<Vec<ModuleImage>, ImageError> {
-    let mut module_images: Vec<ModuleImage> = Vec::new();
+    let mut module_images: Vec<ModuleImage> = vec![];
 
     for binary in module_binaries {
         let module_image = ModuleImage::read(binary)?;
