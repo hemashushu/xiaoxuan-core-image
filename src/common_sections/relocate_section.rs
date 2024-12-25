@@ -33,7 +33,7 @@ use crate::{
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct RelocateSection<'a> {
     pub lists: &'a [RelocateList],
     pub list_data: &'a [u8],

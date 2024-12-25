@@ -21,20 +21,30 @@ use std::fmt::Display;
 
 #[derive(Debug)]
 pub struct ImageError {
-    message: String,
+    // message: String,
+    pub error_type: ImageErrorType,
+}
+
+#[derive(Debug)]
+pub enum ImageErrorType {
+    InvalidImage,
+    RequireNewVersionRuntime,
 }
 
 impl ImageError {
-    pub fn new(message: &str) -> Self {
-        Self {
-            message: message.to_owned(),
-        }
+    pub fn new(error_type: ImageErrorType) -> Self {
+        Self { error_type }
     }
 }
 
 impl Display for ImageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Binary error: {}", self.message)
+        match self.error_type {
+            ImageErrorType::InvalidImage => write!(f, "Not a valid module image."),
+            ImageErrorType::RequireNewVersionRuntime => {
+                write!(f, "The version of module image is newer than runtime.")
+            }
+        }
     }
 }
 

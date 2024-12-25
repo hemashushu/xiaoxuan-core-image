@@ -127,7 +127,7 @@ use crate::{
         module_list_section::ModuleListSection,
     },
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
-    ImageError,
+    ImageError, ImageErrorType,
 };
 
 // the "module image file" binary layout:
@@ -337,7 +337,7 @@ impl<'a> ModuleImage<'a> {
     pub fn read(image_binary: &'a [u8]) -> Result<Self, ImageError> {
         let magic_slice = &image_binary[0..8];
         if magic_slice != IMAGE_FILE_MAGIC_NUMBER {
-            return Err(ImageError::new("Not a valid module image file."));
+            return Err(ImageError::new(ImageErrorType::InvalidImage));
         }
 
         // there is another safe approach for obtaining the version number:
@@ -362,9 +362,7 @@ impl<'a> ModuleImage<'a> {
         let supported_module_format_image_version =
             ((IMAGE_FORMAT_MAJOR_VERSION as u32) << 16) | (IMAGE_FORMAT_MINOR_VERSION as u32); // supported version 1.0
         if declared_module_image_version > supported_module_format_image_version {
-            return Err(ImageError::new(
-                "The module image format requires a newer version runtime to read.",
-            ));
+            return Err(ImageError::new(ImageErrorType::RequireNewVersionRuntime));
         }
 
         let image_body = &image_binary[(header_length as usize)..];
