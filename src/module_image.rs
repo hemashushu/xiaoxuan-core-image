@@ -136,10 +136,10 @@ use crate::{
 //              |---------------------------------------------------|
 //              | magic number (u64)                                | 8 bytes, off=0
 //              |---------------------------------------------------|
-//              | image type (u16)        | header length (u16)     | 4 bytes, off=8
+//              | image type (u16)        | extra header len (u16)  | 4 bytes, off=8
 //              | img fmt minor ver (u16) | img fmt major ver (u16) | 4 bytes, off=12
 //              |---------------------------------------------------|
-//                 default header length = 16 bytes
+//                 base header length = 16 bytes
 
 //                 body
 //              |------------------------------------------------------|
@@ -156,6 +156,7 @@ use crate::{
 
 pub const DATA_ALIGN_BYTES: usize = 4;
 pub const IMAGE_FILE_MAGIC_NUMBER: &[u8; 8] = b"ancmod\0\0"; // stands for the "XiaoXuan Core Module"
+pub const BASE_MODULE_HEADER_LENGTH: usize = 16;
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleImage<'a> {
@@ -352,8 +353,8 @@ impl<'a> ModuleImage<'a> {
         let ptr_image_type = unsafe { ptr.offset(8) };
         let image_type = unsafe { std::ptr::read(ptr_image_type as *const ImageType) };
 
-        let ptr_header_length = unsafe { ptr.offset(10) };
-        let header_length = unsafe { std::ptr::read(ptr_header_length as *const u16) };
+        let ptr_extra_header_length = unsafe { ptr.offset(10) };
+        let extra_header_length = unsafe { std::ptr::read(ptr_extra_header_length as *const u16) };
 
         let ptr_declared_module_format_image_version = unsafe { ptr.offset(12) };
         let declared_module_image_version =
@@ -365,7 +366,7 @@ impl<'a> ModuleImage<'a> {
             return Err(ImageError::new(ImageErrorType::RequireNewVersionRuntime));
         }
 
-        let image_body = &image_binary[(header_length as usize)..];
+        let image_body = &image_binary[(BASE_MODULE_HEADER_LENGTH + extra_header_length as usize)..];
 
         // since the structure of module image and a section are the same,
         // that is, the module image itself can be thought of
@@ -383,12 +384,12 @@ impl<'a> ModuleImage<'a> {
     }
 
     pub fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        const DEFAULT_MODULE_HEADER_LENGTH: u16 = 16;
+        const EXTRA_HEADER_LENGTH: u16 = 0;
 
         // write header
         writer.write_all(IMAGE_FILE_MAGIC_NUMBER)?;
         writer.write_all(&(self.image_type as u16).to_le_bytes())?;
-        writer.write_all(&DEFAULT_MODULE_HEADER_LENGTH.to_le_bytes())?;
+        writer.write_all(&EXTRA_HEADER_LENGTH.to_le_bytes())?;
         writer.write_all(&IMAGE_FORMAT_MINOR_VERSION.to_le_bytes())?;
         writer.write_all(&IMAGE_FORMAT_MAJOR_VERSION.to_le_bytes())?;
 
@@ -630,7 +631,9 @@ mod tests {
             type_section::TypeSection,
         },
         entry::{LocalVariableEntry, LocalVariableListEntry, TypeEntry},
-        module_image::{ImageType, ModuleImage, SectionEntry, IMAGE_FILE_MAGIC_NUMBER},
+        module_image::{
+            ImageType, ModuleImage, SectionEntry, BASE_MODULE_HEADER_LENGTH, IMAGE_FILE_MAGIC_NUMBER,
+        },
     };
 
     #[test]
@@ -736,13 +739,14 @@ mod tests {
 
         assert_eq!(&image_binary[0..8], IMAGE_FILE_MAGIC_NUMBER);
         assert_eq!(&image_binary[8..10], &[2, 0]); // image type
-        assert_eq!(&image_binary[10..12], &[16, 0]); // header length
+        assert_eq!(&image_binary[10..12], &[0, 0]); // extra header length
         assert_eq!(&image_binary[12..14], &[0, 0]); // image format minor version number, little endian
         assert_eq!(&image_binary[14..16], &[1, 0]); // image format major version number, little endian
 
         // body
-        let header_length: u16 = u16::from_le_bytes((&image_binary[10..12]).try_into().unwrap());
-        let remains = &image_binary[(header_length as usize)..];
+        let extra_header_length: u16 =
+            u16::from_le_bytes((&image_binary[10..12]).try_into().unwrap());
+        let remains = &image_binary[(BASE_MODULE_HEADER_LENGTH + extra_header_length as usize)..];
 
         // section count
         let (section_count_data, remains) = remains.split_at(8);

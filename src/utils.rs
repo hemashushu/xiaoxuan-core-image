@@ -370,14 +370,14 @@ pub fn helper_build_module_binary(
     external_function_entries: Vec<ExternalFunctionEntry>,
     entry_function_public_index: u32,
 ) -> Vec<u8> {
-    // build type section
+    // type section
     let (type_items, types_data) = TypeSection::convert_from_entries(&type_entries);
     let type_section = TypeSection {
         items: &type_items,
         types_data: &types_data,
     };
 
-    // build local variable section
+    // local variable section
     let (local_lists, local_list_data) =
         LocalVariableSection::convert_from_entries(&local_list_entries);
     let local_variable_section = LocalVariableSection {
@@ -385,34 +385,34 @@ pub fn helper_build_module_binary(
         list_data: &local_list_data,
     };
 
-    // build function section
+    // function section
     let (function_items, codes_data) = FunctionSection::convert_from_entries(&function_entries);
     let function_section = FunctionSection {
         items: &function_items,
         codes_data: &codes_data,
     };
 
-    // build read-only data section
+    // read-only data section
     let (ro_items, ro_data) = ReadOnlyDataSection::convert_from_entries(&read_only_data_entries);
     let ro_data_section = ReadOnlyDataSection {
         items: &ro_items,
         datas_data: &ro_data,
     };
 
-    // build read-write data section
+    // read-write data section
     let (rw_items, rw_data) = ReadWriteDataSection::convert_from_entries(&read_write_data_entries);
     let rw_data_section = ReadWriteDataSection {
         items: &rw_items,
         datas_data: &rw_data,
     };
 
-    // build uninitilized data section
+    // uninitilized data section
     let uninit_items = UninitDataSection::convert_from_entries(&uninit_uninit_data_entries);
     let uninit_data_section = UninitDataSection {
         items: &uninit_items,
     };
 
-    // function name paths (abitray)
+    // function name section
     let (function_name_items, function_names_data) =
         FunctionNameSection::convert_from_entries(&[
             FunctionNameEntry::new("func0".to_owned(), true),
@@ -424,7 +424,7 @@ pub fn helper_build_module_binary(
         full_names_data: &function_names_data,
     };
 
-    // data name paths
+    // data name section
     let (data_name_items, data_names_data) = DataNameSection::convert_from_entries(&[
         DataNameEntry::new("data0".to_owned(), true),
         DataNameEntry::new("data1".to_owned(), true),
@@ -435,7 +435,7 @@ pub fn helper_build_module_binary(
         full_names_data: &data_names_data,
     };
 
-    // build external library section
+    // external library section
     let (external_library_items, external_library_data) =
         ExternalLibrarySection::convert_from_entries(&external_library_entries);
     let external_library_section = ExternalLibrarySection {
@@ -443,7 +443,7 @@ pub fn helper_build_module_binary(
         items_data: &external_library_data,
     };
 
-    // build external function section
+    // external function section
     let (external_function_items, external_function_data) =
         ExternalFunctionSection::convert_from_entries(&external_function_entries);
     let external_function_section = ExternalFunctionSection {
@@ -451,10 +451,10 @@ pub fn helper_build_module_binary(
         names_data: &external_function_data,
     };
 
-    // build common property section
+    // common property section
     let common_property_section = CommonPropertySection::new(name, 0, 0);
 
-    // build function index
+    // function index
     let function_ranges: Vec<RangeItem> = vec![RangeItem {
         offset: 0,
         count: function_entries.len() as u32,
@@ -472,7 +472,7 @@ pub fn helper_build_module_binary(
         items: &function_index_items,
     };
 
-    // build data index
+    // data index
 
     // the data index is ordered by:
     // 1. imported ro data
@@ -510,7 +510,7 @@ pub fn helper_build_module_binary(
         items: &data_index_items,
     };
 
-    // build unified external library section
+    // unified external library section
     // for simplicity, build 1:1 to the external_library_entries
     let unified_external_library_entries = external_library_entries.clone();
     let (unified_external_library_items, unified_external_library_data) =
@@ -520,17 +520,7 @@ pub fn helper_build_module_binary(
         items_data: &unified_external_library_data,
     };
 
-    // build unified external function section
-    // for simplicity, build 1:1 to external_function_entries
-    let unified_external_function_entries = external_function_entries.clone();
-    let (unified_external_function_items, unified_external_function_data) =
-        UnifiedExternalFunctionSection::convert_from_entries(&unified_external_function_entries);
-    let unified_external_function_section = UnifiedExternalFunctionSection {
-        items: &unified_external_function_items,
-        names_data: &unified_external_function_data,
-    };
-
-    // build unified external type section
+    // unified external type section
     // for simplicity, build 1:1 to type_entries
     let unified_external_type_entries = type_entries.clone();
     let (unified_external_type_items, unified_external_type_data) =
@@ -538,6 +528,16 @@ pub fn helper_build_module_binary(
     let unified_external_type_section = UnifiedExternalTypeSection {
         items: &unified_external_type_items,
         types_data: &unified_external_type_data,
+    };
+
+    // unified external function section
+    // for simplicity, build 1:1 to external_function_entries
+    let unified_external_function_entries = external_function_entries.clone();
+    let (unified_external_function_items, unified_external_function_data) =
+        UnifiedExternalFunctionSection::convert_from_entries(&unified_external_function_entries);
+    let unified_external_function_section = UnifiedExternalFunctionSection {
+        items: &unified_external_function_items,
+        names_data: &unified_external_function_data,
     };
 
     // external function index section
@@ -557,12 +557,14 @@ pub fn helper_build_module_binary(
         items: &external_function_index_items,
     };
 
+    // index property section
     let index_property_section = IndexPropertySection {
         entry_function_public_index,
         runtime_major_version: RUNTIME_MAJOR_VERSION,
         runtime_minor_version: RUNTIME_MINOR_VERSION,
     };
 
+    // module list
     let import_module_entry = ImportModuleEntry::new(
         name.to_owned(),
         Box::new(ModuleDependency::Local(Box::new(DependencyLocal {

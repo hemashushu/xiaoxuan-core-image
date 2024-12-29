@@ -8,6 +8,8 @@ pub mod bytecode_reader;
 pub mod bytecode_writer;
 pub mod common_sections;
 pub mod entry;
+pub mod entry_reader;
+pub mod entry_writer;
 pub mod index_sections;
 pub mod module_image;
 pub mod tableaccess;

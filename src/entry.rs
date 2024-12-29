@@ -10,7 +10,7 @@ use anc_isa::{
     DataSectionType, ExternalLibraryDependency, MemoryDataType, ModuleDependency, OperandDataType,
 };
 
-use crate::module_image::RelocateType;
+use crate::module_image::{ImageType, RelocateType};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeEntry {
@@ -574,4 +574,67 @@ impl ExternalFunctionIndexEntry {
             unified_external_function_index,
         }
     }
+}
+
+#[derive(Debug)]
+pub struct ImageCommonEntry {
+    // Note that this is the name of module/package,
+    // it CANNOT be the name of submodule even if the current image is
+    // a "object module", it also CANNOT be the full name or name path.
+    //
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
+    pub name: String,
+
+    pub image_type: ImageType,
+
+    // the dependencies
+    pub import_module_entries: Vec<ImportModuleEntry>,
+
+    // the following entries are used for linking:
+    // - import_function_entries
+    // - import_data_entries
+    // - function_name_entries
+    // - data_name_entries
+    pub import_function_entries: Vec<ImportFunctionEntry>,
+    pub import_data_entries: Vec<ImportDataEntry>,
+
+    pub type_entries: Vec<TypeEntry>,
+    pub local_variable_list_entries: Vec<LocalVariableListEntry>,
+    pub function_entries: Vec<FunctionEntry>,
+
+    pub read_only_data_entries: Vec<InitedDataEntry>,
+    pub read_write_data_entries: Vec<InitedDataEntry>,
+    pub uninit_data_entries: Vec<UninitDataEntry>,
+
+    // the name path entries only contain the internal functions.
+    pub function_name_entries: Vec<FunctionNameEntry>,
+
+    // the name path entries only contain the internal data items.
+    pub data_name_entries: Vec<DataNameEntry>,
+
+    pub relocate_list_entries: Vec<RelocateListEntry>,
+
+    // the dependencies
+    pub external_library_entries: Vec<ExternalLibraryEntry>,
+    pub external_function_entries: Vec<ExternalFunctionEntry>,
+}
+
+#[derive(Debug)]
+pub struct ImageIndexEntry {
+    pub function_index_entries: Vec<FunctionIndexListEntry>,
+    pub data_index_entries: Vec<DataIndexListEntry>,
+    pub external_library_entries: Vec<ExternalLibraryEntry>,
+    pub external_type_entries: Vec<TypeEntry>,
+    pub external_function_entries: Vec<ExternalFunctionEntry>,
+    pub external_function_index_entries: Vec<ExternalFunctionIndexListEntry>,
+    pub module_entries: Vec<ImportModuleEntry>,
+    pub entry_function_public_index: usize,
 }
