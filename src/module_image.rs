@@ -104,11 +104,11 @@ use anc_isa::{IMAGE_FORMAT_MAJOR_VERSION, IMAGE_FORMAT_MINOR_VERSION};
 use crate::{
     common_sections::{
         common_property_section::CommonPropertySection,
-        data_name_section::DataNameSection,
         data_section::{ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection},
+        export_data_section::ExportDataSection,
+        export_function_section::ExportFunctionSection,
         external_function_section::ExternalFunctionSection,
         external_library_section::ExternalLibrarySection,
-        function_name_section::FunctionNameSection,
         function_section::FunctionSection,
         import_data_section::ImportDataSection,
         import_function_section::ImportFunctionSection,
@@ -197,10 +197,10 @@ pub enum ModuleSectionId {
     //
     // if the feature 'bridge function' is required (i.e.,
     // embed the XiaoXuan Core VM in another Rust applicaton) ,
-    // the section 'FunctionName' and 'DataName' are required also.
-    FunctionName = 0x0030, // 0x30
-    DataName,              // 0x31
-    Relocate,              // 0x32
+    // the section 'ExportFunction' and 'ExportData' are required also.
+    ExportFunction = 0x0030, // 0x30
+    ExportData,              // 0x31
+    Relocate,                // 0x32
 
     // optional (for debug and linking)
     ImportModule = 0x0040, // 0x40
@@ -241,6 +241,23 @@ pub enum ImageType {
 
     // `*.anco`
     ObjectFile,
+}
+
+/// The visibility of function and data between shared modules.
+#[repr(u8)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Visibility {
+    /// Disallows functions and data to be shared between
+    /// different modules.
+    ///
+    /// Note that all functions and data (within different submodules) are accessible
+    /// in the same module, even if the value of `Visibility` is `Private`.
+    /// In particular, this is also true when merging (statically linking) two modules.
+    Private,
+
+    /// Allows functions and data to be shared between
+    /// different modules.
+    Public,
 }
 
 // About re-locating
@@ -366,7 +383,8 @@ impl<'a> ModuleImage<'a> {
             return Err(ImageError::new(ImageErrorType::RequireNewVersionRuntime));
         }
 
-        let image_body = &image_binary[(BASE_MODULE_HEADER_LENGTH + extra_header_length as usize)..];
+        let image_body =
+            &image_binary[(BASE_MODULE_HEADER_LENGTH + extra_header_length as usize)..];
 
         // since the structure of module image and a section are the same,
         // that is, the module image itself can be thought of
@@ -534,15 +552,15 @@ impl<'a> ModuleImage<'a> {
     }
 
     // optional section (for debug, link only and bridge function calling)
-    pub fn get_optional_function_name_section(&'a self) -> Option<FunctionNameSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::FunctionName)
-            .map(FunctionNameSection::read)
+    pub fn get_optional_export_function_section(&'a self) -> Option<ExportFunctionSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::ExportFunction)
+            .map(ExportFunctionSection::read)
     }
 
     // optional section (for debug, link only and bridge function calling)
-    pub fn get_optional_data_name_section(&'a self) -> Option<DataNameSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::DataName)
-            .map(DataNameSection::read)
+    pub fn get_optional_export_data_section(&'a self) -> Option<ExportDataSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::ExportData)
+            .map(ExportDataSection::read)
     }
 
     // optional section (for debug and link only)
@@ -632,7 +650,8 @@ mod tests {
         },
         entry::{LocalVariableEntry, LocalVariableListEntry, TypeEntry},
         module_image::{
-            ImageType, ModuleImage, SectionEntry, BASE_MODULE_HEADER_LENGTH, IMAGE_FILE_MAGIC_NUMBER,
+            ImageType, ModuleImage, SectionEntry, BASE_MODULE_HEADER_LENGTH,
+            IMAGE_FILE_MAGIC_NUMBER,
         },
     };
 

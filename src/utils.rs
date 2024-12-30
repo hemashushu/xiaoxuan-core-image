@@ -5,19 +5,19 @@
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
 use crate::common_sections::common_property_section::CommonPropertySection;
-use crate::common_sections::data_name_section::DataNameSection;
-use crate::common_sections::function_name_section::FunctionNameSection;
+use crate::common_sections::export_data_section::ExportDataSection;
+use crate::common_sections::export_function_section::ExportFunctionSection;
 use crate::entry::{
-    DataNameEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
-    FunctionNameEntry, ImportModuleEntry, InitedDataEntry, LocalVariableEntry,
-    LocalVariableListEntry, TypeEntry, UninitDataEntry,
+    ExportDataEntry, ExportFunctionEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
+    ImportModuleEntry, InitedDataEntry, LocalVariableEntry, LocalVariableListEntry, TypeEntry,
+    UninitDataEntry,
 };
 use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
 use crate::index_sections::index_property_section::IndexPropertySection;
 use crate::index_sections::module_list_section::ModuleListSection;
 use crate::ImageError;
 use anc_isa::{
-    DataSectionType, DependencyLocal, ModuleDependency, OperandDataType, RUNTIME_MAJOR_VERSION,
+    DataSectionType, ModuleDependency, OperandDataType, RUNTIME_MAJOR_VERSION,
     RUNTIME_MINOR_VERSION,
 };
 
@@ -36,7 +36,7 @@ use crate::index_sections::external_function_index_section::{
 use crate::index_sections::external_function_section::UnifiedExternalFunctionSection;
 use crate::index_sections::external_library_section::UnifiedExternalLibrarySection;
 use crate::index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection};
-use crate::module_image::{ImageType, ModuleImage, RangeItem, SectionEntry};
+use crate::module_image::{ImageType, ModuleImage, RangeItem, SectionEntry, Visibility};
 
 /// helper object for unit test
 pub struct HelperFunctionEntry {
@@ -189,9 +189,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
             let params_as_local_variables = entry
                 .params
                 .iter()
-                .map(|data_type| {
-                    convert_operand_data_type_to_local_variable_entry(*data_type)
-                })
+                .map(|data_type| convert_operand_data_type_to_local_variable_entry(*data_type))
                 .collect::<Vec<_>>();
 
             let mut local_variables = vec![];
@@ -210,9 +208,7 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
             let params_as_local_variables = entry
                 .params
                 .iter()
-                .map(|data_type| {
-                    convert_operand_data_type_to_local_variable_entry(*data_type)
-                })
+                .map(|data_type| convert_operand_data_type_to_local_variable_entry(*data_type))
                 .collect::<Vec<_>>();
 
             let mut local_variables = vec![];
@@ -305,9 +301,7 @@ pub fn helper_build_module_binary_with_functions_and_data_and_external_functions
             let params_as_local_variables = entry
                 .params
                 .iter()
-                .map(|data_type| {
-                    convert_operand_data_type_to_local_variable_entry(*data_type)
-                })
+                .map(|data_type| convert_operand_data_type_to_local_variable_entry(*data_type))
                 .collect::<Vec<_>>();
 
             let mut local_variables = vec![];
@@ -412,27 +406,37 @@ pub fn helper_build_module_binary(
         items: &uninit_items,
     };
 
-    // function name section
-    let (function_name_items, function_names_data) =
-        FunctionNameSection::convert_from_entries(&[
-            FunctionNameEntry::new("func0".to_owned(), true),
-            FunctionNameEntry::new("func1".to_owned(), true),
+    // export function section
+    // for simplicity, these are abitray items
+    let (export_function_items, export_function_names_data) =
+        ExportFunctionSection::convert_from_entries(&[
+            ExportFunctionEntry::new("func0".to_owned(), Visibility::Public),
+            ExportFunctionEntry::new("func1".to_owned(), Visibility::Public),
         ]);
 
-    let function_name_section = FunctionNameSection {
-        items: &function_name_items,
-        full_names_data: &function_names_data,
+    let export_function_section = ExportFunctionSection {
+        items: &export_function_items,
+        full_names_data: &export_function_names_data,
     };
 
-    // data name section
-    let (data_name_items, data_names_data) = DataNameSection::convert_from_entries(&[
-        DataNameEntry::new("data0".to_owned(), true),
-        DataNameEntry::new("data1".to_owned(), true),
+    // export data section
+    // for simplicity, these are abitray items
+    let (export_data_items, export_data_names_data) = ExportDataSection::convert_from_entries(&[
+        ExportDataEntry::new(
+            "data0".to_owned(),
+            Visibility::Public,
+            DataSectionType::ReadWrite,
+        ),
+        ExportDataEntry::new(
+            "data1".to_owned(),
+            Visibility::Public,
+            DataSectionType::ReadWrite,
+        ),
     ]);
 
-    let data_name_section = DataNameSection {
-        items: &data_name_items,
-        full_names_data: &data_names_data,
+    let export_data_section = ExportDataSection {
+        items: &export_data_items,
+        full_names_data: &export_data_names_data,
     };
 
     // external library section
@@ -565,14 +569,8 @@ pub fn helper_build_module_binary(
     };
 
     // module list
-    let import_module_entry = ImportModuleEntry::new(
-        name.to_owned(),
-        Box::new(ModuleDependency::Local(Box::new(DependencyLocal {
-            path: "".to_owned(),
-            values: None,
-            condition: None,
-        }))),
-    );
+    let import_module_entry =
+        ImportModuleEntry::new(name.to_owned(), Box::new(ModuleDependency::Current));
     let (module_list_items, module_list_data) =
         ModuleListSection::convert_from_entries(&[import_module_entry]);
     let module_list_section = ModuleListSection {
@@ -590,8 +588,8 @@ pub fn helper_build_module_binary(
         &ro_data_section,
         &rw_data_section,
         &uninit_data_section,
-        &function_name_section,
-        &data_name_section,
+        &export_function_section,
+        &export_data_section,
         /* these sections are empty: import_module, import_function, import_data */
         &external_library_section,
         &external_function_section,
@@ -606,7 +604,8 @@ pub fn helper_build_module_binary(
         &external_function_index_section,
     ];
 
-    let (section_items, sections_data) = ModuleImage::convert_from_section_entries(&section_entries);
+    let (section_items, sections_data) =
+        ModuleImage::convert_from_section_entries(&section_entries);
     let module_image = ModuleImage {
         image_type: ImageType::Application,
         items: &section_items,

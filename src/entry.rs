@@ -10,7 +10,7 @@ use anc_isa::{
     DataSectionType, ExternalLibraryDependency, MemoryDataType, ModuleDependency, OperandDataType,
 };
 
-use crate::module_image::{ImageType, RelocateType};
+use crate::module_image::{ImageType, RelocateType, Visibility};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeEntry {
@@ -347,7 +347,7 @@ impl ImportDataEntry {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct FunctionNameEntry {
+pub struct ExportFunctionEntry {
     // the full name of the exported function
     //
     // about the "full_name" and "name_path"
@@ -360,17 +360,20 @@ pub struct FunctionNameEntry {
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
     pub full_name: String,
-    pub export: bool,
+    pub visibility: Visibility,
 }
 
-impl FunctionNameEntry {
-    pub fn new(full_name: String, export: bool) -> Self {
-        Self { full_name, export }
+impl ExportFunctionEntry {
+    pub fn new(full_name: String, visibility: Visibility) -> Self {
+        Self {
+            full_name,
+            visibility,
+        }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct DataNameEntry {
+pub struct ExportDataEntry {
     // the full name of exported data
     //
     // about the "full_name" and "name_path"
@@ -383,12 +386,17 @@ pub struct DataNameEntry {
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
     pub full_name: String,
-    pub export: bool,
+    pub visibility: Visibility,
+    pub section_type: DataSectionType,
 }
 
-impl DataNameEntry {
-    pub fn new(full_name: String, export: bool) -> Self {
-        Self { full_name, export }
+impl ExportDataEntry {
+    pub fn new(full_name: String, visibility: Visibility, section_type: DataSectionType) -> Self {
+        Self {
+            full_name,
+            visibility,
+            section_type,
+        }
     }
 }
 
@@ -601,8 +609,8 @@ pub struct ImageCommonEntry {
     // the following entries are used for linking:
     // - import_function_entries
     // - import_data_entries
-    // - function_name_entries
-    // - data_name_entries
+    // - export_function_entries
+    // - export_data_entries
     pub import_function_entries: Vec<ImportFunctionEntry>,
     pub import_data_entries: Vec<ImportDataEntry>,
 
@@ -615,10 +623,10 @@ pub struct ImageCommonEntry {
     pub uninit_data_entries: Vec<UninitDataEntry>,
 
     // the name path entries only contain the internal functions.
-    pub function_name_entries: Vec<FunctionNameEntry>,
+    pub export_function_entries: Vec<ExportFunctionEntry>,
 
     // the name path entries only contain the internal data items.
-    pub data_name_entries: Vec<DataNameEntry>,
+    pub export_data_entries: Vec<ExportDataEntry>,
 
     pub relocate_list_entries: Vec<RelocateListEntry>,
 
@@ -629,11 +637,11 @@ pub struct ImageCommonEntry {
 
 #[derive(Debug)]
 pub struct ImageIndexEntry {
-    pub function_index_entries: Vec<FunctionIndexListEntry>,
-    pub data_index_entries: Vec<DataIndexListEntry>,
-    pub external_library_entries: Vec<ExternalLibraryEntry>,
-    pub external_type_entries: Vec<TypeEntry>,
-    pub external_function_entries: Vec<ExternalFunctionEntry>,
+    pub function_index_list_entries: Vec<FunctionIndexListEntry>,
+    pub data_index_list_entries: Vec<DataIndexListEntry>,
+    pub unified_external_library_entries: Vec<ExternalLibraryEntry>,
+    pub unified_external_type_entries: Vec<TypeEntry>,
+    pub unified_external_function_entries: Vec<ExternalFunctionEntry>,
     pub external_function_index_entries: Vec<ExternalFunctionIndexListEntry>,
     pub module_entries: Vec<ImportModuleEntry>,
     pub entry_function_public_index: usize,

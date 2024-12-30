@@ -4,6 +4,7 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
+//! this section list all internal data.
 //! the data names should follow these order:
 //! 1. internal read-only data
 //! 2. internal read-write data
@@ -11,28 +12,31 @@
 
 // "data name section" binary layout
 //
-//              |-----------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                              |
-//              |-----------------------------------------------------------------------------------|
-//  item 0 -->  | full name offset 0 (u32) | full name length 0 (u32) | export 0 (u8) | pad 3 bytes | <-- table
-//  item 1 -->  | full name offset 1       | full name length 1       | export 1      | pad 3 bytes |
-//              | ...                                                                               |
-//              |-----------------------------------------------------------------------------------|
-// offset 0 --> | full name string 0 (UTF-8)                                                        | <-- data area
-// offset 1 --> | full name string 1                                                                |
-//              | ...                                                                               |
-//              |-----------------------------------------------------------------------------------|
+//              |--------------------------------------------------------------------------------------------------|
+//              | item count (u32) | (4 bytes padding)                                                             |
+//              |--------------------------------------------------------------------------------------------------|
+//  item 0 -->  | full name offset 0 (u32) | full name length 0 (u32) | vis 0 (u8) | sec type 0 (u8) | pad 2 bytes | <-- table
+//  item 1 -->  | full name offset 1       | full name length 1       | vis 1      | sec type 1      | pad 2 bytes |
+//              | ...                                                                                              |
+//              |--------------------------------------------------------------------------------------------------|
+// offset 0 --> | full name string 0 (UTF-8)                                                                       | <-- data area
+// offset 1 --> | full name string 1                                                                               |
+//              | ...                                                                                              |
+//              |--------------------------------------------------------------------------------------------------|
 
-use crate::entry::DataNameEntry;
+use anc_isa::DataSectionType;
 
+use crate::entry::ExportDataEntry;
+
+use crate::module_image::Visibility;
 use crate::{
     module_image::{ModuleSectionId, SectionEntry},
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
-pub struct DataNameSection<'a> {
-    pub items: &'a [DataNameItem],
+pub struct ExportDataSection<'a> {
+    pub items: &'a [ExportDataItem],
     pub full_names_data: &'a [u8],
 }
 
@@ -40,7 +44,7 @@ pub struct DataNameSection<'a> {
 // imported data will not be list in this table.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct DataNameItem {
+pub struct ExportDataItem {
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
@@ -53,32 +57,33 @@ pub struct DataNameItem {
     pub full_name_offset: u32,
     pub full_name_length: u32,
 
-    // Used to indicate the visibility of this item when this
-    // module is used as a shared module.
-    // Note that in the case of static linking, the item is always
-    // visible to other modules, regardless of the value of this property.
-    //
-    // 0=false, 1=true
-    pub export: u8,
-    _padding0: [u8; 3],
+    pub visibility: Visibility,
+    pub section_type: DataSectionType,
+    _padding0: [u8; 2],
 }
 
-impl DataNameItem {
-    pub fn new(full_name_offset: u32, full_name_length: u32, export: u8) -> Self {
+impl ExportDataItem {
+    pub fn new(
+        full_name_offset: u32,
+        full_name_length: u32,
+        visibility: Visibility,
+        section_type: DataSectionType,
+    ) -> Self {
         Self {
             full_name_offset,
             full_name_length,
-            export,
-            _padding0: [0, 0, 0],
+            visibility,
+            section_type,
+            _padding0: [0, 0],
         }
     }
 }
 
-impl<'a> SectionEntry<'a> for DataNameSection<'a> {
+impl<'a> SectionEntry<'a> for ExportDataSection<'a> {
     fn read(section_data: &'a [u8]) -> Self {
         let (items, full_names_data) =
-            read_section_with_table_and_data_area::<DataNameItem>(section_data);
-        DataNameSection {
+            read_section_with_table_and_data_area::<ExportDataItem>(section_data);
+        ExportDataSection {
             items,
             full_names_data,
         }
@@ -89,14 +94,14 @@ impl<'a> SectionEntry<'a> for DataNameSection<'a> {
     }
 
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::DataName
+        ModuleSectionId::ExportData
     }
 }
 
-impl<'a> DataNameSection<'a> {
+impl<'a> ExportDataSection<'a> {
     /// the item index is the 'mixed data internal index'
     ///
-    /// the data names in the `data_name_section` is order by:
+    /// the data items in the `export_data_section` are ordered by:
     /// 1. internal read-only data
     /// 2. internal read-write data
     /// 3. internal uninit data
@@ -111,7 +116,10 @@ impl<'a> DataNameSection<'a> {
     ///
     /// therefore:
     /// data_public_index = (all import datas) + mixed_data_internal_index
-    pub fn get_item_index_and_export(&'a self, expected_full_name: &str) -> Option<(usize, bool)> {
+    pub fn get_item_index_and_visibility_and_section_type(
+        &'a self,
+        expected_full_name: &str,
+    ) -> Option<(usize, Visibility, DataSectionType)> {
         let items = self.items;
         let full_name_data = self.full_names_data;
 
@@ -125,12 +133,15 @@ impl<'a> DataNameSection<'a> {
 
         opt_idx.map(|idx| {
             let item = &items[idx];
-            (idx, item.export != 0)
+            (idx, item.visibility, item.section_type)
         })
     }
 
     /// the item index is the 'mixed data internal index'
-    pub fn get_item_full_name_and_export(&self, data_internal_index: usize) -> (&str, bool) {
+    pub fn get_item_full_name_and_visibility_and_section_type(
+        &self,
+        data_internal_index: usize,
+    ) -> (&str, Visibility, DataSectionType) {
         let items = self.items;
         let full_names_data = self.full_names_data;
 
@@ -138,10 +149,10 @@ impl<'a> DataNameSection<'a> {
         let full_name_data = &full_names_data[item.full_name_offset as usize
             ..(item.full_name_offset + item.full_name_length) as usize];
         let full_name = std::str::from_utf8(full_name_data).unwrap();
-        (full_name, item.export != 0)
+        (full_name, item.visibility, item.section_type)
     }
 
-    pub fn convert_to_entries(&self) -> Vec<DataNameEntry> {
+    pub fn convert_to_entries(&self) -> Vec<ExportDataEntry> {
         let items = self.items;
         let full_names_data = self.full_names_data;
         items
@@ -150,12 +161,12 @@ impl<'a> DataNameSection<'a> {
                 let full_name_data = &full_names_data[item.full_name_offset as usize
                     ..(item.full_name_offset + item.full_name_length) as usize];
                 let full_name = std::str::from_utf8(full_name_data).unwrap();
-                DataNameEntry::new(full_name.to_owned(), item.export != 0)
+                ExportDataEntry::new(full_name.to_owned(), item.visibility, item.section_type)
             })
             .collect()
     }
 
-    pub fn convert_from_entries(entries: &[DataNameEntry]) -> (Vec<DataNameItem>, Vec<u8>) {
+    pub fn convert_from_entries(entries: &[ExportDataEntry]) -> (Vec<ExportDataItem>, Vec<u8>) {
         let full_name_bytes = entries
             .iter()
             .map(|entry| entry.full_name.as_bytes())
@@ -171,13 +182,14 @@ impl<'a> DataNameSection<'a> {
                 let full_name_length = full_name_bytes[idx].len() as u32;
                 next_offset += full_name_length; // for next offset
 
-                DataNameItem::new(
+                ExportDataItem::new(
                     full_name_offset,
                     full_name_length,
-                    if entry.export { 1 } else { 0 },
+                    entry.visibility,
+                    entry.section_type,
                 )
             })
-            .collect::<Vec<DataNameItem>>();
+            .collect::<Vec<ExportDataItem>>();
 
         let full_names_data = full_name_bytes
             .iter()
@@ -190,17 +202,22 @@ impl<'a> DataNameSection<'a> {
 
 #[cfg(test)]
 mod tests {
+    use anc_isa::DataSectionType;
+
     use crate::{
-        common_sections::data_name_section::{DataNameItem, DataNameSection},
-        entry::DataNameEntry,
-        module_image::SectionEntry,
+        common_sections::export_data_section::{ExportDataItem, ExportDataSection},
+        entry::ExportDataEntry,
+        module_image::{SectionEntry, Visibility},
     };
 
     #[test]
     fn test_write_section() {
-        let items: Vec<DataNameItem> = vec![DataNameItem::new(0, 3, 0), DataNameItem::new(3, 5, 1)];
+        let items: Vec<ExportDataItem> = vec![
+            ExportDataItem::new(0, 3, Visibility::Private, DataSectionType::ReadOnly),
+            ExportDataItem::new(3, 5, Visibility::Public, DataSectionType::ReadWrite),
+        ];
 
-        let section = DataNameSection {
+        let section = ExportDataSection {
             items: &items,
             full_names_data: "foohello".as_bytes(),
         };
@@ -214,13 +231,15 @@ mod tests {
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
-            0, // export
-            0, 0, 0, // padding
+            0, // visibility
+            0, // section type
+            0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
-            1, // export
-            0, 0, 0, // padding
+            1, // visibility
+            1, // section type
+            0, 0, // padding
         ];
 
         expect_data.extend_from_slice(b"foo");
@@ -237,45 +256,76 @@ mod tests {
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
-            0, // export
-            0, 0, 0, // padding
+            0, // visibility
+            0, // section type
+            0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
-            1, // export
-            0, 0, 0, // padding
+            1, // visibility
+            1, // section type
+            0, 0, // padding
         ];
 
         section_data.extend_from_slice("foo".as_bytes());
         section_data.extend_from_slice("hello".as_bytes());
 
-        let section = DataNameSection::read(&section_data);
+        let section = ExportDataSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(section.items[0], DataNameItem::new(0, 3, 0));
-        assert_eq!(section.items[1], DataNameItem::new(3, 5, 1));
+        assert_eq!(
+            section.items[0],
+            ExportDataItem::new(0, 3, Visibility::Private, DataSectionType::ReadOnly)
+        );
+        assert_eq!(
+            section.items[1],
+            ExportDataItem::new(3, 5, Visibility::Public, DataSectionType::ReadWrite)
+        );
         assert_eq!(section.full_names_data, "foohello".as_bytes())
     }
 
     #[test]
     fn test_convert() {
-        let entries: Vec<DataNameEntry> = vec![
-            DataNameEntry::new("foo".to_string(), false),
-            DataNameEntry::new("hello".to_string(), true),
+        let entries: Vec<ExportDataEntry> = vec![
+            ExportDataEntry::new(
+                "foo".to_string(),
+                Visibility::Private,
+                DataSectionType::ReadOnly,
+            ),
+            ExportDataEntry::new(
+                "hello".to_string(),
+                Visibility::Public,
+                DataSectionType::ReadWrite,
+            ),
         ];
 
-        let (items, names_data) = DataNameSection::convert_from_entries(&entries);
-        let section = DataNameSection {
+        let (items, names_data) = ExportDataSection::convert_from_entries(&entries);
+        let section = ExportDataSection {
             items: &items,
             full_names_data: &names_data,
         };
 
-        assert_eq!(section.get_item_index_and_export("foo"), Some((0, false)));
-        assert_eq!(section.get_item_index_and_export("hello"), Some((1, true)));
-        assert_eq!(section.get_item_index_and_export("bar"), None);
+        assert_eq!(
+            section.get_item_index_and_visibility_and_section_type("foo"),
+            Some((0, Visibility::Private, DataSectionType::ReadOnly))
+        );
+        assert_eq!(
+            section.get_item_index_and_visibility_and_section_type("hello"),
+            Some((1, Visibility::Public, DataSectionType::ReadWrite))
+        );
+        assert_eq!(
+            section.get_item_index_and_visibility_and_section_type("bar"),
+            None
+        );
 
-        assert_eq!(section.get_item_full_name_and_export(0), ("foo", false));
-        assert_eq!(section.get_item_full_name_and_export(1), ("hello", true));
+        assert_eq!(
+            section.get_item_full_name_and_visibility_and_section_type(0),
+            ("foo", Visibility::Private, DataSectionType::ReadOnly)
+        );
+        assert_eq!(
+            section.get_item_full_name_and_visibility_and_section_type(1),
+            ("hello", Visibility::Public, DataSectionType::ReadWrite)
+        );
 
         let entries_restore = section.convert_to_entries();
         assert_eq!(entries, entries_restore);

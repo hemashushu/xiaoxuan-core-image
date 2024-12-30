@@ -4,31 +4,31 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-//! this section list only the internal functions.
+//! this section list all internal functions.
 
 // "function name section" binary layout
 //
-//              |-----------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                              |
-//              |-----------------------------------------------------------------------------------|
-//  item 0 -->  | full name offset 0 (u32) | full name length 0 (u32) | export 0 (u8) | pad 3 bytes | <-- table
-//  item 1 -->  | full name offset 1       | full name length 1       | export 1      | pad 3 bytes |
-//              | ...                                                                               |
-//              |-----------------------------------------------------------------------------------|
-// offset 0 --> | full name string 0 (UTF-8)                                                        | <-- data area
-// offset 1 --> | full name string 1                                                                |
-//              | ...                                                                               |
-//              |-----------------------------------------------------------------------------------|
+//              |---------------------------------------------------------------------------------------|
+//              | item count (u32) | (4 bytes padding)                                                  |
+//              |---------------------------------------------------------------------------------------|
+//  item 0 -->  | full name offset 0 (u32) | full name length 0 (u32) | visibility 0 (u8) | pad 3 bytes | <-- table
+//  item 1 -->  | full name offset 1       | full name length 1       | visibility 1      | pad 3 bytes |
+//              | ...                                                                                   |
+//              |---------------------------------------------------------------------------------------|
+// offset 0 --> | full name string 0 (UTF-8)                                                            | <-- data area
+// offset 1 --> | full name string 1                                                                    |
+//              | ...                                                                                   |
+//              |---------------------------------------------------------------------------------------|
 
 use crate::{
-    entry::FunctionNameEntry,
-    module_image::{ModuleSectionId, SectionEntry},
+    entry::ExportFunctionEntry,
+    module_image::{ModuleSectionId, SectionEntry, Visibility},
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
-pub struct FunctionNameSection<'a> {
-    pub items: &'a [FunctionNameItem],
+pub struct ExportFunctionSection<'a> {
+    pub items: &'a [ExportFunctionItem],
     pub full_names_data: &'a [u8],
 }
 
@@ -36,7 +36,7 @@ pub struct FunctionNameSection<'a> {
 // imported functions will not be list in this table.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct FunctionNameItem {
+pub struct ExportFunctionItem {
     // about the "full_name" and "name_path"
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
@@ -49,32 +49,26 @@ pub struct FunctionNameItem {
     pub full_name_offset: u32,
     pub full_name_length: u32,
 
-    // Used to indicate the visibility of this item when this
-    // module is used as a shared module.
-    // Note that in the case of static linking, the item is always
-    // visible to other modules, regardless of the value of this property.
-    //
-    // 0=false, 1=true
-    pub export: u8,
+    pub visibility: Visibility,
     _padding0: [u8; 3],
 }
 
-impl FunctionNameItem {
-    pub fn new(full_name_offset: u32, full_name_length: u32, export: u8) -> Self {
+impl ExportFunctionItem {
+    pub fn new(full_name_offset: u32, full_name_length: u32, visibility: Visibility) -> Self {
         Self {
             full_name_offset,
             full_name_length,
-            export,
+            visibility,
             _padding0: [0, 0, 0],
         }
     }
 }
 
-impl<'a> SectionEntry<'a> for FunctionNameSection<'a> {
+impl<'a> SectionEntry<'a> for ExportFunctionSection<'a> {
     fn read(section_data: &'a [u8]) -> Self {
         let (items, full_names_data) =
-            read_section_with_table_and_data_area::<FunctionNameItem>(section_data);
-        FunctionNameSection {
+            read_section_with_table_and_data_area::<ExportFunctionItem>(section_data);
+        ExportFunctionSection {
             items,
             full_names_data,
         }
@@ -85,11 +79,11 @@ impl<'a> SectionEntry<'a> for FunctionNameSection<'a> {
     }
 
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::FunctionName
+        ModuleSectionId::ExportFunction
     }
 }
 
-impl<'a> FunctionNameSection<'a> {
+impl<'a> ExportFunctionSection<'a> {
     /// the item index is the `function internal index`
     ///
     /// the function public index is mixed by the following items:
@@ -98,7 +92,10 @@ impl<'a> FunctionNameSection<'a> {
     ///
     /// therefore:
     /// function_public_index = (all import functions) + function_internal_index
-    pub fn get_item_index_and_export(&'a self, expected_full_name: &str) -> Option<(usize, bool)> {
+    pub fn get_item_index_and_visibility(
+        &'a self,
+        expected_full_name: &str,
+    ) -> Option<(usize, Visibility)> {
         let items = self.items;
         let full_names_data = self.full_names_data;
 
@@ -112,11 +109,14 @@ impl<'a> FunctionNameSection<'a> {
 
         opt_idx.map(|idx| {
             let item = &items[idx];
-            (idx, item.export != 0)
+            (idx, item.visibility)
         })
     }
 
-    pub fn get_item_full_name_and_export(&self, function_internal_index: usize) -> (&str, bool) {
+    pub fn get_item_full_name_and_visibility(
+        &self,
+        function_internal_index: usize,
+    ) -> (&str, Visibility) {
         let items = self.items;
         let full_names_data = self.full_names_data;
 
@@ -124,10 +124,10 @@ impl<'a> FunctionNameSection<'a> {
         let full_name_data = &full_names_data[item.full_name_offset as usize
             ..(item.full_name_offset + item.full_name_length) as usize];
         let full_name = std::str::from_utf8(full_name_data).unwrap();
-        (full_name, item.export != 0)
+        (full_name, item.visibility)
     }
 
-    pub fn convert_to_entries(&self) -> Vec<FunctionNameEntry> {
+    pub fn convert_to_entries(&self) -> Vec<ExportFunctionEntry> {
         let items = self.items;
         let full_names_data = self.full_names_data;
 
@@ -138,12 +138,14 @@ impl<'a> FunctionNameSection<'a> {
                     ..(item.full_name_offset + item.full_name_length) as usize];
 
                 let full_name = std::str::from_utf8(full_name_data).unwrap().to_owned();
-                FunctionNameEntry::new(full_name.to_owned(), item.export != 0)
+                ExportFunctionEntry::new(full_name.to_owned(), item.visibility)
             })
             .collect()
     }
 
-    pub fn convert_from_entries(entries: &[FunctionNameEntry]) -> (Vec<FunctionNameItem>, Vec<u8>) {
+    pub fn convert_from_entries(
+        entries: &[ExportFunctionEntry],
+    ) -> (Vec<ExportFunctionItem>, Vec<u8>) {
         let full_name_bytes = entries
             .iter()
             .map(|entry| entry.full_name.as_bytes())
@@ -159,13 +161,9 @@ impl<'a> FunctionNameSection<'a> {
                 let full_name_length = full_name_bytes[idx].len() as u32;
                 next_offset += full_name_length; // for next offset
 
-                FunctionNameItem::new(
-                    full_name_offset,
-                    full_name_length,
-                    if entry.export { 1 } else { 0 },
-                )
+                ExportFunctionItem::new(full_name_offset, full_name_length, entry.visibility)
             })
-            .collect::<Vec<FunctionNameItem>>();
+            .collect::<Vec<ExportFunctionItem>>();
 
         let full_names_data = full_name_bytes
             .iter()
@@ -179,19 +177,19 @@ impl<'a> FunctionNameSection<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        common_sections::function_name_section::{FunctionNameItem, FunctionNameSection},
-        entry::FunctionNameEntry,
-        module_image::SectionEntry,
+        common_sections::export_function_section::{ExportFunctionItem, ExportFunctionSection},
+        entry::ExportFunctionEntry,
+        module_image::{SectionEntry, Visibility},
     };
 
     #[test]
     fn test_write_section() {
-        let items: Vec<FunctionNameItem> = vec![
-            FunctionNameItem::new(0, 3, 0),
-            FunctionNameItem::new(3, 5, 1),
+        let items: Vec<ExportFunctionItem> = vec![
+            ExportFunctionItem::new(0, 3, Visibility::Private),
+            ExportFunctionItem::new(3, 5, Visibility::Public),
         ];
 
-        let section = FunctionNameSection {
+        let section = ExportFunctionSection {
             items: &items,
             full_names_data: "foohello".as_bytes(),
         };
@@ -205,12 +203,12 @@ mod tests {
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
-            0, // export
+            0, // visibility
             0, 0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
-            1, // export
+            1, // visibility
             0, 0, 0, // padding
         ];
 
@@ -228,45 +226,63 @@ mod tests {
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
-            0, // export
+            0, // visibility
             0, 0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
-            1, // export
+            1, // visibility
             0, 0, 0, // padding
         ];
 
         section_data.extend_from_slice("foo".as_bytes());
         section_data.extend_from_slice("hello".as_bytes());
 
-        let section = FunctionNameSection::read(&section_data);
+        let section = ExportFunctionSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(section.items[0], FunctionNameItem::new(0, 3, /*11,*/ 0));
-        assert_eq!(section.items[1], FunctionNameItem::new(3, 5, /*13,*/ 1));
+        assert_eq!(
+            section.items[0],
+            ExportFunctionItem::new(0, 3, /*11,*/ Visibility::Private)
+        );
+        assert_eq!(
+            section.items[1],
+            ExportFunctionItem::new(3, 5, /*13,*/ Visibility::Public)
+        );
         assert_eq!(section.full_names_data, "foohello".as_bytes())
     }
 
     #[test]
     fn test_convert() {
-        let entries: Vec<FunctionNameEntry> = vec![
-            FunctionNameEntry::new("foo".to_string(), /*11,*/ false),
-            FunctionNameEntry::new("hello".to_string(), /*13,*/ true),
+        let entries: Vec<ExportFunctionEntry> = vec![
+            ExportFunctionEntry::new("foo".to_string(), /*11,*/ Visibility::Private),
+            ExportFunctionEntry::new("hello".to_string(), /*13,*/ Visibility::Public),
         ];
 
-        let (items, names_data) = FunctionNameSection::convert_from_entries(&entries);
-        let section = FunctionNameSection {
+        let (items, names_data) = ExportFunctionSection::convert_from_entries(&entries);
+        let section = ExportFunctionSection {
             items: &items,
             full_names_data: &names_data,
         };
 
-        assert_eq!(section.get_item_index_and_export("foo"), Some((0, false)));
-        assert_eq!(section.get_item_index_and_export("hello"), Some((1, true)));
-        assert_eq!(section.get_item_index_and_export("bar"), None);
+        assert_eq!(
+            section.get_item_index_and_visibility("foo"),
+            Some((0, Visibility::Private))
+        );
+        assert_eq!(
+            section.get_item_index_and_visibility("hello"),
+            Some((1, Visibility::Public))
+        );
+        assert_eq!(section.get_item_index_and_visibility("bar"), None);
 
-        assert_eq!(section.get_item_full_name_and_export(0), ("foo", false));
-        assert_eq!(section.get_item_full_name_and_export(1), ("hello", true));
+        assert_eq!(
+            section.get_item_full_name_and_visibility(0),
+            ("foo", Visibility::Private)
+        );
+        assert_eq!(
+            section.get_item_full_name_and_visibility(1),
+            ("hello", Visibility::Public)
+        );
 
         let entries_restore = section.convert_to_entries();
         assert_eq!(entries, entries_restore);

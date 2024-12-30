@@ -48,12 +48,12 @@ pub fn read_object_file(
         .get_optional_import_data_section()
         .unwrap_or_default()
         .convert_to_entries();
-    let function_name_entries = module_image
-        .get_optional_function_name_section()
+    let export_function_entries = module_image
+        .get_optional_export_function_section()
         .unwrap_or_default()
         .convert_to_entries();
-    let data_name_entries = module_image
-        .get_optional_data_name_section()
+    let export_data_entries = module_image
+        .get_optional_export_data_section()
         .unwrap_or_default()
         .convert_to_entries();
     let relocate_list_entries = module_image
@@ -75,8 +75,8 @@ pub fn read_object_file(
         read_only_data_entries,
         read_write_data_entries,
         uninit_data_entries,
-        function_name_entries,
-        data_name_entries,
+        export_function_entries,
+        export_data_entries,
         relocate_list_entries,
         external_library_entries,
         external_function_entries,
