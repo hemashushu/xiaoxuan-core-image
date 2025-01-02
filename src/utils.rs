@@ -8,18 +8,15 @@ use crate::common_sections::common_property_section::CommonPropertySection;
 use crate::common_sections::export_data_section::ExportDataSection;
 use crate::common_sections::export_function_section::ExportFunctionSection;
 use crate::entry::{
-    ExportDataEntry, ExportFunctionEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
-    ImportModuleEntry, InitedDataEntry, LocalVariableEntry, LocalVariableListEntry, TypeEntry,
-    UninitDataEntry,
+    ExportDataEntry, ExportFunctionEntry, ExternalFunctionEntry, ExternalLibraryEntry,
+    FunctionEntry, ImportModuleEntry, InitedDataEntry, LocalVariableEntry, LocalVariableListEntry,
+    TypeEntry, UninitDataEntry,
 };
 use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
 use crate::index_sections::index_property_section::IndexPropertySection;
 use crate::index_sections::module_list_section::ModuleListSection;
 use crate::ImageError;
-use anc_isa::{
-    DataSectionType, ModuleDependency, OperandDataType, RUNTIME_MAJOR_VERSION,
-    RUNTIME_MINOR_VERSION,
-};
+use anc_isa::{DataSectionType, ModuleDependency, OperandDataType};
 
 use crate::common_sections::data_section::{
     ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection,
@@ -564,8 +561,6 @@ pub fn helper_build_module_binary(
     // index property section
     let index_property_section = IndexPropertySection {
         entry_function_public_index,
-        runtime_major_version: RUNTIME_MAJOR_VERSION,
-        runtime_minor_version: RUNTIME_MINOR_VERSION,
     };
 
     // module list

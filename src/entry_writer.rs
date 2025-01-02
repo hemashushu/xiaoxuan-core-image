@@ -6,8 +6,6 @@
 
 use std::io::Write;
 
-use anc_isa::{RUNTIME_MAJOR_VERSION, RUNTIME_MINOR_VERSION};
-
 use crate::{
     common_sections::{
         common_property_section::CommonPropertySection,
@@ -365,8 +363,6 @@ pub fn write_image_file(
 
     let index_property_section = IndexPropertySection {
         entry_function_public_index: image_index_entry.entry_function_public_index as u32,
-        runtime_major_version: RUNTIME_MAJOR_VERSION,
-        runtime_minor_version: RUNTIME_MINOR_VERSION,
     };
 
     let section_entries: Vec<&dyn SectionEntry> = vec![

@@ -4,6 +4,8 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
+use anc_isa::RUNTIME_EDITION;
+
 use crate::module_image::{ModuleSectionId, SectionEntry};
 
 pub const MODULE_NAME_BUFFER_LENGTH: usize = 256;
@@ -11,7 +13,7 @@ pub const MODULE_NAME_BUFFER_LENGTH: usize = 256;
 #[repr(C)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct CommonPropertySection {
-    // pub image_type: ImageType,
+    pub edition: [u8; 8],
 
     // the "module name", "import data count" and "import function count" are
     // used for find the public index of function and data in
@@ -53,6 +55,7 @@ impl CommonPropertySection {
         };
 
         Self {
+            edition: *RUNTIME_EDITION,
             import_data_count,
             import_function_count,
             module_name_length: module_name_src.len() as u32,
@@ -90,6 +93,8 @@ impl<'a> SectionEntry<'a> for CommonPropertySection {
 
 #[cfg(test)]
 mod tests {
+    use anc_isa::RUNTIME_EDITION;
+
     use crate::module_image::SectionEntry;
 
     use super::CommonPropertySection;
@@ -101,13 +106,15 @@ mod tests {
         let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
 
-        let mut expect_data = vec![
-            // 1, 0, 0, 0, // image type
+        let mut expect_data = vec![];
+
+        expect_data.append(&mut RUNTIME_EDITION.to_vec());
+        expect_data.append(&mut vec![
             17, 0, 0, 0, // import data count
             19, 0, 0, 0, // import function count
             3, 0, 0, 0, // name length
             0x62, 0x61, 0x72, // name buffer
-        ];
+        ]);
 
         expect_data.resize(std::mem::size_of::<CommonPropertySection>(), 0);
 
@@ -116,18 +123,19 @@ mod tests {
 
     #[test]
     fn test_read_section() {
-        let mut section_data = vec![
-            // 1, 0, 0, 0, // image type
+        let mut section_data = vec![];
+        section_data.append(&mut RUNTIME_EDITION.to_vec());
+        section_data.append(&mut vec![
             17, 0, 0, 0, // import data count
             19, 0, 0, 0, // import function count
             3, 0, 0, 0, // name length
-            0x62, 0x61, 0x72, // name buffer, "bar"
-        ];
+            0x62, 0x61, 0x72, // name buffer
+        ]);
 
         section_data.resize(std::mem::size_of::<CommonPropertySection>(), 0);
 
         let section = CommonPropertySection::read(&section_data);
-        // assert_eq!(section.image_type, ImageType::SharedModule);
+        assert_eq!(&section.edition, RUNTIME_EDITION);
         assert_eq!(section.import_data_count, 17);
         assert_eq!(section.import_function_count, 19);
         assert_eq!(section.module_name_length, 3);

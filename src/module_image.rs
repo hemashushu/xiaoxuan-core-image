@@ -156,7 +156,9 @@ use crate::{
 
 pub const DATA_ALIGN_BYTES: usize = 4;
 pub const IMAGE_FILE_MAGIC_NUMBER: &[u8; 8] = b"ancmod\0\0"; // stands for the "XiaoXuan Core Module"
+
 pub const BASE_MODULE_HEADER_LENGTH: usize = 16;
+pub const BASE_SECTION_HEADER_LENGTH: usize = 8;
 
 #[derive(Debug, PartialEq)]
 pub struct ModuleImage<'a> {
@@ -640,7 +642,7 @@ impl<'a> ModuleImage<'a> {
 
 #[cfg(test)]
 mod tests {
-    use anc_isa::{MemoryDataType, OperandDataType};
+    use anc_isa::{MemoryDataType, OperandDataType, RUNTIME_EDITION};
 
     use crate::{
         common_sections::{
@@ -679,27 +681,6 @@ mod tests {
             types_data: &types_data,
         };
 
-        //         // build FuncSection instance
-        //         // note: arbitrary functions
-        //         let function_entries = vec![
-        //             FunctionEntry {
-        //                 type_index: 2,
-        //                 local_variable_list_index: 3,
-        //                 code: vec![1u8, 2, 3, 5, 7],
-        //             },
-        //             FunctionEntry {
-        //                 type_index: 5,
-        //                 local_variable_list_index: 7,
-        //                 code: vec![11u8, 13, 17, 19, 23, 29],
-        //             },
-        //         ];
-        //
-        //         let (function_items, codes_data) = FunctionSection::convert_from_entries(&function_entries);
-        //         let function_section = FunctionSection {
-        //             items: &function_items,
-        //             codes_data: &codes_data,
-        //         };
-
         // build LocalVariableSection instance
         // note: arbitrary local variables
         let local_variable_list_entries = vec![
@@ -717,30 +698,10 @@ mod tests {
             list_data: &local_variable_list_data,
         };
 
-        //         // build FuncIndexSection instance
-        //         // note: arbitrary indices
-        //         let function_index_module_entries = vec![
-        //             FunctionIndexListEntry::new(vec![
-        //                 FunctionIndexEntry::new(2, 3),
-        //                 FunctionIndexEntry::new(5, 7),
-        //             ]),
-        //             FunctionIndexListEntry::new(vec![FunctionIndexEntry::new(11, 13)]),
-        //         ];
-        //
-        //         let (function_index_ranges, function_index_items) =
-        //             FunctionIndexSection::convert_from_entries(&function_index_module_entries);
-        //
-        //         let function_index_section = FunctionIndexSection {
-        //             ranges: &function_index_ranges,
-        //             items: &function_index_items,
-        //         };
-
         // build ModuleImage instance
         let section_entries: Vec<&dyn SectionEntry> = vec![
             &type_section,
-            // &function_section,
             &local_variable_section,
-            // &function_index_section,
             &common_property_section,
         ];
 
@@ -783,21 +744,13 @@ mod tests {
                 0, 0, 0, 0, // offset 0
                 36, 0, 0, 0, // length 0
                 //
-                // 0x13, 0, 0, 0, // section id, function section
-                // 36, 0, 0, 0, // offset 1
-                // 52, 0, 0, 0, // length 1
-                //
                 0x12, 0, 0, 0, // section id, local variable section
                 36, 0, 0, 0, // offset 2
                 68, 0, 0, 0, // length 2
                 //
-                // 0x82, 0, 0, 0, // section id, function index section
-                // 156, 0, 0, 0, // offset 3
-                // 48, 0, 0, 0, // length 3
-                //
                 0x10, 0, 0, 0, // section id, common property section
                 104, 0, 0, 0, // offset 6,
-                12, 1, 0, 0 // length 256 + 12
+                20, 1, 0, 0 // length 256 + 20
             ]
         );
 
@@ -826,30 +779,6 @@ mod tests {
                 3, // F64
             ]
         );
-
-        // let (function_section_data, remains) = remains.split_at(52);
-        // assert_eq!(
-        //     function_section_data,
-        //     &[
-        //         2, 0, 0, 0, // item count
-        //         0, 0, 0, 0, // padding
-        //         //
-        //         0, 0, 0, 0, // code offset 0
-        //         5, 0, 0, 0, // code len 0
-        //         2, 0, 0, 0, // function type index 0
-        //         3, 0, 0, 0, // local variable index 0
-        //         //
-        //         5, 0, 0, 0, // code offset 1
-        //         6, 0, 0, 0, // code len 1
-        //         5, 0, 0, 0, // function type index 1
-        //         7, 0, 0, 0, // local variable index 1
-        //         //
-        //         1, 2, 3, 5, 7, // code 0
-        //         11, 13, 17, 19, 23, 29, // code 1
-        //         //
-        //         0, // padding
-        //     ]
-        // );
 
         // local variable list section
 
@@ -893,45 +822,16 @@ mod tests {
             ]
         );
 
-        // let (function_index_section_data, remains) = remains.split_at(48);
-        // assert_eq!(
-        //     function_index_section_data,
-        //     &[
-        //         /* table 0 */
-        //         2, 0, 0, 0, // item count
-        //         0, 0, 0, 0, // padding
-        //         0, 0, 0, 0, // offset 0
-        //         2, 0, 0, 0, // count 0
-        //         2, 0, 0, 0, // offset 1
-        //         1, 0, 0, 0, // count 1
-        //         /* table 1 - module 0 */
-        //         // 0, 0, 0, 0, // function idx 0
-        //         2, 0, 0, 0, // target module idx 0
-        //         3, 0, 0, 0, // target function idx 0
-        //         //
-        //         // 1, 0, 0, 0, // function idx 1
-        //         5, 0, 0, 0, // target module idx 1
-        //         7, 0, 0, 0, // target function idx 1
-        //         /* table 1 - module 0 */
-        //         // 0, 0, 0, 0, // function idx 0
-        //         11, 0, 0, 0, // target module idx 0
-        //         13, 0, 0, 0, // target function idx 0
-        //     ]
-        // );
-
         // common property section
+        let mut expected_common_property_section_data = vec![];
+        expected_common_property_section_data.append(&mut RUNTIME_EDITION.to_vec());
+        expected_common_property_section_data.append(&mut vec![
+            17, 0, 0, 0, // import_data_count
+            19, 0, 0, 0, // import_function_count
+            3, 0, 0, 0, // name length
+        ]);
 
-        assert_eq!(
-            &remains[..12],
-            &[
-                // 0, 0, 0, 0, // image type
-                // 11, 0, 0, 0, // constructor function public index
-                // 13, 0, 0, 0, // destructor function public index
-                17, 0, 0, 0, // import_data_count
-                19, 0, 0, 0, // import_function_count
-                3, 0, 0, 0, // name length
-            ]
-        );
+        assert_eq!(&remains[..20], &expected_common_property_section_data);
 
         // load
         let module_image_restore = ModuleImage::read(&image_binary).unwrap();
@@ -956,20 +856,6 @@ mod tests {
             ([].as_ref(), vec![OperandDataType::F64].as_ref(),)
         );
 
-        //         // check function section
-        //         let function_section_restore = module_image_restore.get_function_section();
-        //         assert_eq!(function_section_restore.items.len(), 2);
-        //
-        //         assert_eq!(
-        //             function_section_restore.get_item_type_index_and_local_variable_list_index_and_code(0),
-        //             (2, 3, vec![1u8, 2, 3, 5, 7].as_ref(),)
-        //         );
-        //
-        //         assert_eq!(
-        //             function_section_restore.get_item_type_index_and_local_variable_list_index_and_code(1),
-        //             (5, 7, vec![11u8, 13, 17, 19, 23, 29].as_ref(),)
-        //         );
-
         // check local variable list section
 
         let local_variable_section_restore = module_image_restore.get_local_variable_section();
@@ -988,45 +874,9 @@ mod tests {
             &[LocalVariableItem::new(0, 12, MemoryDataType::Bytes, 4),]
         );
 
-        //         // check function index section
-        //         let function_index_section_restore = module_image_restore.get_function_index_section();
-        //
-        //         assert_eq!(function_index_section_restore.ranges.len(), 2);
-        //         assert_eq!(function_index_section_restore.items.len(), 3);
-        //
-        //         assert_eq!(
-        //             &function_index_section_restore.ranges[0],
-        //             &RangeItem::new(0, 2,)
-        //         );
-        //         assert_eq!(
-        //             &function_index_section_restore.ranges[1],
-        //             &RangeItem::new(2, 1,)
-        //         );
-        //
-        //         assert_eq!(
-        //             &function_index_section_restore.items[0],
-        //             &FunctionIndexItem::new(2, 3)
-        //         );
-        //         assert_eq!(
-        //             &function_index_section_restore.items[1],
-        //             &FunctionIndexItem::new(5, 7)
-        //         );
-        //         assert_eq!(
-        //             &function_index_section_restore.items[2],
-        //             &FunctionIndexItem::new(11, 13)
-        //         );
-
         // check common property section
 
         let common_property_section_restore = module_image_restore.get_common_property_section();
-        // assert_eq!(
-        //     common_property_section_restore.constructor_function_public_index,
-        //     11
-        // );
-        // assert_eq!(
-        //     common_property_section_restore.destructor_function_public_index,
-        //     13
-        // );
         assert_eq!(common_property_section_restore.import_data_count, 17);
         assert_eq!(common_property_section_restore.import_function_count, 19);
 
