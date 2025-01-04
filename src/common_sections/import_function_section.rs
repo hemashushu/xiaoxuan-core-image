@@ -7,7 +7,7 @@
 // "import function section" binary layout
 //
 //              |------------------------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                                           |
+//              | item count (u32) | extra header length (u32)                                                   |
 //              |------------------------------------------------------------------------------------------------|
 //  item 0 -->  | full name off 0 (u32) | full name len 0 (u32) | import module idx 0 (u32) | type index 0 (u32) | <-- table
 //  item 1 -->  | full name off 1       | full name len 1       | import module idx 1       | type index 1       |
@@ -169,7 +169,7 @@ mod tests {
     fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
@@ -210,7 +210,7 @@ mod tests {
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length

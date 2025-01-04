@@ -584,6 +584,26 @@ impl ExternalFunctionIndexEntry {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct EntryPointEntry {
+    /// The name of the executable unit.
+    ///
+    /// For application, it's the name of the submodule in which the unit resides,
+    /// specially, the name of the default entry point is the empty string.
+    /// For unit tests, it's the name of testing function.
+    pub unit_name: String,
+    pub function_public_index: usize,
+}
+
+impl EntryPointEntry {
+    pub fn new(unit_name: String, function_public_index: usize) -> Self {
+        Self {
+            unit_name,
+            function_public_index,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ImageCommonEntry {
     // Note that this is the name of module/package,
@@ -637,6 +657,7 @@ pub struct ImageCommonEntry {
 
 #[derive(Debug)]
 pub struct ImageIndexEntry {
+    pub entry_point_entries: Vec<EntryPointEntry>,
     pub function_index_list_entries: Vec<FunctionIndexListEntry>,
     pub data_index_list_entries: Vec<DataIndexListEntry>,
     pub unified_external_library_entries: Vec<ExternalLibraryEntry>,
@@ -644,5 +665,4 @@ pub struct ImageIndexEntry {
     pub unified_external_function_entries: Vec<ExternalFunctionEntry>,
     pub external_function_index_entries: Vec<ExternalFunctionIndexListEntry>,
     pub module_entries: Vec<ImportModuleEntry>,
-    pub entry_function_public_index: usize,
 }

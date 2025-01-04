@@ -12,7 +12,7 @@ pub const MODULE_NAME_BUFFER_LENGTH: usize = 256;
 
 #[repr(C)]
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub struct CommonPropertySection {
+pub struct PropertySection {
     pub edition: [u8; 8],
 
     // the "module name", "import data count" and "import function count" are
@@ -41,7 +41,7 @@ pub struct CommonPropertySection {
     pub module_name_buffer: [u8; 256],
 }
 
-impl CommonPropertySection {
+impl PropertySection {
     pub fn new(module_name: &str, import_data_count: u32, import_function_count: u32) -> Self {
         let module_name_src = module_name.as_bytes();
         let mut module_name_dest = [0u8; MODULE_NAME_BUFFER_LENGTH];
@@ -68,18 +68,18 @@ impl CommonPropertySection {
     }
 }
 
-impl<'a> SectionEntry<'a> for CommonPropertySection {
+impl<'a> SectionEntry<'a> for PropertySection {
     fn read(section_data: &'a [u8]) -> Self {
         let property_section_ptr = unsafe {
-            std::mem::transmute::<*const u8, *const CommonPropertySection>(section_data.as_ptr())
+            std::mem::transmute::<*const u8, *const PropertySection>(section_data.as_ptr())
         };
 
         unsafe { *property_section_ptr }
     }
 
     fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
-        let mut section_data = [0u8; std::mem::size_of::<CommonPropertySection>()];
-        let src = self as *const CommonPropertySection as *const u8;
+        let mut section_data = [0u8; std::mem::size_of::<PropertySection>()];
+        let src = self as *const PropertySection as *const u8;
         let dst = section_data.as_mut_ptr();
         unsafe { std::ptr::copy(src, dst, section_data.len()) };
 
@@ -87,7 +87,7 @@ impl<'a> SectionEntry<'a> for CommonPropertySection {
     }
 
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::CommonProperty
+        ModuleSectionId::Property
     }
 }
 
@@ -97,11 +97,11 @@ mod tests {
 
     use crate::module_image::SectionEntry;
 
-    use super::CommonPropertySection;
+    use super::PropertySection;
 
     #[test]
     fn test_write_section() {
-        let section = CommonPropertySection::new("bar", 17, 19);
+        let section = PropertySection::new("bar", 17, 19);
 
         let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
@@ -116,7 +116,7 @@ mod tests {
             0x62, 0x61, 0x72, // name buffer
         ]);
 
-        expect_data.resize(std::mem::size_of::<CommonPropertySection>(), 0);
+        expect_data.resize(std::mem::size_of::<PropertySection>(), 0);
 
         assert_eq!(section_data, expect_data);
     }
@@ -132,9 +132,9 @@ mod tests {
             0x62, 0x61, 0x72, // name buffer
         ]);
 
-        section_data.resize(std::mem::size_of::<CommonPropertySection>(), 0);
+        section_data.resize(std::mem::size_of::<PropertySection>(), 0);
 
-        let section = CommonPropertySection::read(&section_data);
+        let section = PropertySection::read(&section_data);
         assert_eq!(&section.edition, RUNTIME_EDITION);
         assert_eq!(section.import_data_count, 17);
         assert_eq!(section.import_function_count, 19);

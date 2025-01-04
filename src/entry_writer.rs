@@ -8,7 +8,6 @@ use std::io::Write;
 
 use crate::{
     common_sections::{
-        common_property_section::CommonPropertySection,
         data_section::{ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection},
         export_data_section::ExportDataSection,
         export_function_section::ExportFunctionSection,
@@ -19,17 +18,17 @@ use crate::{
         import_function_section::ImportFunctionSection,
         import_module_section::ImportModuleSection,
         local_variable_section::LocalVariableSection,
+        property_section::PropertySection,
         type_section::TypeSection,
     },
     entry::{ImageCommonEntry, ImageIndexEntry},
     index_sections::{
-        data_index_section::DataIndexSection,
+        data_index_section::DataIndexSection, entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,
         external_library_section::UnifiedExternalLibrarySection,
         external_type_section::UnifiedExternalTypeSection,
-        function_index_section::FunctionIndexSection, index_property_section::IndexPropertySection,
-        module_list_section::ModuleListSection,
+        function_index_section::FunctionIndexSection, module_list_section::ModuleListSection,
     },
     module_image::{ImageType, ModuleImage, SectionEntry},
 };
@@ -40,7 +39,7 @@ pub fn write_object_file(
     writer: &mut dyn Write,
 ) -> std::io::Result<()> {
     // property section
-    let common_property_section = CommonPropertySection::new(
+    let property_section = PropertySection::new(
         &image_common_entry.name,
         image_common_entry.import_data_entries.len() as u32,
         image_common_entry.import_function_entries.len() as u32,
@@ -171,7 +170,7 @@ pub fn write_object_file(
         &import_data_section,
         &export_function_section,
         &export_data_section,
-        &common_property_section,
+        &property_section,
     ];
 
     // build object file binary
@@ -193,7 +192,7 @@ pub fn write_image_file(
     writer: &mut dyn Write,
 ) -> std::io::Result<()> {
     // property section
-    let common_property_section = CommonPropertySection::new(
+    let property_section = PropertySection::new(
         &image_common_entry.name,
         image_common_entry.import_data_entries.len() as u32,
         image_common_entry.import_function_entries.len() as u32,
@@ -361,8 +360,11 @@ pub fn write_image_file(
         items: &external_function_index_items,
     };
 
-    let index_property_section = IndexPropertySection {
-        entry_function_public_index: image_index_entry.entry_function_public_index as u32,
+    let (entry_point_items, unit_names_data) =
+        EntryPointSection::convert_from_entries(&image_index_entry.entry_point_entries);
+    let entry_point_section = EntryPointSection {
+        items: &entry_point_items,
+        unit_names_data: &unit_names_data,
     };
 
     let section_entries: Vec<&dyn SectionEntry> = vec![
@@ -380,7 +382,7 @@ pub fn write_image_file(
         &import_data_section,
         &export_function_section,
         &export_data_section,
-        &common_property_section,
+        &property_section,
         // index
         &function_index_section,
         &data_index_section,
@@ -389,7 +391,7 @@ pub fn write_image_file(
         &unified_external_type_section,
         &unified_external_function_section,
         &external_function_index_section,
-        &index_property_section,
+        &entry_point_section,
     ];
 
     // build object file binary

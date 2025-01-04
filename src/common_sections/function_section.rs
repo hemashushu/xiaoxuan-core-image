@@ -7,7 +7,7 @@
 // "function section" binary layout
 //
 //              |-------------------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                                      |
+//              | item count (u32) | extra header length (u32)                                              |
 //              |-------------------------------------------------------------------------------------------|
 //   item 0 --> | code offset 0 (u32) | code length 0 (u32) | type index 0 (u32) | local list index 0 (u32) |  <-- table
 //   item 1 --> | code offset 1       | code length 1       | type index 1       | local list index 1       |
@@ -163,7 +163,7 @@ mod tests {
     fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             3, 0, 0, 0, // code offset (item 0)
             5, 0, 0, 0, // code length
@@ -203,7 +203,7 @@ mod tests {
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             3, 0, 0, 0, // code offset (item 0)
             5, 0, 0, 0, // code length

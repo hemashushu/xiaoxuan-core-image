@@ -4,35 +4,36 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-use crate::common_sections::common_property_section::CommonPropertySection;
-use crate::common_sections::export_data_section::ExportDataSection;
-use crate::common_sections::export_function_section::ExportFunctionSection;
-use crate::entry::{
-    ExportDataEntry, ExportFunctionEntry, ExternalFunctionEntry, ExternalLibraryEntry,
-    FunctionEntry, ImportModuleEntry, InitedDataEntry, LocalVariableEntry, LocalVariableListEntry,
-    TypeEntry, UninitDataEntry,
-};
-use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
-use crate::index_sections::index_property_section::IndexPropertySection;
-use crate::index_sections::module_list_section::ModuleListSection;
-use crate::ImageError;
-use anc_isa::{DataSectionType, ModuleDependency, OperandDataType};
-
 use crate::common_sections::data_section::{
     ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection,
 };
+use crate::common_sections::export_data_section::ExportDataSection;
+use crate::common_sections::export_function_section::ExportFunctionSection;
 use crate::common_sections::external_function_section::ExternalFunctionSection;
 use crate::common_sections::external_library_section::ExternalLibrarySection;
 use crate::common_sections::function_section::FunctionSection;
 use crate::common_sections::local_variable_section::LocalVariableSection;
+use crate::common_sections::property_section::PropertySection;
 use crate::common_sections::type_section::TypeSection;
 use crate::index_sections::data_index_section::{DataIndexItem, DataIndexSection};
+use crate::index_sections::entry_point_section::EntryPointSection;
 use crate::index_sections::external_function_index_section::{
     ExternalFunctionIndexItem, ExternalFunctionIndexSection,
 };
 use crate::index_sections::external_function_section::UnifiedExternalFunctionSection;
 use crate::index_sections::external_library_section::UnifiedExternalLibrarySection;
+use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
 use crate::index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection};
+use crate::index_sections::module_list_section::ModuleListSection;
+use crate::ImageError;
+use anc_isa::{DataSectionType, ModuleDependency, OperandDataType};
+
+use crate::entry::{
+    EntryPointEntry, ExportDataEntry, ExportFunctionEntry, ExternalFunctionEntry,
+    ExternalLibraryEntry, FunctionEntry, ImportModuleEntry, InitedDataEntry, LocalVariableEntry,
+    LocalVariableListEntry, TypeEntry, UninitDataEntry,
+};
+
 use crate::module_image::{ImageType, ModuleImage, RangeItem, SectionEntry, Visibility};
 
 /// helper object for unit test
@@ -359,7 +360,7 @@ pub fn helper_build_module_binary(
     function_entries: Vec<FunctionEntry>,
     external_library_entries: Vec<ExternalLibraryEntry>,
     external_function_entries: Vec<ExternalFunctionEntry>,
-    entry_function_public_index: u32,
+    entry_function_public_index: usize,
 ) -> Vec<u8> {
     // type section
     let (type_items, types_data) = TypeSection::convert_from_entries(&type_entries);
@@ -452,8 +453,8 @@ pub fn helper_build_module_binary(
         names_data: &external_function_data,
     };
 
-    // common property section
-    let common_property_section = CommonPropertySection::new(name, 0, 0);
+    // property section
+    let property_section = PropertySection::new(name, 0, 0);
 
     // function index
     let function_ranges: Vec<RangeItem> = vec![RangeItem {
@@ -558,9 +559,16 @@ pub fn helper_build_module_binary(
         items: &external_function_index_items,
     };
 
-    // index property section
-    let index_property_section = IndexPropertySection {
+    // entry point section
+    let entry_point_entries = vec![EntryPointEntry::new(
+        "".to_string(), // the name of default entry point is empty string
         entry_function_public_index,
+    )];
+    let (entry_point_items, unit_names_data) =
+        EntryPointSection::convert_from_entries(&entry_point_entries);
+    let entry_point_section = EntryPointSection {
+        items: &entry_point_items,
+        unit_names_data: &unit_names_data,
     };
 
     // module list
@@ -576,7 +584,7 @@ pub fn helper_build_module_binary(
     // build module image
     let section_entries: Vec<&dyn SectionEntry> = vec![
         /* the following are common sections */
-        &common_property_section,
+        &property_section,
         &type_section,
         &local_variable_section,
         &function_section,
@@ -589,7 +597,7 @@ pub fn helper_build_module_binary(
         &external_library_section,
         &external_function_section,
         /* the following are index sections */
-        &index_property_section,
+        &entry_point_section,
         &module_list_section,
         &function_index_section,
         &data_index_section,

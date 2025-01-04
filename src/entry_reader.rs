@@ -61,10 +61,10 @@ pub fn read_object_file(
         .unwrap_or_default()
         .convert_to_entries();
 
-    let common_property_section = module_image.get_common_property_section();
+    let property_section = module_image.get_property_section();
 
     let image_common_entry = ImageCommonEntry {
-        name: common_property_section.get_module_name().to_owned(),
+        name: property_section.get_module_name().to_owned(),
         image_type: module_image.image_type,
         import_module_entries,
         import_function_entries,

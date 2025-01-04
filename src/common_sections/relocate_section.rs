@@ -7,7 +7,7 @@
 // "relocate section" binary layout
 //
 //              |-----------------------------------------------|
-//              | item count (u32) | (4 bytes padding)          |
+//              | item count (u32) | extra header length (u32)  |
 //              |-----------------------------------------------|
 //  item 0 -->  | list offset 0 (u32) | list item count 0 (u32) | <-- table
 //  item 1 -->  | list offset 1       | list item count 1       |
@@ -253,7 +253,7 @@ mod tests {
                 // header
                 //
                 7, 0, 0, 0, // item count
-                0, 0, 0, 0, // 4 bytes padding
+                0, 0, 0, 0, // extra section header len (i32)
                 //
                 // table
                 //
@@ -340,7 +340,7 @@ mod tests {
             // header
             //
             7, 0, 0, 0, // item count
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             // table
             //

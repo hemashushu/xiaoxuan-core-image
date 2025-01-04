@@ -7,7 +7,7 @@
 // "read-only data section" binary layout
 //
 //              |------------------------------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                                                 |
+//              | item count (u32) | extra header length (u32)                                                         |
 //              |------------------------------------------------------------------------------------------------------|
 //  item 0 -->  | data offset 0 (u32) | data length 0 (u32) | mem data type 0 (u8) | pad (1 byte) | data align 0 (u16) | <-- table
 //  item 1 -->  | data offset 1       | data length 1       | mem data type 1      |              | data align 1       |
@@ -23,7 +23,7 @@
 // "uninit data section" binary layout
 //
 //              |------------------------------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                                                 |
+//              | item count (u32) | extra header length (u32)                                                         |
 //              |------------------------------------------------------------------------------------------------------|
 //  item 0 -->  | data offset 0 (u32) | data length 0 (u32) | mem data type 0 (u8) | pad (1 byte) | data align 0 (u16) | <-- table
 //  item 1 -->  | data offset 1       | data length 1       | mem data type 1      |              | data align 1       |

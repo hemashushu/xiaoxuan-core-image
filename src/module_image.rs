@@ -62,7 +62,7 @@
 // stored in the following sections:
 //
 // - function index section
-// - index property section
+// - entry point section
 //
 // there are also some optional sections:
 //
@@ -103,7 +103,6 @@ use anc_isa::{IMAGE_FORMAT_MAJOR_VERSION, IMAGE_FORMAT_MINOR_VERSION};
 
 use crate::{
     common_sections::{
-        common_property_section::CommonPropertySection,
         data_section::{ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection},
         export_data_section::ExportDataSection,
         export_function_section::ExportFunctionSection,
@@ -114,17 +113,17 @@ use crate::{
         import_function_section::ImportFunctionSection,
         import_module_section::ImportModuleSection,
         local_variable_section::LocalVariableSection,
+        property_section::PropertySection,
         relocate_section::RelocateSection,
         type_section::TypeSection,
     },
     index_sections::{
-        data_index_section::DataIndexSection,
+        data_index_section::DataIndexSection, entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,
         external_library_section::UnifiedExternalLibrarySection,
         external_type_section::UnifiedExternalTypeSection,
-        function_index_section::FunctionIndexSection, index_property_section::IndexPropertySection,
-        module_list_section::ModuleListSection,
+        function_index_section::FunctionIndexSection, module_list_section::ModuleListSection,
     },
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
     ImageError, ImageErrorType,
@@ -143,7 +142,7 @@ use crate::{
 
 //                 body
 //              |------------------------------------------------------|
-//              | section item count (u32) | (4 bytes padding)         | 8 bytes, off=16
+//              | section item count (u32) | extra header length (u32) | 8 bytes, off=16
 //              |------------------------------------------------------|
 //   item 0 --> | section id 0 (u32) | offset 0 (u32) | length 0 (u32) | <-- table
 //   item 1 --> | section id 1       | offset 1       | length 1       |
@@ -185,10 +184,10 @@ impl ModuleSectionItem {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ModuleSectionId {
     // essential
-    CommonProperty = 0x0010, // 0x10
-    Type,                    // 0x11
-    LocalVariable,           // 0x12
-    Function,                // 0x13
+    Property = 0x0010, // 0x10
+    Type,              // 0x11
+    LocalVariable,     // 0x12
+    Function,          // 0x13
 
     // optional
     ReadOnlyData = 0x0020, // 0x20
@@ -214,9 +213,9 @@ pub enum ModuleSectionId {
     /*
      essential (application only)
     */
-    IndexProperty = 0x0080, // 0x80
-    ModuleList,             // 0x81, this section is used by the module loader
-    FunctionIndex,          // 0x82
+    EntryPoint = 0x0080, // 0x80
+    FunctionIndex,       // 0x81
+    ModuleList,          // 0x82, this section is used by the module loader
 
     /*
     optional (application only)
@@ -473,11 +472,11 @@ impl<'a> ModuleImage<'a> {
     }
 
     // essential section
-    pub fn get_common_property_section(&'a self) -> CommonPropertySection {
-        self.get_section_data_by_id(ModuleSectionId::CommonProperty)
+    pub fn get_property_section(&'a self) -> PropertySection {
+        self.get_section_data_by_id(ModuleSectionId::Property)
             .map_or_else(
                 || panic!("Can not find the common property section."),
-                CommonPropertySection::read,
+                PropertySection::read,
             )
     }
 
@@ -509,11 +508,11 @@ impl<'a> ModuleImage<'a> {
     }
 
     // essential section (application only)
-    pub fn get_index_property_section(&'a self) -> IndexPropertySection {
-        self.get_section_data_by_id(ModuleSectionId::IndexProperty)
+    pub fn get_entry_point_section(&'a self) -> EntryPointSection<'a> {
+        self.get_section_data_by_id(ModuleSectionId::EntryPoint)
             .map_or_else(
-                || panic!("Can not find the index property section."),
-                IndexPropertySection::read,
+                || panic!("Can not find the entry point section."),
+                EntryPointSection::read,
             )
     }
 
@@ -646,8 +645,8 @@ mod tests {
 
     use crate::{
         common_sections::{
-            common_property_section::CommonPropertySection,
             local_variable_section::{LocalVariableItem, LocalVariableSection},
+            property_section::PropertySection,
             type_section::TypeSection,
         },
         entry::{LocalVariableEntry, LocalVariableListEntry, TypeEntry},
@@ -659,8 +658,8 @@ mod tests {
 
     #[test]
     fn test_module_image_read_and_write() {
-        // build common property section
-        let common_property_section = CommonPropertySection::new("bar", 17, 19);
+        // build property section
+        let property_section = PropertySection::new("bar", 17, 19);
 
         // build TypeSection instance
         // note: arbitrary types
@@ -699,11 +698,8 @@ mod tests {
         };
 
         // build ModuleImage instance
-        let section_entries: Vec<&dyn SectionEntry> = vec![
-            &type_section,
-            &local_variable_section,
-            &common_property_section,
-        ];
+        let section_entries: Vec<&dyn SectionEntry> =
+            vec![&type_section, &local_variable_section, &property_section];
 
         let (section_items, sections_data) =
             ModuleImage::convert_from_section_entries(&section_entries);
@@ -788,7 +784,7 @@ mod tests {
             &[
                 // header
                 2, 0, 0, 0, // item count
-                0, 0, 0, 0, // 4 bytes padding
+                0, 0, 0, 0, // extra section header len (i32)
                 // table
                 0, 0, 0, 0, // offset
                 2, 0, 0, 0, // count
@@ -823,15 +819,15 @@ mod tests {
         );
 
         // common property section
-        let mut expected_common_property_section_data = vec![];
-        expected_common_property_section_data.append(&mut RUNTIME_EDITION.to_vec());
-        expected_common_property_section_data.append(&mut vec![
+        let mut expected_property_section_data = vec![];
+        expected_property_section_data.append(&mut RUNTIME_EDITION.to_vec());
+        expected_property_section_data.append(&mut vec![
             17, 0, 0, 0, // import_data_count
             19, 0, 0, 0, // import_function_count
             3, 0, 0, 0, // name length
         ]);
 
-        assert_eq!(&remains[..20], &expected_common_property_section_data);
+        assert_eq!(&remains[..20], &expected_property_section_data);
 
         // load
         let module_image_restore = ModuleImage::read(&image_binary).unwrap();
@@ -876,10 +872,10 @@ mod tests {
 
         // check common property section
 
-        let common_property_section_restore = module_image_restore.get_common_property_section();
-        assert_eq!(common_property_section_restore.import_data_count, 17);
-        assert_eq!(common_property_section_restore.import_function_count, 19);
+        let property_section_restore = module_image_restore.get_property_section();
+        assert_eq!(property_section_restore.import_data_count, 17);
+        assert_eq!(property_section_restore.import_function_count, 19);
 
-        assert_eq!(common_property_section_restore.get_module_name(), "bar");
+        assert_eq!(property_section_restore.get_module_name(), "bar");
     }
 }

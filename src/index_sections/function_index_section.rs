@@ -21,13 +21,13 @@
 
 // "function index section" binary layout
 //
-//         |--------------------------------------|
-//         | item count (u32) | (4 bytes padding) |
-//         |--------------------------------------|
-// range 0 | offset 0 (u32) | count 0 (u32)       | <-- table 0
-// range 1 | offset 1       | count 1             |
-//         | ...                                  |
-//         |--------------------------------------|
+//         |----------------------------------------------|
+//         | item count (u32) | extra header length (u32) |
+//         |----------------------------------------------|
+// range 0 | offset 0 (u32) | count 0 (u32)               | <-- table 0
+// range 1 | offset 1       | count 1                     |
+//         | ...                                          |
+//         |----------------------------------------------|
 //
 //         |--------------------------------------------------------|
 //         | target mod idx 0 (u32) | function internal idx 0 (u32) | <-- table 1
@@ -173,7 +173,7 @@ mod tests {
     fn test_read_section() {
         let section_data = vec![
             2u8, 0, 0, 0, // item count (little endian)
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             0, 0, 0, 0, // offset 0 (item 0)
             2, 0, 0, 0, // count 0
@@ -247,7 +247,7 @@ mod tests {
             section_data,
             vec![
                 2u8, 0, 0, 0, // item count (little endian)
-                0, 0, 0, 0, // 4 bytes padding
+                0, 0, 0, 0, // extra section header len (i32)
                 //
                 0, 0, 0, 0, // offset 0 (item 0)
                 2, 0, 0, 0, // count 0

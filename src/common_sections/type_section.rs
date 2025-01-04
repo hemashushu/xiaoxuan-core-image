@@ -7,7 +7,7 @@
 // "type section" binary layout
 //
 //                     |-----------------------------------------------------------------------------------------------|
-//                     | item count (u32) | (4 bytes padding)                                                          |
+//                     | item count (u32) | extra header length (u32)                                                  |
 //                     |-----------------------------------------------------------------------------------------------|
 //          item 0 --> | params count 0 (u16) | results count 0 (u16) | params offset 0 (u32) | results offset 0 (u32) | <-- table
 //          item 1 --> | params count 1       | results count 1       | params offset 1       | results offset 1       |
@@ -215,7 +215,7 @@ mod tests {
     fn test_read_section() {
         let section_data = vec![
             3u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             2, 0, // param count
             3, 0, // result count
@@ -314,7 +314,7 @@ mod tests {
             section_data,
             vec![
                 3u8, 0, 0, 0, // item count
-                0, 0, 0, 0, // 4 bytes padding
+                0, 0, 0, 0, // extra section header len (i32)
                 //
                 2, 0, // param count
                 3, 0, // result count

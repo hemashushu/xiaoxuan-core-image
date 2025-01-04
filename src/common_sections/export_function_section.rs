@@ -9,7 +9,7 @@
 // "function name section" binary layout
 //
 //              |---------------------------------------------------------------------------------------|
-//              | item count (u32) | (4 bytes padding)                                                  |
+//              | item count (u32) | extra header length (u32)                                          |
 //              |---------------------------------------------------------------------------------------|
 //  item 0 -->  | full name offset 0 (u32) | full name length 0 (u32) | visibility 0 (u8) | pad 3 bytes | <-- table
 //  item 1 -->  | full name offset 1       | full name length 1       | visibility 1      | pad 3 bytes |
@@ -199,7 +199,7 @@ mod tests {
 
         let mut expect_data = vec![
             2u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
@@ -222,7 +222,7 @@ mod tests {
     fn test_read_section() {
         let mut section_data = vec![
             2u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // 4 bytes padding
+            0, 0, 0, 0, // extra section header len (i32)
             //
             0, 0, 0, 0, // name offset (item 0)
             3, 0, 0, 0, // name length
