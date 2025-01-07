@@ -22,19 +22,19 @@
 // - import module section
 // - import function section
 // - import data section
-// - function name section
-// - data name section
+// - export function section
+// - export data section
 // - relocate section
 // - external library section
 // - external function section
-// - common property section
+// - property section
 //
 // a minimal module needs only 4 sections:
 //
 // - type section
 // - local variable section
 // - function section
-// - common property section
+// - property section
 //
 // data sections are optional:
 //
@@ -45,8 +45,9 @@
 // other sections are not needed at the runtime,
 // they are used for debugging and linking:
 //
-// - function name section
-// - data name section
+// - export function section
+// - export data section
+// - relocate section
 // - import module section
 // - import function section
 // - import data section
@@ -54,7 +55,7 @@
 // - external function section
 //
 // note that if the 'bridge function feature' is enable, the
-// function name section and the data name section are required.
+// export function section and the export data section are required.
 
 // an application consists of one or more modules,
 // when the main module and other modules are linked,
@@ -63,6 +64,7 @@
 //
 // - function index section
 // - entry point section
+// - module list section
 //
 // there are also some optional sections:
 //
@@ -70,7 +72,7 @@
 // - external function index section
 // - unified external library section
 // - unified external function section
-// - module list section
+
 
 // the design of the module
 // ------------------------

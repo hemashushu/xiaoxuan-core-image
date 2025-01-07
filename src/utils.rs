@@ -648,10 +648,11 @@ fn convert_operand_data_type_to_local_variable_entry(
 #[cfg(test)]
 mod tests {
     use core::str;
+    use std::collections::HashMap;
 
     use anc_isa::{
-        DataSectionType, DependencyLocal, DependencyShare, ExternalLibraryDependency,
-        ExternalLibraryDependencyType, MemoryDataType, OperandDataType,
+        DataSectionType, DependencyCondition, DependencyLocal, DependencyShare,
+        ExternalLibraryDependency, ExternalLibraryDependencyType, MemoryDataType, OperandDataType,
     };
 
     use crate::{
@@ -835,10 +836,10 @@ mod tests {
                     "libmagic".to_owned(),
                     Box::new(ExternalLibraryDependency::Share(Box::new(
                         DependencyShare {
-                            repository: Option::Some("default".to_owned()),
+                            repository: "default".to_owned(),
                             version: "1.2".to_owned(),
-                            values: None,
-                            condition: None,
+                            condition: DependencyCondition::True,
+                            parameters: HashMap::default(),
                         },
                     ))),
                 ),
@@ -847,8 +848,8 @@ mod tests {
                     Box::new(ExternalLibraryDependency::Local(Box::new(
                         DependencyLocal {
                             path: "libz.so.1".to_owned(),
-                            condition: None,
-                            values: None,
+                            condition: DependencyCondition::True,
+                            parameters: HashMap::default(),
                         },
                     ))),
                 ),
@@ -937,10 +938,10 @@ mod tests {
                 "libmagic",
                 ExternalLibraryDependencyType::Share,
                 ExternalLibraryDependency::Share(Box::new(DependencyShare {
-                    repository: Option::Some("default".to_owned()),
+                    repository: "default".to_owned(),
                     version: "1.2".to_owned(),
-                    values: None,
-                    condition: None,
+                    condition: DependencyCondition::True,
+                    parameters: HashMap::default()
                 },))
             )
         );
@@ -961,8 +962,8 @@ mod tests {
                 ExternalLibraryDependencyType::Local,
                 ExternalLibraryDependency::Local(Box::new(DependencyLocal {
                     path: "libz.so.1".to_owned(),
-                    condition: None,
-                    values: None
+                    condition: DependencyCondition::True,
+                    parameters: HashMap::default()
                 }))
             )
         );
@@ -1064,10 +1065,10 @@ mod tests {
                 "libmagic",
                 ExternalLibraryDependencyType::Share,
                 ExternalLibraryDependency::Share(Box::new(DependencyShare {
-                    repository: Option::Some("default".to_owned()),
+                    repository: "default".to_owned(),
                     version: "1.2".to_owned(),
-                    values: None,
-                    condition: None,
+                    condition: DependencyCondition::True,
+                    parameters: HashMap::default()
                 },))
             )
         );
@@ -1088,8 +1089,8 @@ mod tests {
                 ExternalLibraryDependencyType::Local,
                 ExternalLibraryDependency::Local(Box::new(DependencyLocal {
                     path: "libz.so.1".to_owned(),
-                    condition: None,
-                    values: None
+                    condition: DependencyCondition::True,
+                    parameters: HashMap::default()
                 }))
             )
         );

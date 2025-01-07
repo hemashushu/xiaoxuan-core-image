@@ -167,8 +167,11 @@ impl<'a> UnifiedExternalLibrarySection<'a> {
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashMap;
+
     use anc_isa::{
-        DependencyLocal, DependencyRemote, ExternalLibraryDependency, ExternalLibraryDependencyType,
+        DependencyCondition, DependencyLocal, DependencyRemote, ExternalLibraryDependency,
+        ExternalLibraryDependencyType,
     };
 
     use crate::{
@@ -270,8 +273,8 @@ mod tests {
                 Box::new(ExternalLibraryDependency::Local(Box::new(
                     DependencyLocal {
                         path: "libhello.so.1".to_owned(),
-                        condition: None,
-                        values: None,
+                        condition: DependencyCondition::True,
+                        parameters: HashMap::default(),
                     },
                 ))),
             ),
@@ -282,8 +285,8 @@ mod tests {
                         url: "http://a.b/c".to_owned(),
                         reversion: "v1.0.1".to_owned(),
                         path: "/xyz.so.2".to_owned(),
-                        values: None,
-                        condition: None,
+                        condition: DependencyCondition::True,
+                        parameters: HashMap::default(),
                     },
                 ))),
             ),

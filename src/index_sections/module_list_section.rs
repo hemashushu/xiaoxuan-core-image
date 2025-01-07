@@ -168,7 +168,9 @@ impl<'a> ModuleListSection<'a> {
 #[cfg(test)]
 mod tests {
 
-    use anc_isa::{DependencyLocal, DependencyRemote, ModuleDependency, ModuleDependencyType};
+    use std::collections::HashMap;
+
+    use anc_isa::{DependencyCondition, DependencyLocal, DependencyRemote, ModuleDependency, ModuleDependencyType};
 
     use crate::{
         entry::ImportModuleEntry,
@@ -267,8 +269,8 @@ mod tests {
                 "foobar".to_owned(),
                 Box::new(ModuleDependency::Local(Box::new(DependencyLocal {
                     path: "hello".to_owned(),
-                    condition: None,
-                    values: None,
+                    condition: DependencyCondition::True,
+                    parameters: HashMap::default()
                 }))),
             ),
             ImportModuleEntry::new(
@@ -277,8 +279,8 @@ mod tests {
                     url: "http://a.b/c".to_owned(),
                     reversion: "v1.0.1".to_owned(),
                     path: "/xyz".to_owned(),
-                    values: None,
-                    condition: None,
+                    condition: DependencyCondition::True,
+                    parameters: HashMap::default()
                 }))),
             ),
         ];

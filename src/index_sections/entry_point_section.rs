@@ -37,9 +37,9 @@ pub struct EntryPointSection<'a> {
 pub struct EntryPointItem {
     /// The name of the executable unit.
     ///
-    /// For application, it's the name of the submodule in which the unit resides,
-    /// specially, the name of the default entry point is the empty string.
-    /// For unit tests, it's the name of testing function.
+    /// - empty string for the default entry point (in file "main.anca").
+    /// - submodule name for the executable units in the "app" folder.
+    /// - submodule and function name ("test_*") for the unit test (in folder "tests").
     pub unit_name_offset: u32,
     pub unit_name_length: u32,
 
