@@ -28,7 +28,7 @@ use crate::{
         external_function_section::UnifiedExternalFunctionSection,
         external_library_section::UnifiedExternalLibrarySection,
         external_type_section::UnifiedExternalTypeSection,
-        function_index_section::FunctionIndexSection, module_list_section::ModuleListSection,
+        function_index_section::FunctionIndexSection, dependent_module_section::DependentModuleSection,
     },
     module_image::{ImageType, ModuleImage, SectionEntry},
 };
@@ -317,11 +317,11 @@ pub fn write_image_file(
         items: &data_index_items,
     };
 
-    let (module_list_items, module_list_data) =
-        ModuleListSection::convert_from_entries(&image_index_entry.module_entries);
-    let module_list_section = ModuleListSection {
-        items: &module_list_items,
-        items_data: &module_list_data,
+    let (dependent_module_items, dependent_module_data) =
+        DependentModuleSection::convert_from_entries(&image_index_entry.dependent_module_entries);
+    let dependent_module_section = DependentModuleSection {
+        items: &dependent_module_items,
+        items_data: &dependent_module_data,
     };
 
     let (unified_external_library_items, unified_external_library_data) =
@@ -386,7 +386,7 @@ pub fn write_image_file(
         // index
         &function_index_section,
         &data_index_section,
-        &module_list_section,
+        &dependent_module_section,
         &unified_external_library_section,
         &unified_external_type_section,
         &unified_external_function_section,

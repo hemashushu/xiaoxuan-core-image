@@ -283,6 +283,35 @@ impl ImportModuleEntry {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct DependentModuleEntry {
+    // Note that this is the name of module/package,
+    // it CANNOT be the name of submodule even if the current image is
+    // a "object module", it also CANNOT be the full name or name path.
+    //
+    // about the "full_name" and "name_path"
+    // -------------------------------------
+    // - "full_name" = "module_name::name_path"
+    // - "name_path" = "namespace::identifier"
+    // - "namespace" = "sub_module_name"{0,N}
+    //
+    // e.g.
+    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
+    // and the full name is "myapp::utils::add"
+    pub name: String,
+    pub value: Box<ModuleDependency>,
+
+    // the hash of parameters and compile environment variables,
+    // only exists in Local/Remote/Share dependencies
+    pub hash: [u8; 32],
+}
+
+impl DependentModuleEntry {
+    pub fn new(name: String, value: Box<ModuleDependency>, hash: [u8; 32]) -> Self {
+        Self { name, value, hash }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct ImportFunctionEntry {
     // the full name of imported function
     //
@@ -664,5 +693,5 @@ pub struct ImageIndexEntry {
     pub unified_external_type_entries: Vec<TypeEntry>,
     pub unified_external_function_entries: Vec<ExternalFunctionEntry>,
     pub external_function_index_entries: Vec<ExternalFunctionIndexListEntry>,
-    pub module_entries: Vec<ImportModuleEntry>,
+    pub dependent_module_entries: Vec<DependentModuleEntry>,
 }

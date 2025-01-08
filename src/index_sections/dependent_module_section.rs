@@ -4,10 +4,7 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-//! The binary layout of this section is
-//! the same as `ImportModuleSection`
-
-// "import module section" binary layout
+// "dependent module section" binary layout
 //
 //              |-----------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                |
@@ -26,35 +23,40 @@
 use anc_isa::{ModuleDependency, ModuleDependencyType};
 
 use crate::{
-    entry::ImportModuleEntry,
+    entry::DependentModuleEntry,
     module_image::{ModuleSectionId, SectionEntry},
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
-pub struct ModuleListSection<'a> {
-    pub items: &'a [ModuleListItem],
+pub struct DependentModuleSection<'a> {
+    pub items: &'a [DependentModuleItem],
     pub items_data: &'a [u8],
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct ModuleListItem {
+pub struct DependentModuleItem {
     pub name_offset: u32, // the offset of the name string in data area
     pub name_length: u32, // the length (in bytes) of the name string in data area
     pub value_offset: u32,
     pub value_length: u32,
     pub module_dependent_type: ModuleDependencyType, // u8
     _padding0: [u8; 3],
+
+    // the hash of parameters and compile environment variables,
+    // only exists in Local/Remote/Share dependencies
+    pub hash: [u8; 32],
 }
 
-impl ModuleListItem {
+impl DependentModuleItem {
     pub fn new(
         name_offset: u32,
         name_length: u32,
         value_offset: u32,
         value_length: u32,
         module_dependent_type: ModuleDependencyType,
+        hash: [u8; 32],
     ) -> Self {
         Self {
             name_offset,
@@ -63,15 +65,16 @@ impl ModuleListItem {
             value_length,
             module_dependent_type,
             _padding0: [0; 3],
+            hash,
         }
     }
 }
 
-impl<'a> SectionEntry<'a> for ModuleListSection<'a> {
+impl<'a> SectionEntry<'a> for DependentModuleSection<'a> {
     fn read(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
-            read_section_with_table_and_data_area::<ModuleListItem>(section_data);
-        ModuleListSection {
+            read_section_with_table_and_data_area::<DependentModuleItem>(section_data);
+        DependentModuleSection {
             items,
             items_data: names_data,
         }
@@ -82,15 +85,15 @@ impl<'a> SectionEntry<'a> for ModuleListSection<'a> {
     }
 
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::ModuleList
+        ModuleSectionId::DependentModule
     }
 }
 
-impl<'a> ModuleListSection<'a> {
-    pub fn get_item_name_and_module_dependent_type_and_value(
+impl<'a> DependentModuleSection<'a> {
+    pub fn get_item_name_and_module_dependent_type_and_value_and_hash(
         &'a self,
         idx: usize,
-    ) -> (&'a str, ModuleDependencyType, &'a [u8]) {
+    ) -> (&'a str, ModuleDependencyType, &'a [u8], &'a [u8; 32]) {
         let items = self.items;
         let items_data = self.items_data;
 
@@ -104,10 +107,13 @@ impl<'a> ModuleListSection<'a> {
             std::str::from_utf8(name_data).unwrap(),
             item.module_dependent_type,
             value_data,
+            &item.hash,
         )
     }
 
-    pub fn convert_from_entries(entries: &[ImportModuleEntry]) -> (Vec<ModuleListItem>, Vec<u8>) {
+    pub fn convert_from_entries(
+        entries: &[DependentModuleEntry],
+    ) -> (Vec<DependentModuleItem>, Vec<u8>) {
         let mut name_bytes = entries
             .iter()
             .map(|entry| entry.name.as_bytes().to_vec())
@@ -142,15 +148,16 @@ impl<'a> ModuleListSection<'a> {
                     ModuleDependency::Current => ModuleDependencyType::Current,
                 };
 
-                ModuleListItem::new(
+                DependentModuleItem::new(
                     name_offset,
                     name_length,
                     value_offset,
                     value_length,
                     module_dependent_type,
+                    entry.hash,
                 )
             })
-            .collect::<Vec<ModuleListItem>>();
+            .collect::<Vec<DependentModuleItem>>();
 
         let items_data = name_bytes
             .iter_mut()
@@ -170,11 +177,14 @@ mod tests {
 
     use std::collections::HashMap;
 
-    use anc_isa::{DependencyCondition, DependencyLocal, DependencyRemote, ModuleDependency, ModuleDependencyType};
+    use anc_isa::{
+        DependencyCondition, DependencyLocal, DependencyRemote, ModuleDependency,
+        ModuleDependencyType,
+    };
 
     use crate::{
-        entry::ImportModuleEntry,
-        index_sections::module_list_section::{ModuleListItem, ModuleListSection},
+        entry::DependentModuleEntry,
+        index_sections::dependent_module_section::{DependentModuleItem, DependentModuleSection},
         module_image::SectionEntry,
     };
 
@@ -190,6 +200,10 @@ mod tests {
             5, 0, 0, 0, // value length
             0, // module dependent type
             0, 0, 0, // padding
+            11, 13, 17, 19, 0, 0, 0, 0, // hash group 0
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 1
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 2
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 3
             //
             8, 0, 0, 0, // name offset (item 1)
             4, 0, 0, 0, // name length
@@ -197,6 +211,10 @@ mod tests {
             6, 0, 0, 0, // value length
             1, // module dependent type
             0, 0, 0, // padding
+            23, 29, 31, 37, 0, 0, 0, 0, // hash group 0
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 1
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 2
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 3
         ];
 
         section_data.extend_from_slice(b"foo");
@@ -204,16 +222,40 @@ mod tests {
         section_data.extend_from_slice(b".bar");
         section_data.extend_from_slice(b".world");
 
-        let section = ModuleListSection::read(&section_data);
+        let section = DependentModuleSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
         assert_eq!(
             section.items[0],
-            ModuleListItem::new(0, 3, 3, 5, ModuleDependencyType::Local)
+            DependentModuleItem::new(
+                0,
+                3,
+                3,
+                5,
+                ModuleDependencyType::Local,
+                [
+                    11, 13, 17, 19, 0, 0, 0, 0, // hash group 0
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 1
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 2
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 3
+                ]
+            )
         );
         assert_eq!(
             section.items[1],
-            ModuleListItem::new(8, 4, 12, 6, ModuleDependencyType::Remote,)
+            DependentModuleItem::new(
+                8,
+                4,
+                12,
+                6,
+                ModuleDependencyType::Remote,
+                [
+                    23, 29, 31, 37, 0, 0, 0, 0, // hash group 0
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 1
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 2
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 3
+                ]
+            )
         );
         assert_eq!(section.items_data, "foohello.bar.world".as_bytes())
     }
@@ -221,11 +263,35 @@ mod tests {
     #[test]
     fn test_write_section() {
         let items = vec![
-            ModuleListItem::new(0, 3, 3, 5, ModuleDependencyType::Local),
-            ModuleListItem::new(8, 4, 12, 6, ModuleDependencyType::Remote),
+            DependentModuleItem::new(
+                0,
+                3,
+                3,
+                5,
+                ModuleDependencyType::Local,
+                [
+                    11, 13, 17, 19, 0, 0, 0, 0, // hash group 0
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 1
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 2
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 3
+                ],
+            ),
+            DependentModuleItem::new(
+                8,
+                4,
+                12,
+                6,
+                ModuleDependencyType::Remote,
+                [
+                    23, 29, 31, 37, 0, 0, 0, 0, // hash group 0
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 1
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 2
+                    0, 0, 0, 0, 0, 0, 0, 0, // hash group 3
+                ],
+            ),
         ];
 
-        let section = ModuleListSection {
+        let section = DependentModuleSection {
             items: &items,
             items_data: b"foohello.bar.world",
         };
@@ -243,6 +309,10 @@ mod tests {
             5, 0, 0, 0, // value length
             0, // module dependent type
             0, 0, 0, // padding
+            11, 13, 17, 19, 0, 0, 0, 0, // hash group 0
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 1
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 2
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 3
             //
             8, 0, 0, 0, // name offset (item 1)
             4, 0, 0, 0, // name length
@@ -250,6 +320,10 @@ mod tests {
             6, 0, 0, 0, // value length
             1, // module dependent type
             0, 0, 0, // padding
+            23, 29, 31, 37, 0, 0, 0, 0, // hash group 0
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 1
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 2
+            0, 0, 0, 0, 0, 0, 0, 0, // hash group 3
         ];
 
         expect_data.extend_from_slice(b"foo");
@@ -265,37 +339,47 @@ mod tests {
     #[test]
     fn test_convert() {
         let entries = vec![
-            ImportModuleEntry::new(
+            DependentModuleEntry::new(
                 "foobar".to_owned(),
                 Box::new(ModuleDependency::Local(Box::new(DependencyLocal {
                     path: "hello".to_owned(),
                     condition: DependencyCondition::True,
-                    parameters: HashMap::default()
+                    parameters: HashMap::default(),
                 }))),
+                [11_u8; 32],
             ),
-            ImportModuleEntry::new(
+            DependentModuleEntry::new(
                 "helloworld".to_owned(),
                 Box::new(ModuleDependency::Remote(Box::new(DependencyRemote {
                     url: "http://a.b/c".to_owned(),
                     reversion: "v1.0.1".to_owned(),
                     path: "/xyz".to_owned(),
                     condition: DependencyCondition::True,
-                    parameters: HashMap::default()
+                    parameters: HashMap::default(),
                 }))),
+                [13_u8; 32],
             ),
         ];
 
-        let (items, items_data) = ModuleListSection::convert_from_entries(&entries);
-        let section = ModuleListSection {
+        let (items, items_data) = DependentModuleSection::convert_from_entries(&entries);
+        let section = DependentModuleSection {
             items: &items,
             items_data: &items_data,
         };
 
-        let (name0, type0, value0) = section.get_item_name_and_module_dependent_type_and_value(0);
-        let (name1, type1, value1) = section.get_item_name_and_module_dependent_type_and_value(1);
+        let (name0, type0, value0, hash0) =
+            section.get_item_name_and_module_dependent_type_and_value_and_hash(0);
+        let (name1, type1, value1, hash1) =
+            section.get_item_name_and_module_dependent_type_and_value_and_hash(1);
 
-        assert_eq!((name0, type0), ("foobar", ModuleDependencyType::Local));
-        assert_eq!((name1, type1), ("helloworld", ModuleDependencyType::Remote));
+        assert_eq!(
+            (name0, type0, hash0),
+            ("foobar", ModuleDependencyType::Local, &[11_u8; 32])
+        );
+        assert_eq!(
+            (name1, type1, hash1),
+            ("helloworld", ModuleDependencyType::Remote, &[13_u8; 32])
+        );
 
         let v0: ModuleDependency = ason::from_reader(value0).unwrap();
         assert_eq!(&v0, entries[0].value.as_ref());

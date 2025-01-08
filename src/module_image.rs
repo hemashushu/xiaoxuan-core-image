@@ -64,7 +64,7 @@
 //
 // - function index section
 // - entry point section
-// - module list section
+// - dependent module section
 //
 // there are also some optional sections:
 //
@@ -72,7 +72,6 @@
 // - external function index section
 // - unified external library section
 // - unified external function section
-
 
 // the design of the module
 // ------------------------
@@ -120,12 +119,13 @@ use crate::{
         type_section::TypeSection,
     },
     index_sections::{
-        data_index_section::DataIndexSection, entry_point_section::EntryPointSection,
+        data_index_section::DataIndexSection, dependent_module_section::DependentModuleSection,
+        entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,
         external_library_section::UnifiedExternalLibrarySection,
         external_type_section::UnifiedExternalTypeSection,
-        function_index_section::FunctionIndexSection, module_list_section::ModuleListSection,
+        function_index_section::FunctionIndexSection,
     },
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
     ImageError, ImageErrorType,
@@ -217,7 +217,7 @@ pub enum ModuleSectionId {
     */
     EntryPoint = 0x0080, // 0x80
     FunctionIndex,       // 0x81
-    ModuleList,          // 0x82, this section is used by the module loader
+    DependentModule,     // 0x82, this section is used by the module loader
 
     /*
     optional (application only)
@@ -519,11 +519,11 @@ impl<'a> ModuleImage<'a> {
     }
 
     // essential section (application only)
-    pub fn get_module_list_section(&'a self) -> ModuleListSection<'a> {
-        self.get_section_data_by_id(ModuleSectionId::ModuleList)
+    pub fn get_module_list_section(&'a self) -> DependentModuleSection<'a> {
+        self.get_section_data_by_id(ModuleSectionId::DependentModule)
             .map_or_else(
                 || panic!("Can not find the index property section."),
-                ModuleListSection::read,
+                DependentModuleSection::read,
             )
     }
 

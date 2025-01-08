@@ -16,6 +16,7 @@ use crate::common_sections::local_variable_section::LocalVariableSection;
 use crate::common_sections::property_section::PropertySection;
 use crate::common_sections::type_section::TypeSection;
 use crate::index_sections::data_index_section::{DataIndexItem, DataIndexSection};
+use crate::index_sections::dependent_module_section::DependentModuleSection;
 use crate::index_sections::entry_point_section::EntryPointSection;
 use crate::index_sections::external_function_index_section::{
     ExternalFunctionIndexItem, ExternalFunctionIndexSection,
@@ -24,14 +25,13 @@ use crate::index_sections::external_function_section::UnifiedExternalFunctionSec
 use crate::index_sections::external_library_section::UnifiedExternalLibrarySection;
 use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
 use crate::index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection};
-use crate::index_sections::module_list_section::ModuleListSection;
 use crate::ImageError;
 use anc_isa::{DataSectionType, ModuleDependency, OperandDataType};
 
 use crate::entry::{
-    EntryPointEntry, ExportDataEntry, ExportFunctionEntry, ExternalFunctionEntry,
-    ExternalLibraryEntry, FunctionEntry, ImportModuleEntry, InitedDataEntry, LocalVariableEntry,
-    LocalVariableListEntry, TypeEntry, UninitDataEntry,
+    DependentModuleEntry, EntryPointEntry, ExportDataEntry, ExportFunctionEntry,
+    ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry, InitedDataEntry,
+    LocalVariableEntry, LocalVariableListEntry, TypeEntry, UninitDataEntry,
 };
 
 use crate::module_image::{ImageType, ModuleImage, RangeItem, SectionEntry, Visibility};
@@ -572,11 +572,14 @@ pub fn helper_build_module_binary(
     };
 
     // module list
-    let import_module_entry =
-        ImportModuleEntry::new(name.to_owned(), Box::new(ModuleDependency::Current));
+    let import_module_entry = DependentModuleEntry::new(
+        name.to_owned(),
+        Box::new(ModuleDependency::Current),
+        [0_u8; 32],
+    );
     let (module_list_items, module_list_data) =
-        ModuleListSection::convert_from_entries(&[import_module_entry]);
-    let module_list_section = ModuleListSection {
+        DependentModuleSection::convert_from_entries(&[import_module_entry]);
+    let module_list_section = DependentModuleSection {
         items: &module_list_items,
         items_data: &module_list_data,
     };
