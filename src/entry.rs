@@ -6,11 +6,16 @@
 
 //! Entries are used to simplify the creation and parsing of sections.
 
+use std::fmt::Debug;
+
 use anc_isa::{
     DataSectionType, ExternalLibraryDependency, MemoryDataType, ModuleDependency, OperandDataType,
 };
 
-use crate::module_image::{ImageType, RelocateType, Visibility};
+use crate::{
+    module_image::{ImageType, RelocateType, Visibility},
+    DependencyHash,
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeEntry {
@@ -106,6 +111,16 @@ impl FunctionEntry {
         }
     }
 }
+
+// impl Debug for FunctionEntry {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("FunctionEntry")
+//             .field("type_index", &self.type_index)
+//             .field("local_variable_list_index", &self.local_variable_list_index)
+//             .field("code", &format_bytecode_as_text(&self.code))
+//             .finish()
+//     }
+// }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct InitedDataEntry {
@@ -302,11 +317,11 @@ pub struct DependentModuleEntry {
 
     // the hash of parameters and compile environment variables,
     // only exists in Local/Remote/Share dependencies
-    pub hash: [u8; 32],
+    pub hash: DependencyHash,
 }
 
 impl DependentModuleEntry {
-    pub fn new(name: String, value: Box<ModuleDependency>, hash: [u8; 32]) -> Self {
+    pub fn new(name: String, value: Box<ModuleDependency>, hash: DependencyHash) -> Self {
         Self { name, value, hash }
     }
 }
@@ -649,8 +664,15 @@ pub struct ImageCommonEntry {
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
     pub name: String,
-
     pub image_type: ImageType,
+
+    pub type_entries: Vec<TypeEntry>,
+    pub local_variable_list_entries: Vec<LocalVariableListEntry>,
+    pub function_entries: Vec<FunctionEntry>,
+
+    pub read_only_data_entries: Vec<InitedDataEntry>,
+    pub read_write_data_entries: Vec<InitedDataEntry>,
+    pub uninit_data_entries: Vec<UninitDataEntry>,
 
     // the dependencies
     pub import_module_entries: Vec<ImportModuleEntry>,
@@ -662,14 +684,6 @@ pub struct ImageCommonEntry {
     // - export_data_entries
     pub import_function_entries: Vec<ImportFunctionEntry>,
     pub import_data_entries: Vec<ImportDataEntry>,
-
-    pub type_entries: Vec<TypeEntry>,
-    pub local_variable_list_entries: Vec<LocalVariableListEntry>,
-    pub function_entries: Vec<FunctionEntry>,
-
-    pub read_only_data_entries: Vec<InitedDataEntry>,
-    pub read_write_data_entries: Vec<InitedDataEntry>,
-    pub uninit_data_entries: Vec<UninitDataEntry>,
 
     // the name path entries only contain the internal functions.
     pub export_function_entries: Vec<ExportFunctionEntry>,
@@ -686,12 +700,15 @@ pub struct ImageCommonEntry {
 
 #[derive(Debug)]
 pub struct ImageIndexEntry {
-    pub entry_point_entries: Vec<EntryPointEntry>,
     pub function_index_list_entries: Vec<FunctionIndexListEntry>,
     pub data_index_list_entries: Vec<DataIndexListEntry>,
+    //
+    pub external_function_index_entries: Vec<ExternalFunctionIndexListEntry>,
+    //
     pub unified_external_library_entries: Vec<ExternalLibraryEntry>,
     pub unified_external_type_entries: Vec<TypeEntry>,
     pub unified_external_function_entries: Vec<ExternalFunctionEntry>,
-    pub external_function_index_entries: Vec<ExternalFunctionIndexListEntry>,
+    //
     pub dependent_module_entries: Vec<DependentModuleEntry>,
+    pub entry_point_entries: Vec<EntryPointEntry>,
 }

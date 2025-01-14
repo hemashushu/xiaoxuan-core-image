@@ -19,16 +19,18 @@ use crate::{
         import_module_section::ImportModuleSection,
         local_variable_section::LocalVariableSection,
         property_section::PropertySection,
+        relocate_section::RelocateSection,
         type_section::TypeSection,
     },
     entry::{ImageCommonEntry, ImageIndexEntry},
     index_sections::{
-        data_index_section::DataIndexSection, entry_point_section::EntryPointSection,
+        data_index_section::DataIndexSection, dependent_module_section::DependentModuleSection,
+        entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,
         external_library_section::UnifiedExternalLibrarySection,
         external_type_section::UnifiedExternalTypeSection,
-        function_index_section::FunctionIndexSection, dependent_module_section::DependentModuleSection,
+        function_index_section::FunctionIndexSection,
     },
     module_image::{ImageType, ModuleImage, SectionEntry},
 };
@@ -150,6 +152,14 @@ pub fn write_object_file(
         full_names_data: &export_data_names_data,
     };
 
+    // relocate section
+    let (relocate_lists, relocate_lists_data) =
+        RelocateSection::convert_from_entries(&image_common_entry.relocate_list_entries);
+    let relocate_section = RelocateSection {
+        lists: &relocate_lists,
+        list_data: &relocate_lists_data,
+    };
+
     let image_type = if generate_shared_module {
         ImageType::SharedModule
     } else {
@@ -157,20 +167,26 @@ pub fn write_object_file(
     };
 
     let section_entries: Vec<&dyn SectionEntry> = vec![
+        &property_section,
+        //
         &type_section,
         &local_variable_section,
         &function_section,
+        //
         &read_only_data_section,
         &read_write_data_section,
         &uninit_data_section,
-        &external_library_section,
-        &external_function_section,
+        //
         &import_module_section,
         &import_function_section,
         &import_data_section,
+        //
         &export_function_section,
         &export_data_section,
-        &property_section,
+        &relocate_section,
+        //
+        &external_library_section,
+        &external_function_section,
     ];
 
     // build object file binary
@@ -303,6 +319,15 @@ pub fn write_image_file(
         full_names_data: &export_data_names_data,
     };
 
+    // relocate section
+    let (relocate_lists, relocate_lists_data) =
+        RelocateSection::convert_from_entries(&image_common_entry.relocate_list_entries);
+    let relocate_section = RelocateSection {
+        lists: &relocate_lists,
+        list_data: &relocate_lists_data,
+    };
+
+    // function index section
     let (function_ranges, function_index_items) =
         FunctionIndexSection::convert_from_entries(&image_index_entry.function_index_list_entries);
     let function_index_section = FunctionIndexSection {
@@ -310,6 +335,7 @@ pub fn write_image_file(
         items: &function_index_items,
     };
 
+    // data index section
     let (data_ranges, data_index_items) =
         DataIndexSection::convert_from_entries(&image_index_entry.data_index_list_entries);
     let data_index_section = DataIndexSection {
@@ -317,40 +343,7 @@ pub fn write_image_file(
         items: &data_index_items,
     };
 
-    let (dependent_module_items, dependent_module_data) =
-        DependentModuleSection::convert_from_entries(&image_index_entry.dependent_module_entries);
-    let dependent_module_section = DependentModuleSection {
-        items: &dependent_module_items,
-        items_data: &dependent_module_data,
-    };
-
-    let (unified_external_library_items, unified_external_library_data) =
-        UnifiedExternalLibrarySection::convert_from_entries(
-            &image_index_entry.unified_external_library_entries,
-        );
-    let unified_external_library_section = UnifiedExternalLibrarySection {
-        items: &unified_external_library_items,
-        items_data: &unified_external_library_data,
-    };
-
-    let (unified_external_type_items, unified_external_type_data) =
-        UnifiedExternalTypeSection::convert_from_entries(
-            &image_index_entry.unified_external_type_entries,
-        );
-    let unified_external_type_section = UnifiedExternalTypeSection {
-        items: &unified_external_type_items,
-        types_data: &unified_external_type_data,
-    };
-
-    let (unified_external_function_items, unified_external_function_data) =
-        UnifiedExternalFunctionSection::convert_from_entries(
-            &image_index_entry.unified_external_function_entries,
-        );
-    let unified_external_function_section = UnifiedExternalFunctionSection {
-        items: &unified_external_function_items,
-        names_data: &unified_external_function_data,
-    };
-
+    // external function index section
     let (external_function_ranges, external_function_index_items) =
         ExternalFunctionIndexSection::convert_from_entries(
             &image_index_entry.external_function_index_entries,
@@ -360,6 +353,45 @@ pub fn write_image_file(
         items: &external_function_index_items,
     };
 
+    // unified external library section
+    let (unified_external_library_items, unified_external_library_data) =
+        UnifiedExternalLibrarySection::convert_from_entries(
+            &image_index_entry.unified_external_library_entries,
+        );
+    let unified_external_library_section = UnifiedExternalLibrarySection {
+        items: &unified_external_library_items,
+        items_data: &unified_external_library_data,
+    };
+
+    // unified external type section
+    let (unified_external_type_items, unified_external_type_data) =
+        UnifiedExternalTypeSection::convert_from_entries(
+            &image_index_entry.unified_external_type_entries,
+        );
+    let unified_external_type_section = UnifiedExternalTypeSection {
+        items: &unified_external_type_items,
+        types_data: &unified_external_type_data,
+    };
+
+    // unified external function section
+    let (unified_external_function_items, unified_external_function_data) =
+        UnifiedExternalFunctionSection::convert_from_entries(
+            &image_index_entry.unified_external_function_entries,
+        );
+    let unified_external_function_section = UnifiedExternalFunctionSection {
+        items: &unified_external_function_items,
+        names_data: &unified_external_function_data,
+    };
+
+    // dependent module section
+    let (dependent_module_items, dependent_module_data) =
+        DependentModuleSection::convert_from_entries(&image_index_entry.dependent_module_entries);
+    let dependent_module_section = DependentModuleSection {
+        items: &dependent_module_items,
+        items_data: &dependent_module_data,
+    };
+
+    // entry point section
     let (entry_point_items, unit_names_data) =
         EntryPointSection::convert_from_entries(&image_index_entry.entry_point_entries);
     let entry_point_section = EntryPointSection {
@@ -368,29 +400,41 @@ pub fn write_image_file(
     };
 
     let section_entries: Vec<&dyn SectionEntry> = vec![
-        // common
+        /*
+         * common
+         */
+        &property_section,
+        //
         &type_section,
         &local_variable_section,
         &function_section,
+        //
         &read_only_data_section,
         &read_write_data_section,
         &uninit_data_section,
-        &external_library_section,
-        &external_function_section,
+        //
         &import_module_section,
         &import_function_section,
         &import_data_section,
+        //
         &export_function_section,
         &export_data_section,
-        &property_section,
-        // index
+        &relocate_section,
+        //
+        &external_library_section,
+        &external_function_section,
+        /*
+         * index
+         */
         &function_index_section,
         &data_index_section,
-        &dependent_module_section,
+        &external_function_index_section,
+        //
         &unified_external_library_section,
         &unified_external_type_section,
         &unified_external_function_section,
-        &external_function_index_section,
+        //
+        &dependent_module_section,
         &entry_point_section,
     ];
 

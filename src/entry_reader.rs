@@ -6,9 +6,7 @@
 
 use crate::{entry::ImageCommonEntry, module_image::ModuleImage, ImageError};
 
-pub fn read_object_file(
-    image_binary: &[u8],
-) -> Result<ImageCommonEntry, ImageError> {
+pub fn read_object_file(image_binary: &[u8]) -> Result<ImageCommonEntry, ImageError> {
     let module_image = ModuleImage::read(image_binary)?;
 
     let type_entries = module_image.get_type_section().convert_to_entries();
@@ -66,18 +64,23 @@ pub fn read_object_file(
     let image_common_entry = ImageCommonEntry {
         name: property_section.get_module_name().to_owned(),
         image_type: module_image.image_type,
-        import_module_entries,
-        import_function_entries,
-        import_data_entries,
+        //
         type_entries,
         local_variable_list_entries,
         function_entries,
+        //
         read_only_data_entries,
         read_write_data_entries,
         uninit_data_entries,
+        //
+        import_module_entries,
+        import_function_entries,
+        import_data_entries,
+        //
         export_function_entries,
         export_data_entries,
         relocate_list_entries,
+        //
         external_library_entries,
         external_function_entries,
     };

@@ -26,6 +26,7 @@ use crate::{
     entry::DependentModuleEntry,
     module_image::{ModuleSectionId, SectionEntry},
     tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
+    DependencyHash,
 };
 
 #[derive(Debug, PartialEq)]
@@ -46,7 +47,7 @@ pub struct DependentModuleItem {
 
     // the hash of parameters and compile environment variables,
     // only exists in Local/Remote/Share dependencies
-    pub hash: [u8; 32],
+    pub hash: DependencyHash,
 }
 
 impl DependentModuleItem {
@@ -56,7 +57,7 @@ impl DependentModuleItem {
         value_offset: u32,
         value_length: u32,
         module_dependent_type: ModuleDependencyType,
-        hash: [u8; 32],
+        hash: DependencyHash,
     ) -> Self {
         Self {
             name_offset,
@@ -93,7 +94,7 @@ impl<'a> DependentModuleSection<'a> {
     pub fn get_item_name_and_module_dependent_type_and_value_and_hash(
         &'a self,
         idx: usize,
-    ) -> (&'a str, ModuleDependencyType, &'a [u8], &'a [u8; 32]) {
+    ) -> (&'a str, ModuleDependencyType, &'a [u8], &'a DependencyHash) {
         let items = self.items;
         let items_data = self.items_data;
 

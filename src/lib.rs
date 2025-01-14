@@ -21,6 +21,12 @@ pub mod utils;
 
 use std::fmt::Display;
 
+// the hash of parameters and compile environment variables,
+// only exists in Local/Remote/Share dependencies
+pub type DependencyHash = [u8; 32];
+
+pub const ZERO_DEPENDENCY_HASH: DependencyHash = [0u8; 32];
+
 #[derive(Debug)]
 pub struct ImageError {
     // message: String,
