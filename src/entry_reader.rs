@@ -4,10 +4,12 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
+use anc_isa::EffectiveVersion;
+
 use crate::{entry::ImageCommonEntry, module_image::ModuleImage, ImageError};
 
-pub fn read_object_file(image_binary: &[u8]) -> Result<ImageCommonEntry, ImageError> {
-    let module_image = ModuleImage::read(image_binary)?;
+pub fn read_object_file(object_binary: &[u8]) -> Result<ImageCommonEntry, ImageError> {
+    let module_image = ModuleImage::read(object_binary)?;
 
     let type_entries = module_image.get_type_section().convert_to_entries();
     let local_variable_list_entries = module_image
@@ -63,6 +65,11 @@ pub fn read_object_file(image_binary: &[u8]) -> Result<ImageCommonEntry, ImageEr
 
     let image_common_entry = ImageCommonEntry {
         name: property_section.get_module_name().to_owned(),
+        version: EffectiveVersion::new(
+            property_section.version_major,
+            property_section.version_minor,
+            property_section.version_patch,
+        ),
         image_type: module_image.image_type,
         //
         type_entries,

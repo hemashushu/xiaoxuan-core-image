@@ -661,7 +661,7 @@ mod tests {
     #[test]
     fn test_module_image_read_and_write() {
         // build property section
-        let property_section = PropertySection::new("bar", 17, 19);
+        let property_section = PropertySection::new("bar", *RUNTIME_EDITION, 7, 11, 13, 17, 19);
 
         // build TypeSection instance
         // note: arbitrary types
@@ -739,16 +739,16 @@ mod tests {
             section_table_data,
             &[
                 0x11u8, 0, 0, 0, // section id, type section
-                0, 0, 0, 0, // offset 0
-                36, 0, 0, 0, // length 0
+                0, 0, 0, 0, // offset: 0
+                36, 0, 0, 0, // length: header 8 + rec 12 * 2 + data 4
                 //
                 0x12, 0, 0, 0, // section id, local variable section
-                36, 0, 0, 0, // offset 2
-                68, 0, 0, 0, // length 2
+                36, 0, 0, 0, // offset: 36
+                68, 0, 0, 0, // length: header 8 + rec 12 * 2 + data 12 * 3
                 //
                 0x10, 0, 0, 0, // section id, common property section
-                104, 0, 0, 0, // offset 6,
-                20, 1, 0, 0 // length 256 + 20
+                104, 0, 0, 0, // offset: 104
+                28, 1, 0, 0 // length: prop 28 + name 256
             ]
         );
 
@@ -824,12 +824,18 @@ mod tests {
         let mut expected_property_section_data = vec![];
         expected_property_section_data.append(&mut RUNTIME_EDITION.to_vec());
         expected_property_section_data.append(&mut vec![
+            7, 0, // version patch
+            11, 0, // version minor
+            13, 0, // version major
+            0, 0, // version padding
+            //
             17, 0, 0, 0, // import_data_count
             19, 0, 0, 0, // import_function_count
+            //
             3, 0, 0, 0, // name length
         ]);
 
-        assert_eq!(&remains[..20], &expected_property_section_data);
+        assert_eq!(&remains[..28], &expected_property_section_data);
 
         // load
         let module_image_restore = ModuleImage::read(&image_binary).unwrap();
@@ -875,9 +881,11 @@ mod tests {
         // check common property section
 
         let property_section_restore = module_image_restore.get_property_section();
+        assert_eq!(property_section_restore.version_patch, 7);
+        assert_eq!(property_section_restore.version_minor, 11);
+        assert_eq!(property_section_restore.version_major, 13);
         assert_eq!(property_section_restore.import_data_count, 17);
         assert_eq!(property_section_restore.import_function_count, 19);
-
         assert_eq!(property_section_restore.get_module_name(), "bar");
     }
 }

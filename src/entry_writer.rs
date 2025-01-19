@@ -6,6 +6,8 @@
 
 use std::io::Write;
 
+use anc_isa::RUNTIME_EDITION;
+
 use crate::{
     common_sections::{
         data_section::{ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection},
@@ -43,6 +45,10 @@ pub fn write_object_file(
     // property section
     let property_section = PropertySection::new(
         &image_common_entry.name,
+        *RUNTIME_EDITION,
+        image_common_entry.version.patch,
+        image_common_entry.version.minor,
+        image_common_entry.version.major,
         image_common_entry.import_data_entries.len() as u32,
         image_common_entry.import_function_entries.len() as u32,
     );
@@ -210,6 +216,10 @@ pub fn write_image_file(
     // property section
     let property_section = PropertySection::new(
         &image_common_entry.name,
+        *RUNTIME_EDITION,
+        image_common_entry.version.patch,
+        image_common_entry.version.minor,
+        image_common_entry.version.major,
         image_common_entry.import_data_entries.len() as u32,
         image_common_entry.import_function_entries.len() as u32,
     );

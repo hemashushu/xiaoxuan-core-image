@@ -4,8 +4,6 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-use anc_isa::RUNTIME_EDITION;
-
 use crate::module_image::{ModuleSectionId, SectionEntry};
 
 pub const MODULE_NAME_BUFFER_LENGTH: usize = 256;
@@ -14,6 +12,14 @@ pub const MODULE_NAME_BUFFER_LENGTH: usize = 256;
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PropertySection {
     pub edition: [u8; 8],
+
+    // note:
+    // avoid using the u64 integer, it is because
+    // both instructions and image data are 4-byte aligned.
+    pub version_patch: u16,
+    pub version_minor: u16,
+    pub version_major: u16,
+    _padding0: [u8; 2], // for 4-byte align
 
     // the "module name", "import data count" and "import function count" are
     // used for find the public index of function and data in
@@ -37,12 +43,23 @@ pub struct PropertySection {
     // e.g.
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
+    //
+    // Note that only [a-zA-Z0-9_] and unicode chars are allowed for the (sub)module(/source file) name.
     pub module_name_length: u32,
+
     pub module_name_buffer: [u8; 256],
 }
 
 impl PropertySection {
-    pub fn new(module_name: &str, import_data_count: u32, import_function_count: u32) -> Self {
+    pub fn new(
+        module_name: &str,
+        edition: [u8; 8],
+        version_patch: u16,
+        version_minor: u16,
+        version_major: u16,
+        import_data_count: u32,
+        import_function_count: u32,
+    ) -> Self {
         let module_name_src = module_name.as_bytes();
         let mut module_name_dest = [0u8; MODULE_NAME_BUFFER_LENGTH];
 
@@ -55,7 +72,11 @@ impl PropertySection {
         };
 
         Self {
-            edition: *RUNTIME_EDITION,
+            edition,
+            version_patch,
+            version_minor,
+            version_major,
+            _padding0: [0u8; 2],
             import_data_count,
             import_function_count,
             module_name_length: module_name_src.len() as u32,
@@ -101,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_write_section() {
-        let section = PropertySection::new("bar", 17, 19);
+        let section = PropertySection::new("bar", *RUNTIME_EDITION, 7, 11, 13, 17, 19);
 
         let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
@@ -110,12 +131,19 @@ mod tests {
 
         expect_data.append(&mut RUNTIME_EDITION.to_vec());
         expect_data.append(&mut vec![
+            7, 0, // version patch
+            11, 0, // version minor
+            13, 0, // version major
+            0, 0, // version padding
+            //
             17, 0, 0, 0, // import data count
             19, 0, 0, 0, // import function count
+            //
             3, 0, 0, 0, // name length
             0x62, 0x61, 0x72, // name buffer
         ]);
 
+        // extend the data
         expect_data.resize(std::mem::size_of::<PropertySection>(), 0);
 
         assert_eq!(section_data, expect_data);
@@ -126,16 +154,26 @@ mod tests {
         let mut section_data = vec![];
         section_data.append(&mut RUNTIME_EDITION.to_vec());
         section_data.append(&mut vec![
+            7, 0, // version patch
+            11, 0, // version minor
+            13, 0, // version major
+            0, 0, // version padding
+            //
             17, 0, 0, 0, // import data count
             19, 0, 0, 0, // import function count
+            //
             3, 0, 0, 0, // name length
             0x62, 0x61, 0x72, // name buffer
         ]);
 
+        // extend the data
         section_data.resize(std::mem::size_of::<PropertySection>(), 0);
 
         let section = PropertySection::read(&section_data);
         assert_eq!(&section.edition, RUNTIME_EDITION);
+        assert_eq!(section.version_patch, 7);
+        assert_eq!(section.version_minor, 11);
+        assert_eq!(section.version_major, 13);
         assert_eq!(section.import_data_count, 17);
         assert_eq!(section.import_function_count, 19);
         assert_eq!(section.module_name_length, 3);

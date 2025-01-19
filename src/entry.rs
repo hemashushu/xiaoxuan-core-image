@@ -9,7 +9,8 @@
 use std::fmt::Debug;
 
 use anc_isa::{
-    DataSectionType, ExternalLibraryDependency, MemoryDataType, ModuleDependency, OperandDataType,
+    DataSectionType, EffectiveVersion, ExternalLibraryDependency, MemoryDataType, ModuleDependency,
+    OperandDataType,
 };
 
 use crate::{
@@ -663,7 +664,10 @@ pub struct ImageCommonEntry {
     // e.g.
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
+    //
+    // Note that only [a-zA-Z0-9_] and unicode chars are allowed for the name of (sub)module(/source file).
     pub name: String,
+    pub version: EffectiveVersion,
     pub image_type: ImageType,
 
     pub type_entries: Vec<TypeEntry>,

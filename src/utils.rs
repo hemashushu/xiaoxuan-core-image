@@ -26,7 +26,8 @@ use crate::index_sections::external_library_section::UnifiedExternalLibrarySecti
 use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
 use crate::index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection};
 use crate::ImageError;
-use anc_isa::{DataSectionType, ModuleDependency, OperandDataType};
+
+use anc_isa::{DataSectionType, ModuleDependency, OperandDataType, RUNTIME_EDITION};
 
 use crate::entry::{
     DependentModuleEntry, EntryPointEntry, ExportDataEntry, ExportFunctionEntry,
@@ -454,7 +455,7 @@ pub fn helper_build_module_binary(
     };
 
     // property section
-    let property_section = PropertySection::new(name, 0, 0);
+    let property_section = PropertySection::new(name, *RUNTIME_EDITION, 0, 0, 1, 0, 0);
 
     // function index
     let function_ranges: Vec<RangeItem> = vec![RangeItem {
