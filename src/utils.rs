@@ -62,9 +62,9 @@ pub struct HelperExternalFunctionEntry {
 
 /// helper function for unit test
 pub fn helper_build_module_binary_with_single_function(
-    param_datatypes: Vec<OperandDataType>,
-    result_datatypes: Vec<OperandDataType>,
-    local_variable_entries_without_functions_args: Vec<LocalVariableEntry>,
+    param_datatypes: &[OperandDataType],
+    result_datatypes: &[OperandDataType],
+    local_variable_entries_without_functions_args: &[LocalVariableEntry],
     code: Vec<u8>,
 ) -> Vec<u8> {
     helper_build_module_binary_with_single_function_and_data(
@@ -72,25 +72,25 @@ pub fn helper_build_module_binary_with_single_function(
         result_datatypes,
         local_variable_entries_without_functions_args,
         code,
-        vec![],
-        vec![],
-        vec![],
+        &[],
+        &[],
+        &[],
     )
 }
 
 /// helper function for unit test
 pub fn helper_build_module_binary_with_single_function_and_data(
-    param_datatypes: Vec<OperandDataType>,
-    result_datatypes: Vec<OperandDataType>,
-    local_variable_entries_without_function_args: Vec<LocalVariableEntry>,
+    param_datatypes: &[OperandDataType],
+    result_datatypes: &[OperandDataType],
+    local_variable_entries_without_function_args: &[LocalVariableEntry],
     code: Vec<u8>,
-    read_only_data_entries: Vec<InitedDataEntry>,
-    read_write_data_entries: Vec<InitedDataEntry>,
-    uninit_uninit_data_entries: Vec<UninitDataEntry>,
+    read_only_data_entries: &[InitedDataEntry],
+    read_write_data_entries: &[InitedDataEntry],
+    uninit_uninit_data_entries: &[UninitDataEntry],
 ) -> Vec<u8> {
     let type_entry = TypeEntry {
-        params: param_datatypes.clone(),
-        results: result_datatypes.clone(),
+        params: param_datatypes.to_owned(),
+        results: result_datatypes.to_owned(),
     };
 
     let params_as_local_variables = param_datatypes
@@ -100,7 +100,7 @@ pub fn helper_build_module_binary_with_single_function_and_data(
 
     let mut local_variables = vec![];
     local_variables.extend_from_slice(&params_as_local_variables);
-    local_variables.extend_from_slice(&local_variable_entries_without_function_args);
+    local_variables.extend_from_slice(local_variable_entries_without_function_args);
 
     let local_list_entry = LocalVariableListEntry {
         local_variable_entries: local_variables,
@@ -117,11 +117,11 @@ pub fn helper_build_module_binary_with_single_function_and_data(
         read_only_data_entries,
         read_write_data_entries,
         uninit_uninit_data_entries,
-        vec![type_entry],
-        vec![local_list_entry],
-        vec![function_entry],
-        vec![],
-        vec![],
+        &[type_entry],
+        &[local_list_entry],
+        &[function_entry],
+        &[],
+        &[],
         0,
     )
 }
@@ -142,15 +142,15 @@ pub fn helper_build_module_binary_with_single_function_and_blocks(
     };
 
     helper_build_module_binary_with_functions_and_blocks(
-        vec![helper_function_entry],
-        helper_block_entries,
+        &[helper_function_entry],
+        &helper_block_entries,
     )
 }
 
 /// helper function for unit test
 pub fn helper_build_module_binary_with_functions_and_blocks(
-    helper_function_entries: Vec<HelperFunctionEntry>,
-    helper_block_entries: Vec<HelperBlockEntry>,
+    helper_function_entries: &[HelperFunctionEntry],
+    helper_block_entries: &[HelperBlockEntry],
 ) -> Vec<u8> {
     // build type entries
 
@@ -239,14 +239,14 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
 
     helper_build_module_binary(
         "main",
-        vec![],
-        vec![],
-        vec![],
-        type_entries,
-        local_list_entries,
-        function_entries,
-        vec![],
-        vec![],
+        &[],
+        &[],
+        &[],
+        &type_entries,
+        &local_list_entries,
+        &function_entries,
+        &[],
+        &[],
         entry_function_public_index,
     )
 }
@@ -255,12 +255,12 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
 #[allow(clippy::too_many_arguments)]
 pub fn helper_build_module_binary_with_functions_and_data_and_external_functions(
     // type_entries: Vec<TypeEntry>,
-    helper_function_entries: Vec<HelperFunctionEntry>,
-    read_only_data_entries: Vec<InitedDataEntry>,
-    read_write_data_entries: Vec<InitedDataEntry>,
-    uninit_uninit_data_entries: Vec<UninitDataEntry>,
-    external_library_entries: Vec<ExternalLibraryEntry>,
-    helper_external_function_entries: Vec<HelperExternalFunctionEntry>,
+    helper_function_entries: &[HelperFunctionEntry],
+    read_only_data_entries: &[InitedDataEntry],
+    read_write_data_entries: &[InitedDataEntry],
+    uninit_uninit_data_entries: &[UninitDataEntry],
+    external_library_entries: &[ExternalLibraryEntry],
+    helper_external_function_entries: &[HelperExternalFunctionEntry],
 ) -> Vec<u8> {
     // note:
     // for simplicity, duplicate items would not be merged.
@@ -339,12 +339,12 @@ pub fn helper_build_module_binary_with_functions_and_data_and_external_functions
         read_only_data_entries,
         read_write_data_entries,
         uninit_uninit_data_entries,
-        type_entries,
-        local_list_entries,
-        function_entries,
+        &type_entries,
+        &local_list_entries,
+        &function_entries,
         // helper_external_function_entries,
         external_library_entries,
-        external_function_entries,
+        &external_function_entries,
         0,
     )
 }
@@ -353,18 +353,18 @@ pub fn helper_build_module_binary_with_functions_and_data_and_external_functions
 #[allow(clippy::too_many_arguments)]
 pub fn helper_build_module_binary(
     name: &str,
-    read_only_data_entries: Vec<InitedDataEntry>,
-    read_write_data_entries: Vec<InitedDataEntry>,
-    uninit_uninit_data_entries: Vec<UninitDataEntry>,
-    type_entries: Vec<TypeEntry>,
-    local_list_entries: Vec<LocalVariableListEntry>, // this local list includes function/block args
-    function_entries: Vec<FunctionEntry>,
-    external_library_entries: Vec<ExternalLibraryEntry>,
-    external_function_entries: Vec<ExternalFunctionEntry>,
+    read_only_data_entries: &[InitedDataEntry],
+    read_write_data_entries: &[InitedDataEntry],
+    uninit_uninit_data_entries: &[UninitDataEntry],
+    type_entries: &[TypeEntry],
+    local_list_entries: &[LocalVariableListEntry], // this local list includes function/block args
+    function_entries: &[FunctionEntry],
+    external_library_entries: &[ExternalLibraryEntry],
+    external_function_entries: &[ExternalFunctionEntry],
     entry_function_public_index: usize,
 ) -> Vec<u8> {
     // type section
-    let (type_items, types_data) = TypeSection::convert_from_entries(&type_entries);
+    let (type_items, types_data) = TypeSection::convert_from_entries(type_entries);
     let type_section = TypeSection {
         items: &type_items,
         types_data: &types_data,
@@ -372,35 +372,35 @@ pub fn helper_build_module_binary(
 
     // local variable section
     let (local_lists, local_list_data) =
-        LocalVariableSection::convert_from_entries(&local_list_entries);
+        LocalVariableSection::convert_from_entries(local_list_entries);
     let local_variable_section = LocalVariableSection {
         lists: &local_lists,
         list_data: &local_list_data,
     };
 
     // function section
-    let (function_items, codes_data) = FunctionSection::convert_from_entries(&function_entries);
+    let (function_items, codes_data) = FunctionSection::convert_from_entries(function_entries);
     let function_section = FunctionSection {
         items: &function_items,
         codes_data: &codes_data,
     };
 
     // read-only data section
-    let (ro_items, ro_data) = ReadOnlyDataSection::convert_from_entries(&read_only_data_entries);
+    let (ro_items, ro_data) = ReadOnlyDataSection::convert_from_entries(read_only_data_entries);
     let ro_data_section = ReadOnlyDataSection {
         items: &ro_items,
         datas_data: &ro_data,
     };
 
     // read-write data section
-    let (rw_items, rw_data) = ReadWriteDataSection::convert_from_entries(&read_write_data_entries);
+    let (rw_items, rw_data) = ReadWriteDataSection::convert_from_entries(read_write_data_entries);
     let rw_data_section = ReadWriteDataSection {
         items: &rw_items,
         datas_data: &rw_data,
     };
 
     // uninitilized data section
-    let uninit_items = UninitDataSection::convert_from_entries(&uninit_uninit_data_entries);
+    let uninit_items = UninitDataSection::convert_from_entries(uninit_uninit_data_entries);
     let uninit_data_section = UninitDataSection {
         items: &uninit_items,
     };
@@ -440,7 +440,7 @@ pub fn helper_build_module_binary(
 
     // external library section
     let (external_library_items, external_library_data) =
-        ExternalLibrarySection::convert_from_entries(&external_library_entries);
+        ExternalLibrarySection::convert_from_entries(external_library_entries);
     let external_library_section = ExternalLibrarySection {
         items: &external_library_items,
         items_data: &external_library_data,
@@ -448,7 +448,7 @@ pub fn helper_build_module_binary(
 
     // external function section
     let (external_function_items, external_function_data) =
-        ExternalFunctionSection::convert_from_entries(&external_function_entries);
+        ExternalFunctionSection::convert_from_entries(external_function_entries);
     let external_function_section = ExternalFunctionSection {
         items: &external_function_items,
         names_data: &external_function_data,
@@ -515,9 +515,9 @@ pub fn helper_build_module_binary(
 
     // unified external library section
     // for simplicity, build 1:1 to the external_library_entries
-    let unified_external_library_entries = external_library_entries.clone();
+    let unified_external_library_entries = external_library_entries;
     let (unified_external_library_items, unified_external_library_data) =
-        UnifiedExternalLibrarySection::convert_from_entries(&unified_external_library_entries);
+        UnifiedExternalLibrarySection::convert_from_entries(unified_external_library_entries);
     let unified_external_library_section = UnifiedExternalLibrarySection {
         items: &unified_external_library_items,
         items_data: &unified_external_library_data,
@@ -525,9 +525,9 @@ pub fn helper_build_module_binary(
 
     // unified external type section
     // for simplicity, build 1:1 to type_entries
-    let unified_external_type_entries = type_entries.clone();
+    let unified_external_type_entries = type_entries;
     let (unified_external_type_items, unified_external_type_data) =
-        UnifiedExternalTypeSection::convert_from_entries(&unified_external_type_entries);
+        UnifiedExternalTypeSection::convert_from_entries(unified_external_type_entries);
     let unified_external_type_section = UnifiedExternalTypeSection {
         items: &unified_external_type_items,
         types_data: &unified_external_type_data,
@@ -535,9 +535,9 @@ pub fn helper_build_module_binary(
 
     // unified external function section
     // for simplicity, build 1:1 to external_function_entries
-    let unified_external_function_entries = external_function_entries.clone();
+    let unified_external_function_entries = external_function_entries;
     let (unified_external_function_items, unified_external_function_data) =
-        UnifiedExternalFunctionSection::convert_from_entries(&unified_external_function_entries);
+        UnifiedExternalFunctionSection::convert_from_entries(unified_external_function_entries);
     let unified_external_function_section = UnifiedExternalFunctionSection {
         items: &unified_external_function_items,
         names_data: &unified_external_function_data,
@@ -597,7 +597,7 @@ pub fn helper_build_module_binary(
         &uninit_data_section,
         &export_function_section,
         &export_data_section,
-        /* these sections are empty: import_module, import_function, import_data */
+        /* empty sections: import_module, import_function, import_data */
         &external_library_section,
         &external_function_section,
         /* the following are index sections */
@@ -625,9 +625,9 @@ pub fn helper_build_module_binary(
     image_binary
 }
 
-pub fn helper_load_modules_from_binaries(
-    module_binaries: Vec<&[u8]>,
-) -> Result<Vec<ModuleImage>, ImageError> {
+pub fn helper_load_modules_from_binaries<'a>(
+    module_binaries: &[&'a [u8]],
+) -> Result<Vec<ModuleImage<'a>>, ImageError> {
     let mut module_images: Vec<ModuleImage> = vec![];
 
     for binary in module_binaries {
@@ -678,19 +678,19 @@ mod tests {
     #[test]
     fn test_build_module_binary_with_single_function_and_data_sections() {
         let binary = helper_build_module_binary_with_single_function_and_data(
-            vec![OperandDataType::I64, OperandDataType::I64],
-            vec![OperandDataType::I32],
-            vec![LocalVariableEntry::from_i32()],
+            &[OperandDataType::I64, OperandDataType::I64],
+            &[OperandDataType::I32],
+            &[LocalVariableEntry::from_i32()],
             vec![0u8],
-            vec![
+            &[
                 InitedDataEntry::from_i32(0x11),
                 InitedDataEntry::from_i64(0x13),
             ],
-            vec![InitedDataEntry::from_bytes(
+            &[InitedDataEntry::from_bytes(
                 vec![0x17u8, 0x19, 0x23, 0x29, 0x31, 0x37],
                 8,
             )],
-            vec![
+            &[
                 UninitDataEntry::from_i32(),
                 UninitDataEntry::from_i64(),
                 UninitDataEntry::from_i32(),
@@ -698,7 +698,7 @@ mod tests {
         );
 
         // load module
-        let module_images = helper_load_modules_from_binaries(vec![&binary]).unwrap();
+        let module_images = helper_load_modules_from_binaries(&[&binary]).unwrap();
         assert_eq!(module_images.len(), 1);
 
         // check module image
@@ -787,8 +787,8 @@ mod tests {
         assert_eq!(
             type_section.get_item_params_and_results(0),
             (
-                vec![OperandDataType::I64, OperandDataType::I64].as_ref(),
-                vec![OperandDataType::I32].as_ref()
+                &[OperandDataType::I64, OperandDataType::I64][..],
+                &[OperandDataType::I32][..]
             )
         );
 
@@ -822,16 +822,16 @@ mod tests {
     #[test]
     fn test_build_module_binary_with_single_function_and_external_functions() {
         let binary = helper_build_module_binary_with_functions_and_data_and_external_functions(
-            vec![HelperFunctionEntry {
+            &[HelperFunctionEntry {
                 local_variable_item_entries_without_args: vec![],
                 code: vec![0u8],
                 params: vec![],
                 results: vec![],
             }],
-            vec![],
-            vec![],
-            vec![],
-            vec![
+            &[],
+            &[],
+            &[],
+            &[
                 ExternalLibraryEntry::new(
                     "libc".to_owned(),
                     Box::new(ExternalLibraryDependency::System("libc.so.1".to_owned())),
@@ -858,7 +858,7 @@ mod tests {
                     ))),
                 ),
             ],
-            vec![
+            &[
                 HelperExternalFunctionEntry {
                     name: "getuid".to_owned(),
                     external_library_index: 0,
@@ -899,7 +899,7 @@ mod tests {
         );
 
         // load module
-        let module_images = helper_load_modules_from_binaries(vec![&binary]).unwrap();
+        let module_images = helper_load_modules_from_binaries(&[&binary]).unwrap();
         assert_eq!(module_images.len(), 1);
 
         let module_image = &module_images[0];

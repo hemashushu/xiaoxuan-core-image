@@ -21,7 +21,7 @@
 use crate::{
     entry::ImportFunctionEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
+    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]

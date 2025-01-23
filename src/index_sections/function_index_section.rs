@@ -38,7 +38,7 @@
 use crate::{
     entry::FunctionIndexListEntry,
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
-    tableaccess::{read_section_with_two_tables, write_section_with_two_tables},
+    datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
 };
 
 #[derive(Debug, PartialEq)]

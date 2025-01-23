@@ -36,7 +36,7 @@ use anc_isa::MemoryDataType;
 use crate::{
     entry::{InitedDataEntry, UninitDataEntry},
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{
+    datatableaccess::{
         read_section_with_one_table, read_section_with_table_and_data_area,
         write_section_with_one_table, write_section_with_table_and_data_area,
     },

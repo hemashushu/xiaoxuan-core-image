@@ -30,7 +30,7 @@
 use crate::{
     entry::{RelocateEntry, RelocateListEntry},
     module_image::{ModuleSectionId, RelocateType, SectionEntry},
-    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
+    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]

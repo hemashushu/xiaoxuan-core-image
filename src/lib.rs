@@ -12,7 +12,7 @@ pub mod entry_reader;
 pub mod entry_writer;
 pub mod index_sections;
 pub mod module_image;
-pub mod tableaccess;
+pub mod datatableaccess;
 
 // https://doc.rust-lang.org/reference/conditional-compilation.html#debug_assertions
 // https://doc.rust-lang.org/reference/conditional-compilation.html#test

@@ -23,7 +23,7 @@
 use crate::{
     entry::ExportFunctionEntry,
     module_image::{ModuleSectionId, SectionEntry, Visibility},
-    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
+    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]

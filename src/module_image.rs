@@ -127,7 +127,7 @@ use crate::{
         external_type_section::UnifiedExternalTypeSection,
         function_index_section::FunctionIndexSection,
     },
-    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
+    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
     ImageError, ImageErrorType,
 };
 

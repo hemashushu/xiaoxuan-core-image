@@ -25,7 +25,7 @@ use anc_isa::{ModuleDependency, ModuleDependencyType};
 use crate::{
     entry::DependentModuleEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    tableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
+    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
     DependencyHash,
 };
 
