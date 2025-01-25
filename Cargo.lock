@@ -9,6 +9,7 @@ dependencies = [
  "anc-isa",
  "ason",
  "pretty_assertions",
+ "serde",
 ]
 
 [[package]]

@@ -11,4 +11,4 @@ pub mod external_function_section;
 pub mod external_library_section;
 pub mod external_type_section;
 pub mod function_index_section;
-pub mod dependent_module_section;
+pub mod dynamic_link_module_section;

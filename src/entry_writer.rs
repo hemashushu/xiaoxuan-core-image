@@ -26,7 +26,7 @@ use crate::{
     },
     entry::{ImageCommonEntry, ImageIndexEntry},
     index_sections::{
-        data_index_section::DataIndexSection, dependent_module_section::DependentModuleSection,
+        data_index_section::DataIndexSection, dynamic_link_module_section::DependentModuleSection,
         entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,

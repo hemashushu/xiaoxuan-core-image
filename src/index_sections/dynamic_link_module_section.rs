@@ -4,7 +4,7 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-// "import module section" binary layout
+// "dependent module section" binary layout
 //
 //              |------------------------------------------------|
 //              | item count (u32) | extra header length (u32)   |
@@ -20,39 +20,31 @@
 //              | ...                                            |
 //              |------------------------------------------------|
 
-use anc_isa::ModuleDependency;
-
 use crate::{
     datatableaccess::{
         read_section_with_table_and_data_area, write_section_with_table_and_data_area,
     },
-    entry::ImportModuleEntry,
+    entry::DynamicLinkModuleEntry,
     module_image::{ModuleSectionId, SectionEntry},
 };
 
-#[derive(Debug, PartialEq, Default)]
-pub struct ImportModuleSection<'a> {
-    pub items: &'a [ImportModuleItem],
+#[derive(Debug, PartialEq)]
+pub struct DependentModuleSection<'a> {
+    pub items: &'a [DependentModuleItem],
     pub items_data: &'a [u8],
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct ImportModuleItem {
+pub struct DependentModuleItem {
     pub name_offset: u32, // the offset of the name string in data area
     pub name_length: u32, // the length (in bytes) of the name string in data area
     pub value_offset: u32,
     pub value_length: u32,
 }
 
-impl ImportModuleItem {
-    pub fn new(
-        name_offset: u32,
-        name_length: u32,
-        value_offset: u32,
-        value_length: u32,
-        // module_dependent_type: ModuleDependencyType,
-    ) -> Self {
+impl DependentModuleItem {
+    pub fn new(name_offset: u32, name_length: u32, value_offset: u32, value_length: u32) -> Self {
         Self {
             name_offset,
             name_length,
@@ -62,11 +54,11 @@ impl ImportModuleItem {
     }
 }
 
-impl<'a> SectionEntry<'a> for ImportModuleSection<'a> {
+impl<'a> SectionEntry<'a> for DependentModuleSection<'a> {
     fn read(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
-            read_section_with_table_and_data_area::<ImportModuleItem>(section_data);
-        ImportModuleSection {
+            read_section_with_table_and_data_area::<DependentModuleItem>(section_data);
+        DependentModuleSection {
             items,
             items_data: names_data,
         }
@@ -77,11 +69,11 @@ impl<'a> SectionEntry<'a> for ImportModuleSection<'a> {
     }
 
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::ImportModule
+        ModuleSectionId::DynamicLinkModule
     }
 }
 
-impl<'a> ImportModuleSection<'a> {
+impl<'a> DependentModuleSection<'a> {
     pub fn get_item_name_and_value(&'a self, idx: usize) -> (&'a str, &'a [u8]) {
         let items = self.items;
         let items_data = self.items_data;
@@ -95,26 +87,9 @@ impl<'a> ImportModuleSection<'a> {
         (std::str::from_utf8(name_data).unwrap(), value_data)
     }
 
-    pub fn convert_to_entries(&self) -> Vec<ImportModuleEntry> {
-        let items = self.items;
-        let items_data = self.items_data;
-
-        items
-            .iter()
-            .map(|item| {
-                let name_data = &items_data
-                    [item.name_offset as usize..(item.name_offset + item.name_length) as usize];
-                let value_data = &items_data
-                    [item.value_offset as usize..(item.value_offset + item.value_length) as usize];
-
-                let name = std::str::from_utf8(name_data).unwrap().to_owned();
-                let module_dependency: ModuleDependency = ason::from_reader(value_data).unwrap();
-                ImportModuleEntry::new(name, Box::new(module_dependency))
-            })
-            .collect()
-    }
-
-    pub fn convert_from_entries(entries: &[ImportModuleEntry]) -> (Vec<ImportModuleItem>, Vec<u8>) {
+    pub fn convert_from_entries(
+        entries: &[DynamicLinkModuleEntry],
+    ) -> (Vec<DependentModuleItem>, Vec<u8>) {
         let mut name_bytes = entries
             .iter()
             .map(|entry| entry.name.as_bytes().to_vec())
@@ -123,7 +98,7 @@ impl<'a> ImportModuleSection<'a> {
         let mut value_bytes = entries
             .iter()
             .map(|entry| {
-                let value = entry.module_dependency.as_ref();
+                let value = entry.module_location.as_ref();
                 let value_string = ason::to_string(value).unwrap();
                 value_string.as_bytes().to_vec()
             })
@@ -139,9 +114,9 @@ impl<'a> ImportModuleSection<'a> {
                 let value_offset = name_offset + name_length;
                 next_offset = value_offset + value_length; // for next offset
 
-                ImportModuleItem::new(name_offset, name_length, value_offset, value_length)
+                DependentModuleItem::new(name_offset, name_length, value_offset, value_length)
             })
-            .collect::<Vec<ImportModuleItem>>();
+            .collect::<Vec<DependentModuleItem>>();
 
         let items_data = name_bytes
             .iter_mut()
@@ -158,13 +133,11 @@ impl<'a> ImportModuleSection<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use anc_isa::{DependencyCondition, DependencyLocal, DependencyRemote, ModuleDependency};
-
     use crate::{
-        common_sections::import_module_section::{ImportModuleItem, ImportModuleSection},
-        entry::ImportModuleEntry,
+        entry::{DynamicLinkModuleEntry, ModuleLocation, ModuleLocationCache, ModuleLocationLocal},
+        index_sections::dynamic_link_module_section::{
+            DependentModuleItem, DependentModuleSection,
+        },
         module_image::SectionEntry,
     };
 
@@ -190,28 +163,22 @@ mod tests {
         section_data.extend_from_slice(b".bar");
         section_data.extend_from_slice(b".world");
 
-        let section = ImportModuleSection::read(&section_data);
+        let section = DependentModuleSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(
-            section.items[0],
-            ImportModuleItem::new(0, 3, 3, 5) //, ModuleDependencyType::Local)
-        );
-        assert_eq!(
-            section.items[1],
-            ImportModuleItem::new(8, 4, 12, 6) //, ModuleDependencyType::Remote,)
-        );
+        assert_eq!(section.items[0], DependentModuleItem::new(0, 3, 3, 5,));
+        assert_eq!(section.items[1], DependentModuleItem::new(8, 4, 12, 6,));
         assert_eq!(section.items_data, "foohello.bar.world".as_bytes())
     }
 
     #[test]
     fn test_write_section() {
         let items = vec![
-            ImportModuleItem::new(0, 3, 3, 5), //, ModuleDependencyType::Local),
-            ImportModuleItem::new(8, 4, 12, 6), // ModuleDependencyType::Remote),
+            DependentModuleItem::new(0, 3, 3, 5),
+            DependentModuleItem::new(8, 4, 12, 6),
         ];
 
-        let section = ImportModuleSection {
+        let section = DependentModuleSection {
             items: &items,
             items_data: b"foohello.bar.world",
         };
@@ -247,28 +214,24 @@ mod tests {
     #[test]
     fn test_convert() {
         let entries = vec![
-            ImportModuleEntry::new(
+            DynamicLinkModuleEntry::new(
                 "foobar".to_owned(),
-                Box::new(ModuleDependency::Local(Box::new(DependencyLocal {
-                    path: "hello".to_owned(),
-                    condition: DependencyCondition::True,
-                    parameters: HashMap::default(),
+                Box::new(ModuleLocation::Local(Box::new(ModuleLocationLocal {
+                    path: "/path/to/module".to_owned(),
+                    hash: "01234567".to_owned(),
                 }))),
             ),
-            ImportModuleEntry::new(
+            DynamicLinkModuleEntry::new(
                 "helloworld".to_owned(),
-                Box::new(ModuleDependency::Remote(Box::new(DependencyRemote {
-                    url: "http://a.b/c".to_owned(),
-                    reversion: "v1.0.1".to_owned(),
-                    path: "/xyz".to_owned(),
-                    condition: DependencyCondition::True,
-                    parameters: HashMap::default(),
+                Box::new(ModuleLocation::Cache(Box::new(ModuleLocationCache {
+                    version: Some("1.2.3".to_owned()),
+                    hash: "76543210".to_owned(),
                 }))),
             ),
         ];
 
-        let (items, items_data) = ImportModuleSection::convert_from_entries(&entries);
-        let section = ImportModuleSection {
+        let (items, items_data) = DependentModuleSection::convert_from_entries(&entries);
+        let section = DependentModuleSection {
             items: &items,
             items_data: &items_data,
         };
@@ -279,13 +242,10 @@ mod tests {
         assert_eq!(name0, "foobar");
         assert_eq!(name1, "helloworld");
 
-        let v0: ModuleDependency = ason::from_reader(value0).unwrap();
-        assert_eq!(&v0, entries[0].module_dependency.as_ref());
+        let v0: ModuleLocation = ason::from_reader(value0).unwrap();
+        assert_eq!(&v0, entries[0].module_location.as_ref());
 
-        let v1: ModuleDependency = ason::from_reader(value1).unwrap();
-        assert_eq!(&v1, entries[1].module_dependency.as_ref());
-
-        let entries_restore = section.convert_to_entries();
-        assert_eq!(entries, entries_restore);
+        let v1: ModuleLocation = ason::from_reader(value1).unwrap();
+        assert_eq!(&v1, entries[1].module_location.as_ref());
     }
 }

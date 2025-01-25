@@ -19,9 +19,11 @@
 //              |----------------------------------------------------------------------------|
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::EntryPointEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -35,11 +37,11 @@ pub struct EntryPointSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct EntryPointItem {
-    /// The name of the executable unit.
+    /// The name of the entry points.
     ///
-    /// - empty string for the default entry point (in file "main.anca").
-    /// - submodule name for the executable units in the "app" folder.
-    /// - submodule and function name ("test_*") for the unit test (in folder "tests").
+    /// - 'app_module_name::_start' for the default entry point, entry point name is "_start".
+    /// - 'app_module_name::app::{submodule_name}::_start' for the executable units, entry point name is the name of submodule.
+    /// - 'app_module_name::tests::{submodule_name}::test_*' for unit tests, entry point name is "submodule_name::test_*".
     pub unit_name_offset: u32,
     pub unit_name_length: u32,
 
@@ -151,14 +153,14 @@ mod tests {
     #[test]
     fn test_write_section() {
         let items: Vec<EntryPointItem> = vec![
-            EntryPointItem::new(0, 0, 11),
-            EntryPointItem::new(0, 3, 13),
-            EntryPointItem::new(3, 5, 17),
+            EntryPointItem::new(0, 6, 11),
+            EntryPointItem::new(6, 3, 13),
+            EntryPointItem::new(9, 5, 17),
         ];
 
         let section = EntryPointSection {
             items: &items,
-            unit_names_data: "foohello".as_bytes(),
+            unit_names_data: "_startfoohello".as_bytes(),
         };
 
         let mut section_data: Vec<u8> = vec![];
@@ -169,20 +171,22 @@ mod tests {
             0, 0, 0, 0, // extra section header len (i32)
             //
             0, 0, 0, 0, // name offset (item 0)
-            0, 0, 0, 0, // name length
+            6, 0, 0, 0, // name length
             11, 0, 0, 0, // fn pub idx
             //
-            0, 0, 0, 0, // name offset (item 1)
+            6, 0, 0, 0, // name offset (item 1)
             3, 0, 0, 0, // name length
             13, 0, 0, 0, // fn pub idx
             //
-            3, 0, 0, 0, // name offset (item 1)
+            9, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
             17, 0, 0, 0, // fn pub idx
         ];
 
+        expect_data.extend_from_slice(b"_start");
         expect_data.extend_from_slice(b"foo");
         expect_data.extend_from_slice(b"hello");
+        expect_data.extend_from_slice(b"\0\0"); // section 4-byte align
 
         assert_eq!(section_data, expect_data);
     }
@@ -194,34 +198,35 @@ mod tests {
             0, 0, 0, 0, // extra section header len (i32)
             //
             0, 0, 0, 0, // name offset (item 0)
-            0, 0, 0, 0, // name length
+            6, 0, 0, 0, // name length
             11, 0, 0, 0, // fn pub idx
             //
-            0, 0, 0, 0, // name offset (item 1)
+            6, 0, 0, 0, // name offset (item 1)
             3, 0, 0, 0, // name length
             13, 0, 0, 0, // fn pub idx
             //
-            3, 0, 0, 0, // name offset (item 1)
+            9, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
             17, 0, 0, 0, // fn pub idx
         ];
 
+        section_data.extend_from_slice("_start".as_bytes());
         section_data.extend_from_slice("foo".as_bytes());
         section_data.extend_from_slice("hello".as_bytes());
 
         let section = EntryPointSection::read(&section_data);
 
         assert_eq!(section.items.len(), 3);
-        assert_eq!(section.items[0], EntryPointItem::new(0, 0, 11));
-        assert_eq!(section.items[1], EntryPointItem::new(0, 3, 13));
-        assert_eq!(section.items[2], EntryPointItem::new(3, 5, 17));
-        assert_eq!(section.unit_names_data, "foohello".as_bytes())
+        assert_eq!(section.items[0], EntryPointItem::new(0, 6, 11));
+        assert_eq!(section.items[1], EntryPointItem::new(6, 3, 13));
+        assert_eq!(section.items[2], EntryPointItem::new(9, 5, 17));
+        assert_eq!(section.unit_names_data, "_startfoohello".as_bytes())
     }
 
     #[test]
     fn test_convert() {
         let entries: Vec<EntryPointEntry> = vec![
-            EntryPointEntry::new("".to_string(), 11),
+            EntryPointEntry::new("_start".to_string(), 11),
             EntryPointEntry::new("foo".to_string(), 13),
             EntryPointEntry::new("hello".to_string(), 15),
         ];
@@ -232,7 +237,7 @@ mod tests {
             unit_names_data: &names_data,
         };
 
-        assert_eq!(section.get_function_public_index(""), Some(11));
+        assert_eq!(section.get_function_public_index("_start"), Some(11));
         assert_eq!(section.get_function_public_index("foo"), Some(13));
         assert_eq!(section.get_function_public_index("hello"), Some(15));
 

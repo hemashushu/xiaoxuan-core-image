@@ -64,7 +64,7 @@
 //
 // - function index section
 // - entry point section
-// - dependent module section
+// - dynamic link module section
 //
 // there are also some optional sections:
 //
@@ -118,8 +118,11 @@ use crate::{
         relocate_section::RelocateSection,
         type_section::TypeSection,
     },
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     index_sections::{
-        data_index_section::DataIndexSection, dependent_module_section::DependentModuleSection,
+        data_index_section::DataIndexSection, dynamic_link_module_section::DependentModuleSection,
         entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,
@@ -127,7 +130,6 @@ use crate::{
         external_type_section::UnifiedExternalTypeSection,
         function_index_section::FunctionIndexSection,
     },
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
     ImageError, ImageErrorType,
 };
 
@@ -217,7 +219,7 @@ pub enum ModuleSectionId {
     */
     EntryPoint = 0x0080, // 0x80
     FunctionIndex,       // 0x81
-    DependentModule,     // 0x82, this section is used by the module loader
+    DynamicLinkModule,   // 0x82
 
     /*
     optional (application only)
@@ -519,8 +521,8 @@ impl<'a> ModuleImage<'a> {
     }
 
     // essential section (application only)
-    pub fn get_module_list_section(&'a self) -> DependentModuleSection<'a> {
-        self.get_section_data_by_id(ModuleSectionId::DependentModule)
+    pub fn get_dynamic_link_module_list_section(&'a self) -> DependentModuleSection<'a> {
+        self.get_section_data_by_id(ModuleSectionId::DynamicLinkModule)
             .map_or_else(
                 || panic!("Can not find the index property section."),
                 DependentModuleSection::read,

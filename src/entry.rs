@@ -12,11 +12,9 @@ use anc_isa::{
     DataSectionType, EffectiveVersion, ExternalLibraryDependency, MemoryDataType, ModuleDependency,
     OperandDataType,
 };
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    module_image::{ImageType, RelocateType, Visibility},
-    DependencyHash,
-};
+use crate::module_image::{ImageType, RelocateType, Visibility};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeEntry {
@@ -289,17 +287,20 @@ pub struct ImportModuleEntry {
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
     pub name: String,
-    pub value: Box<ModuleDependency>,
+    pub module_dependency: Box<ModuleDependency>,
 }
 
 impl ImportModuleEntry {
-    pub fn new(name: String, value: Box<ModuleDependency>) -> Self {
-        Self { name, value }
+    pub fn new(name: String, module_dependency: Box<ModuleDependency>) -> Self {
+        Self {
+            name,
+            module_dependency,
+        }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct DependentModuleEntry {
+pub struct DynamicLinkModuleEntry {
     // Note that this is the name of module/package,
     // it CANNOT be the name of submodule even if the current image is
     // a "object module", it also CANNOT be the full name or name path.
@@ -314,16 +315,50 @@ pub struct DependentModuleEntry {
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
     pub name: String,
-    pub value: Box<ModuleDependency>,
 
-    // the hash of parameters and compile environment variables,
-    // only exists in Local/Remote/Share dependencies
-    pub hash: DependencyHash,
+    pub module_location: Box<ModuleLocation>,
 }
 
-impl DependentModuleEntry {
-    pub fn new(name: String, value: Box<ModuleDependency>, hash: DependencyHash) -> Self {
-        Self { name, value, hash }
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename = "location")]
+pub enum ModuleLocation {
+    #[serde(rename = "local")]
+    Local(Box<ModuleLocationLocal>),
+
+    /// Remote and Shared module
+    #[serde(rename = "repository")]
+    Cache(Box<ModuleLocationCache>),
+
+    #[serde(rename = "runtime")]
+    Runtime,
+
+    /// By defuault, the application's main module is merged
+    /// into the same image file (*.anci) as the dynamically linked
+    /// index to simplify and speed up loading.
+    Embed,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename = "local")]
+pub struct ModuleLocationLocal {
+    // The module's path relative to the application folder.
+    pub path: String,
+    pub hash: String,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename = "cache")]
+pub struct ModuleLocationCache {
+    pub version: Option<String>,
+    pub hash: String,
+}
+
+impl DynamicLinkModuleEntry {
+    pub fn new(name: String, module_location: Box<ModuleLocation>) -> Self {
+        Self {
+            name,
+            module_location,
+        }
     }
 }
 
@@ -631,11 +666,11 @@ impl ExternalFunctionIndexEntry {
 
 #[derive(Debug, PartialEq)]
 pub struct EntryPointEntry {
-    /// The name of the executable unit.
+    /// The name of the entry points:
     ///
-    /// - empty string for the default entry point (in file "main.anca").
-    /// - submodule name for the executable units in the "app" folder.
-    /// - submodule and function name ("test_*") for the unit test (in folder "tests").
+    /// - 'app_module_name::_start' for the default entry point, entry point name is "_start".
+    /// - 'app_module_name::app::{submodule_name}::_start' for the executable units, entry point name is the name of submodule.
+    /// - 'app_module_name::tests::{submodule_name}::test_*' for unit tests, entry point name is "submodule_name::test_*".
     pub unit_name: String,
     pub function_public_index: usize,
 }
@@ -713,6 +748,6 @@ pub struct ImageIndexEntry {
     pub unified_external_type_entries: Vec<TypeEntry>,
     pub unified_external_function_entries: Vec<ExternalFunctionEntry>,
     //
-    pub dependent_module_entries: Vec<DependentModuleEntry>,
+    pub dependent_module_entries: Vec<DynamicLinkModuleEntry>,
     pub entry_point_entries: Vec<EntryPointEntry>,
 }
