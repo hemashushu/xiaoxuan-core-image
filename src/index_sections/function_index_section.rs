@@ -36,9 +36,9 @@
 //         |--------------------------------------------------------|
 
 use crate::{
+    datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
     entry::FunctionIndexListEntry,
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
-    datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
 };
 
 #[derive(Debug, PartialEq)]
@@ -101,24 +101,17 @@ impl<'a> SectionEntry<'a> for FunctionIndexSection<'a> {
 }
 
 impl FunctionIndexSection<'_> {
+    pub fn get_items_count(&self, module_index: usize) -> usize {
+        let range = &self.ranges[module_index];
+        range.count as usize
+    }
+
     pub fn get_item_target_module_index_and_function_internal_index(
         &self,
         module_index: usize,
         function_public_index: usize,
     ) -> (usize, usize) {
         let range = &self.ranges[module_index];
-
-        // bounds check
-        #[cfg(feature = "bounds_check")]
-        {
-            if function_public_index > range.count as usize {
-                panic!("Out of bounds of the function public index, module index: {}, total functions (includes imported): {}, request function public index: {}.",
-                    module_index,
-                    range.count,
-                    function_public_index
-                );
-            }
-        }
 
         let item_index = range.offset as usize + function_public_index;
         let item = &self.items[item_index];

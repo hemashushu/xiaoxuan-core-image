@@ -30,9 +30,9 @@
 //         |---------------------------------------|
 
 use crate::{
+    datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
     entry::ExternalFunctionIndexListEntry,
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
-    datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -75,23 +75,17 @@ impl<'a> SectionEntry<'a> for ExternalFunctionIndexSection<'a> {
 }
 
 impl ExternalFunctionIndexSection<'_> {
+    pub fn get_items_count(&self, module_index: usize) -> usize {
+        let range = &self.ranges[module_index];
+        range.count as usize
+    }
+
     pub fn get_item_unified_external_function_index(
         &self,
         module_index: usize,
         external_function_index: usize,
     ) -> usize {
         let range = &self.ranges[module_index];
-
-        // bounds check
-        #[cfg(feature = "bounds_check")]
-        {
-            if external_function_index > range.count as usize {
-                panic!("Out of bounds of the external function index, module index:{}, total external functions: {}, request external function index: {}",
-                    module_index,
-                    range.count,
-                    external_function_index);
-            }
-        }
 
         let item_index = range.offset as usize + external_function_index;
         let item = &self.items[item_index];

@@ -43,9 +43,9 @@
 use anc_isa::DataSectionType;
 
 use crate::{
+    datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
     entry::DataIndexListEntry,
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
-    datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -123,23 +123,17 @@ impl<'a> SectionEntry<'a> for DataIndexSection<'a> {
 }
 
 impl DataIndexSection<'_> {
+    pub fn get_items_count(&self, module_index: usize) -> usize {
+        let range = &self.ranges[module_index];
+        range.count as usize
+    }
+
     pub fn get_item_target_module_index_and_data_internal_index_and_data_section_type(
         &self,
         module_index: usize,
         data_public_index: usize,
     ) -> (usize, usize, DataSectionType) {
         let range = &self.ranges[module_index];
-
-        // bounds check
-        #[cfg(feature = "bounds_check")]
-        {
-            if data_public_index > range.count as usize {
-                panic!(
-                    "Out of bounds of the data public index, module index: {}, total data items: {}, request data index: {}.",
-                    module_index, range.count, data_public_index
-                );
-            }
-        }
 
         let item_index = range.offset as usize + data_public_index;
         let item = &self.items[item_index];

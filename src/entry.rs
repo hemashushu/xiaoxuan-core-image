@@ -14,7 +14,10 @@ use anc_isa::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::module_image::{ImageType, RelocateType, Visibility};
+use crate::{
+    bytecode_reader::format_bytecode_as_text,
+    module_image::{ImageType, RelocateType, Visibility},
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeEntry {
@@ -94,7 +97,7 @@ impl LocalVariableEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub struct FunctionEntry {
     pub type_index: usize,
     pub local_variable_list_index: usize,
@@ -111,15 +114,15 @@ impl FunctionEntry {
     }
 }
 
-// impl Debug for FunctionEntry {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         f.debug_struct("FunctionEntry")
-//             .field("type_index", &self.type_index)
-//             .field("local_variable_list_index", &self.local_variable_list_index)
-//             .field("code", &format_bytecode_as_text(&self.code))
-//             .finish()
-//     }
-// }
+impl Debug for FunctionEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FunctionEntry")
+            .field("type_index", &self.type_index)
+            .field("local_variable_list_index", &self.local_variable_list_index)
+            .field("code", &format_bytecode_as_text(&self.code))
+            .finish()
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct InitedDataEntry {
