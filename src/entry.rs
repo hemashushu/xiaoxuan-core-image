@@ -10,7 +10,7 @@ use std::fmt::Debug;
 
 use anc_isa::{
     DataSectionType, EffectiveVersion, ExternalLibraryDependency, MemoryDataType, ModuleDependency,
-    OperandDataType,
+    OperandDataType, SELF_REFERENCE_MODULE_NAME,
 };
 use serde::{Deserialize, Serialize};
 
@@ -297,6 +297,13 @@ impl ImportModuleEntry {
             module_dependency,
         }
     }
+
+    pub fn self_reference_entry() -> Self {
+        Self {
+            name: SELF_REFERENCE_MODULE_NAME.to_owned(),
+            module_dependency: Box::new(ModuleDependency::Module),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -325,9 +332,11 @@ pub enum ModuleLocation {
     #[serde(rename = "local")]
     Local(Box<ModuleLocationLocal>),
 
-    /// Remote and Shared module
-    #[serde(rename = "repository")]
-    Cache(Box<ModuleLocationCache>),
+    #[serde(rename = "remote")]
+    Remote(Box<ModuleLocationRemote>),
+
+    #[serde(rename = "share")]
+    Share(Box<ModuleLocationShare>),
 
     #[serde(rename = "runtime")]
     Runtime,
@@ -347,9 +356,15 @@ pub struct ModuleLocationLocal {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-#[serde(rename = "cache")]
-pub struct ModuleLocationCache {
-    pub version: Option<String>,
+#[serde(rename = "remote")]
+pub struct ModuleLocationRemote {
+    pub hash: String,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename = "share")]
+pub struct ModuleLocationShare {
+    pub version: String,
     pub hash: String,
 }
 
@@ -748,6 +763,6 @@ pub struct ImageIndexEntry {
     pub unified_external_type_entries: Vec<TypeEntry>,
     pub unified_external_function_entries: Vec<ExternalFunctionEntry>,
     //
-    pub dependent_module_entries: Vec<DynamicLinkModuleEntry>,
+    pub dynamic_link_module_entries: Vec<DynamicLinkModuleEntry>,
     pub entry_point_entries: Vec<EntryPointEntry>,
 }

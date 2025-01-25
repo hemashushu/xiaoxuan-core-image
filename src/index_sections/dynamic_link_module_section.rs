@@ -134,7 +134,7 @@ impl<'a> DependentModuleSection<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        entry::{DynamicLinkModuleEntry, ModuleLocation, ModuleLocationCache, ModuleLocationLocal},
+        entry::{DynamicLinkModuleEntry, ModuleLocation, ModuleLocationShare, ModuleLocationLocal},
         index_sections::dynamic_link_module_section::{
             DependentModuleItem, DependentModuleSection,
         },
@@ -223,8 +223,8 @@ mod tests {
             ),
             DynamicLinkModuleEntry::new(
                 "helloworld".to_owned(),
-                Box::new(ModuleLocation::Cache(Box::new(ModuleLocationCache {
-                    version: Some("1.2.3".to_owned()),
+                Box::new(ModuleLocation::Share(Box::new(ModuleLocationShare {
+                    version: "1.2.3".to_owned(),
                     hash: "76543210".to_owned(),
                 }))),
             ),

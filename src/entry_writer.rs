@@ -395,7 +395,7 @@ pub fn write_image_file(
 
     // dependent module section
     let (dependent_module_items, dependent_module_data) =
-        DependentModuleSection::convert_from_entries(&image_index_entry.dependent_module_entries);
+        DependentModuleSection::convert_from_entries(&image_index_entry.dynamic_link_module_entries);
     let dependent_module_section = DependentModuleSection {
         items: &dependent_module_items,
         items_data: &dependent_module_data,

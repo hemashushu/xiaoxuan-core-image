@@ -34,7 +34,7 @@ use std::{
 // not all bits are always used, only the first 64 bits are used by default.
 pub type DependencyHash = [u8; 32];
 
-pub const ZERO_DEPENDENCY_HASH: DependencyHash = [0u8; 32];
+pub const DEPENDENCY_HASH_ZERO: DependencyHash = [0u8; 32];
 
 #[derive(Debug)]
 pub struct ImageError {
@@ -72,7 +72,7 @@ pub fn compute_dependency_hash(values: &str) -> DependencyHash {
     hasher.write(values.as_bytes());
     let value = hasher.finish();
 
-    let mut buf = ZERO_DEPENDENCY_HASH;
+    let mut buf = DEPENDENCY_HASH_ZERO;
     let bytes = value.to_le_bytes();
     let src = bytes.as_ptr();
     let dst = buf.as_mut_ptr();
