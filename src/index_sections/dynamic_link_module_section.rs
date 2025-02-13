@@ -217,7 +217,7 @@ mod tests {
             DynamicLinkModuleEntry::new(
                 "foobar".to_owned(),
                 Box::new(ModuleLocation::Local(Box::new(ModuleLocationLocal {
-                    path: "/path/to/module".to_owned(),
+                    module_path: "/path/to/module".to_owned(),
                     hash: "01234567".to_owned(),
                 }))),
             ),

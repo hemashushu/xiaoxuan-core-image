@@ -153,7 +153,6 @@ impl<'a> ExternalLibrarySection<'a> {
                     ExternalLibraryDependency::Local(_) => ExternalLibraryDependencyType::Local,
                     ExternalLibraryDependency::Remote(_) => ExternalLibraryDependencyType::Remote,
                     ExternalLibraryDependency::Share(_) => ExternalLibraryDependencyType::Share,
-                    ExternalLibraryDependency::Runtime => ExternalLibraryDependencyType::Runtime,
                     ExternalLibraryDependency::System(_) => ExternalLibraryDependencyType::System,
                 };
 
@@ -299,7 +298,6 @@ mod tests {
                     DependencyRemote {
                         url: "http://a.b/c".to_owned(),
                         reversion: "v1.0.1".to_owned(),
-                        path: "/xyz.so.2".to_owned(),
                         condition: DependencyCondition::True,
                         parameters: HashMap::default(),
                     },

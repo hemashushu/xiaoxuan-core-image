@@ -353,8 +353,8 @@ pub enum ModuleLocation {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename = "local")]
 pub struct ModuleLocationLocal {
-    // The module's path relative to the application folder.
-    pub path: String,
+    // The module path (it is absolute path).
+    pub module_path: String,
     pub hash: String,
 }
 

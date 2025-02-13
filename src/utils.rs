@@ -837,7 +837,6 @@ mod tests {
                     "libmagic".to_owned(),
                     Box::new(ExternalLibraryDependency::Share(Box::new(
                         DependencyShare {
-                            repository: "default".to_owned(),
                             version: "1.2".to_owned(),
                             condition: DependencyCondition::True,
                             parameters: HashMap::default(),
@@ -939,7 +938,6 @@ mod tests {
                 "libmagic",
                 ExternalLibraryDependencyType::Share,
                 ExternalLibraryDependency::Share(Box::new(DependencyShare {
-                    repository: "default".to_owned(),
                     version: "1.2".to_owned(),
                     condition: DependencyCondition::True,
                     parameters: HashMap::default()
@@ -1066,7 +1064,6 @@ mod tests {
                 "libmagic",
                 ExternalLibraryDependencyType::Share,
                 ExternalLibraryDependency::Share(Box::new(DependencyShare {
-                    repository: "default".to_owned(),
                     version: "1.2".to_owned(),
                     condition: DependencyCondition::True,
                     parameters: HashMap::default()
