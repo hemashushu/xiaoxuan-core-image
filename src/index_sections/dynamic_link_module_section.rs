@@ -24,26 +24,26 @@ use crate::{
     datatableaccess::{
         read_section_with_table_and_data_area, write_section_with_table_and_data_area,
     },
-    entry::DynamicLinkModuleEntry,
+    entry::{DynamicLinkModuleEntry, ModuleLocation},
     module_image::{ModuleSectionId, SectionEntry},
 };
 
 #[derive(Debug, PartialEq)]
-pub struct DependentModuleSection<'a> {
-    pub items: &'a [DependentModuleItem],
+pub struct DynamicLinkModuleSection<'a> {
+    pub items: &'a [DynamicLinkModuleItem],
     pub items_data: &'a [u8],
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct DependentModuleItem {
+pub struct DynamicLinkModuleItem {
     pub name_offset: u32, // the offset of the name string in data area
     pub name_length: u32, // the length (in bytes) of the name string in data area
     pub value_offset: u32,
     pub value_length: u32,
 }
 
-impl DependentModuleItem {
+impl DynamicLinkModuleItem {
     pub fn new(name_offset: u32, name_length: u32, value_offset: u32, value_length: u32) -> Self {
         Self {
             name_offset,
@@ -54,11 +54,11 @@ impl DependentModuleItem {
     }
 }
 
-impl<'a> SectionEntry<'a> for DependentModuleSection<'a> {
+impl<'a> SectionEntry<'a> for DynamicLinkModuleSection<'a> {
     fn read(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
-            read_section_with_table_and_data_area::<DependentModuleItem>(section_data);
-        DependentModuleSection {
+            read_section_with_table_and_data_area::<DynamicLinkModuleItem>(section_data);
+        DynamicLinkModuleSection {
             items,
             items_data: names_data,
         }
@@ -73,7 +73,7 @@ impl<'a> SectionEntry<'a> for DependentModuleSection<'a> {
     }
 }
 
-impl<'a> DependentModuleSection<'a> {
+impl<'a> DynamicLinkModuleSection<'a> {
     pub fn get_item_name_and_value(&'a self, idx: usize) -> (&'a str, &'a [u8]) {
         let items = self.items;
         let items_data = self.items_data;
@@ -87,9 +87,28 @@ impl<'a> DependentModuleSection<'a> {
         (std::str::from_utf8(name_data).unwrap(), value_data)
     }
 
+    pub fn convert_to_entries(&self) -> Vec<DynamicLinkModuleEntry> {
+        let items = self.items;
+        let items_data = self.items_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let name_data = &items_data
+                    [item.name_offset as usize..(item.name_offset + item.name_length) as usize];
+                let value_data = &items_data
+                    [item.value_offset as usize..(item.value_offset + item.value_length) as usize];
+
+                let name = std::str::from_utf8(name_data).unwrap().to_owned();
+                let module_location: ModuleLocation = ason::from_reader(value_data).unwrap();
+                DynamicLinkModuleEntry::new(name, Box::new(module_location))
+            })
+            .collect()
+    }
+
     pub fn convert_from_entries(
         entries: &[DynamicLinkModuleEntry],
-    ) -> (Vec<DependentModuleItem>, Vec<u8>) {
+    ) -> (Vec<DynamicLinkModuleItem>, Vec<u8>) {
         let mut name_bytes = entries
             .iter()
             .map(|entry| entry.name.as_bytes().to_vec())
@@ -114,9 +133,9 @@ impl<'a> DependentModuleSection<'a> {
                 let value_offset = name_offset + name_length;
                 next_offset = value_offset + value_length; // for next offset
 
-                DependentModuleItem::new(name_offset, name_length, value_offset, value_length)
+                DynamicLinkModuleItem::new(name_offset, name_length, value_offset, value_length)
             })
-            .collect::<Vec<DependentModuleItem>>();
+            .collect::<Vec<DynamicLinkModuleItem>>();
 
         let items_data = name_bytes
             .iter_mut()
@@ -134,9 +153,9 @@ impl<'a> DependentModuleSection<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        entry::{DynamicLinkModuleEntry, ModuleLocation, ModuleLocationShare, ModuleLocationLocal},
+        entry::{DynamicLinkModuleEntry, ModuleLocation, ModuleLocationLocal, ModuleLocationShare},
         index_sections::dynamic_link_module_section::{
-            DependentModuleItem, DependentModuleSection,
+            DynamicLinkModuleItem, DynamicLinkModuleSection,
         },
         module_image::SectionEntry,
     };
@@ -163,22 +182,22 @@ mod tests {
         section_data.extend_from_slice(b".bar");
         section_data.extend_from_slice(b".world");
 
-        let section = DependentModuleSection::read(&section_data);
+        let section = DynamicLinkModuleSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(section.items[0], DependentModuleItem::new(0, 3, 3, 5,));
-        assert_eq!(section.items[1], DependentModuleItem::new(8, 4, 12, 6,));
+        assert_eq!(section.items[0], DynamicLinkModuleItem::new(0, 3, 3, 5,));
+        assert_eq!(section.items[1], DynamicLinkModuleItem::new(8, 4, 12, 6,));
         assert_eq!(section.items_data, "foohello.bar.world".as_bytes())
     }
 
     #[test]
     fn test_write_section() {
         let items = vec![
-            DependentModuleItem::new(0, 3, 3, 5),
-            DependentModuleItem::new(8, 4, 12, 6),
+            DynamicLinkModuleItem::new(0, 3, 3, 5),
+            DynamicLinkModuleItem::new(8, 4, 12, 6),
         ];
 
-        let section = DependentModuleSection {
+        let section = DynamicLinkModuleSection {
             items: &items,
             items_data: b"foohello.bar.world",
         };
@@ -230,8 +249,8 @@ mod tests {
             ),
         ];
 
-        let (items, items_data) = DependentModuleSection::convert_from_entries(&entries);
-        let section = DependentModuleSection {
+        let (items, items_data) = DynamicLinkModuleSection::convert_from_entries(&entries);
+        let section = DynamicLinkModuleSection {
             items: &items,
             items_data: &items_data,
         };
@@ -247,5 +266,8 @@ mod tests {
 
         let v1: ModuleLocation = ason::from_reader(value1).unwrap();
         assert_eq!(&v1, entries[1].module_location.as_ref());
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 }

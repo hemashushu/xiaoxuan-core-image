@@ -32,16 +32,26 @@ pub struct EntryPointSection<'a> {
     pub unit_names_data: &'a [u8],
 }
 
-// this table only contains the internal functions,
-// imported functions will not be list in this table.
+/// internal entry point names:
+///
+/// - internal entry point name: "_start"
+///   executes function: '{app_module_name}::_start' (the default entry point)
+///   user CLI unit name: "" (empty string)
+///
+/// - internal entry point name: "{submodule_name}"
+///   executes function: '{app_module_name}::app::{submodule_name}::_start' (the additional executable units)
+///   user CLI unit name: ":{submodule_name}"
+///
+/// - internal entry point name: "{submodule_name}::test_*"
+///   executes function: '{app_module_name}::tests::{submodule_name}::test_*' (unit tests)
+///   user CLI unit name: name path prefix, e.g. "{submodule_name}", "{submodule_name}::test_get_"
+///
+/// this table only contains the internal functions,
+/// imported functions will not be list in this table.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct EntryPointItem {
-    /// The name of the entry points.
-    ///
-    /// - 'app_module_name::_start' for the default entry point, entry point name is "_start".
-    /// - 'app_module_name::app::{submodule_name}::_start' for the executable units, entry point name is the name of submodule.
-    /// - 'app_module_name::tests::{submodule_name}::test_*' for unit tests, entry point name is "submodule_name::test_*".
+    /// The internal name of the entry points.
     pub unit_name_offset: u32,
     pub unit_name_length: u32,
 

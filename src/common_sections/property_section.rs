@@ -31,7 +31,7 @@ pub struct PropertySection {
     pub import_function_count: u32,
 
     // Note that this is the name of module/package,
-    // it CANNOT be the name of submodule even if the current image is
+    // it CANNOT be the name of submodule (i.e. namespace) even if the current image is
     // a "object module", it also CANNOT be the full name or name path.
     //
     // about the "full_name" and "name_path"

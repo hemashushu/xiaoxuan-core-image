@@ -277,7 +277,7 @@ impl ExternalFunctionEntry {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportModuleEntry {
     // Note that this is the name of module/package,
-    // it CANNOT be the name of submodule even if the current image is
+    // it CANNOT be the name of submodule (i.e. namespace) even if the current image is
     // a "object module", it also CANNOT be the full name or name path.
     //
     // about the "full_name" and "name_path"
@@ -312,7 +312,7 @@ impl ImportModuleEntry {
 #[derive(Debug, PartialEq, Clone)]
 pub struct DynamicLinkModuleEntry {
     // Note that this is the name of module/package,
-    // it CANNOT be the name of submodule even if the current image is
+    // it CANNOT be the name of submodule (i.e. namespace) even if the current image is
     // a "object module", it also CANNOT be the full name or name path.
     //
     // about the "full_name" and "name_path"
@@ -344,9 +344,9 @@ pub enum ModuleLocation {
     #[serde(rename = "runtime")]
     Runtime,
 
-    /// By defuault, the application's main module is merged
-    /// into the same image file (*.anci) as the dynamically linked
-    /// index to simplify and speed up loading.
+    /// By defuault, the application's module file (*.ancm) is merged
+    /// into the application image file (*.anci) as the first module of all
+    /// dependent modules for simplification.
     Embed,
 }
 
@@ -394,6 +394,8 @@ pub struct ImportFunctionEntry {
     // e.g.
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
+    //
+    // note that the module name can not be the name "module" of virtual module.
     pub full_name: String,
     pub import_module_index: usize,
     pub type_index: usize, // used for validation when linking
@@ -422,6 +424,8 @@ pub struct ImportDataEntry {
     // e.g.
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
+    //
+    // note that the module name can not be the name "module" of virtual module.
     pub full_name: String,
     pub import_module_index: usize,
     pub data_section_type: DataSectionType, // for validation when linking
@@ -457,6 +461,8 @@ pub struct ExportFunctionEntry {
     // e.g.
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
+    //
+    // note that the module name can not be the name "module" of virtual module.
     pub full_name: String,
     pub visibility: Visibility,
 }
@@ -483,6 +489,8 @@ pub struct ExportDataEntry {
     // e.g.
     // the name path of function "add" in submodule "myapp:utils" is "utils::add",
     // and the full name is "myapp::utils::add"
+    //
+    // note that the module name can not be the name "module" of virtual module.
     pub full_name: String,
     pub visibility: Visibility,
     pub section_type: DataSectionType,
@@ -647,7 +655,7 @@ impl DataIndexEntry {
 }
 
 /// DataIndexListEntry per Module
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct DataIndexListEntry {
     pub index_entries: Vec<DataIndexEntry>,
 }
@@ -658,7 +666,7 @@ impl DataIndexListEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ExternalFunctionIndexListEntry {
     pub index_entries: Vec<ExternalFunctionIndexEntry>,
 }
@@ -682,13 +690,22 @@ impl ExternalFunctionIndexEntry {
     }
 }
 
+/// internal entry point names:
+///
+/// - internal entry point name: "_start"
+///   executes function: '{app_module_name}::_start' (the default entry point)
+///   user CLI unit name: "" (empty string)
+///
+/// - internal entry point name: "{submodule_name}"
+///   executes function: '{app_module_name}::app::{submodule_name}::_start' (the additional executable units)
+///   user CLI unit name: ":{submodule_name}"
+///
+/// - internal entry point name: "{submodule_name}::test_*"
+///   executes function: '{app_module_name}::tests::{submodule_name}::test_*' (unit tests)
+///   user CLI unit name: name path prefix, e.g. "{submodule_name}", "{submodule_name}::test_get_"
 #[derive(Debug, PartialEq)]
 pub struct EntryPointEntry {
-    /// The name of the entry points:
-    ///
-    /// - 'app_module_name::_start' for the default entry point, entry point name is "_start".
-    /// - 'app_module_name::app::{submodule_name}::_start' for the executable units, entry point name is the name of submodule.
-    /// - 'app_module_name::tests::{submodule_name}::test_*' for unit tests, entry point name is "submodule_name::test_*".
+    /// The internal name of the entry points.
     pub unit_name: String,
     pub function_public_index: usize,
 }
@@ -705,7 +722,7 @@ impl EntryPointEntry {
 #[derive(Debug)]
 pub struct ImageCommonEntry {
     // Note that this is the name of module/package,
-    // it CANNOT be the name of submodule even if the current image is
+    // it CANNOT be the name of submodule (i.e. namespace) even if the current image is
     // a "object module", it also CANNOT be the full name or name path.
     //
     // about the "full_name" and "name_path"

@@ -31,7 +31,7 @@
 
 use crate::{
     datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
-    entry::ExternalFunctionIndexListEntry,
+    entry::{ExternalFunctionIndexEntry, ExternalFunctionIndexListEntry},
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
 };
 
@@ -91,6 +91,23 @@ impl ExternalFunctionIndexSection<'_> {
         let item = &self.items[item_index];
 
         item.unified_external_function_index as usize
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<ExternalFunctionIndexListEntry> {
+        self.ranges
+            .iter()
+            .map(|range| {
+                let index_entries = (0..(range.count as usize))
+                    .map(|item_index| {
+                        let item = &self.items[range.offset as usize + item_index];
+                        ExternalFunctionIndexEntry::new(
+                            item.unified_external_function_index as usize,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                ExternalFunctionIndexListEntry::new(index_entries)
+            })
+            .collect::<Vec<_>>()
     }
 
     pub fn convert_from_entries(
@@ -246,5 +263,8 @@ mod tests {
 
         assert_eq!(section.get_item_unified_external_function_index(1, 0), 23);
         assert_eq!(section.get_item_unified_external_function_index(1, 1), 29);
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 }

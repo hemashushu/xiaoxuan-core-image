@@ -16,7 +16,7 @@ use crate::common_sections::local_variable_section::LocalVariableSection;
 use crate::common_sections::property_section::PropertySection;
 use crate::common_sections::type_section::TypeSection;
 use crate::index_sections::data_index_section::{DataIndexItem, DataIndexSection};
-use crate::index_sections::dynamic_link_module_section::DependentModuleSection;
+use crate::index_sections::dynamic_link_module_section::DynamicLinkModuleSection;
 use crate::index_sections::entry_point_section::EntryPointSection;
 use crate::index_sections::external_function_index_section::{
     ExternalFunctionIndexItem, ExternalFunctionIndexSection,
@@ -576,8 +576,8 @@ pub fn helper_build_module_binary(
     let import_module_entry =
         DynamicLinkModuleEntry::new(name.to_owned(), Box::new(ModuleLocation::Embed));
     let (module_list_items, module_list_data) =
-        DependentModuleSection::convert_from_entries(&[import_module_entry]);
-    let module_list_section = DependentModuleSection {
+        DynamicLinkModuleSection::convert_from_entries(&[import_module_entry]);
+    let module_list_section = DynamicLinkModuleSection {
         items: &module_list_items,
         items_data: &module_list_data,
     };

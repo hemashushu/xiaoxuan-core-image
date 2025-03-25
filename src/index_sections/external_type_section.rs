@@ -28,9 +28,11 @@ use std::ptr::slice_from_raw_parts;
 use anc_isa::OperandDataType;
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::TypeEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -126,6 +128,40 @@ impl<'a> UnifiedExternalTypeSection<'a> {
             params: params.to_vec(),
             results: results.to_vec(),
         }
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<TypeEntry> {
+        let items = &self.items;
+        let types_data = &self.types_data;
+
+        items
+            .iter()
+            .map(|item| {
+                let params_data = &types_data[(item.params_offset as usize)
+                    ..(item.params_offset as usize + item.params_count as usize)];
+                let results_data = &types_data[(item.results_offset as usize)
+                    ..(item.results_offset as usize + item.results_count as usize)];
+
+                let params_slice = unsafe {
+                    &*slice_from_raw_parts(
+                        params_data.as_ptr() as *const OperandDataType,
+                        item.params_count as usize,
+                    )
+                };
+
+                let results_slice = unsafe {
+                    &*slice_from_raw_parts(
+                        results_data.as_ptr() as *const OperandDataType,
+                        item.results_count as usize,
+                    )
+                };
+
+                TypeEntry {
+                    params: params_slice.to_vec(),
+                    results: results_slice.to_vec(),
+                }
+            })
+            .collect()
     }
 
     pub fn convert_from_entries(entries: &[TypeEntry]) -> (Vec<TypeItem>, Vec<u8>) {
@@ -364,5 +400,8 @@ mod tests {
             section.get_item_params_and_results(3),
             ([].as_ref(), [].as_ref())
         );
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 }

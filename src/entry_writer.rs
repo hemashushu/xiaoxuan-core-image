@@ -26,7 +26,7 @@ use crate::{
     },
     entry::{ImageCommonEntry, ImageIndexEntry},
     index_sections::{
-        data_index_section::DataIndexSection, dynamic_link_module_section::DependentModuleSection,
+        data_index_section::DataIndexSection, dynamic_link_module_section::DynamicLinkModuleSection,
         entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,
@@ -393,12 +393,14 @@ pub fn write_image_file(
         names_data: &unified_external_function_data,
     };
 
-    // dependent module section
-    let (dependent_module_items, dependent_module_data) =
-        DependentModuleSection::convert_from_entries(&image_index_entry.dynamic_link_module_entries);
-    let dependent_module_section = DependentModuleSection {
-        items: &dependent_module_items,
-        items_data: &dependent_module_data,
+    // dynamic link module section
+    let (dynamic_link_module_items, dynamic_link_module_data) =
+        DynamicLinkModuleSection::convert_from_entries(
+            &image_index_entry.dynamic_link_module_entries,
+        );
+    let dynamic_link_module_section = DynamicLinkModuleSection {
+        items: &dynamic_link_module_items,
+        items_data: &dynamic_link_module_data,
     };
 
     // entry point section
@@ -444,7 +446,7 @@ pub fn write_image_file(
         &unified_external_type_section,
         &unified_external_function_section,
         //
-        &dependent_module_section,
+        &dynamic_link_module_section,
         &entry_point_section,
     ];
 

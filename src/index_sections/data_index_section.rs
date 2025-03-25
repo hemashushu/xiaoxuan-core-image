@@ -44,7 +44,7 @@ use anc_isa::DataSectionType;
 
 use crate::{
     datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
-    entry::DataIndexListEntry,
+    entry::{DataIndexEntry, DataIndexListEntry},
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
 };
 
@@ -142,6 +142,25 @@ impl DataIndexSection<'_> {
             item.data_internal_index as usize,
             item.target_data_section_type,
         )
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<DataIndexListEntry> {
+        self.ranges
+            .iter()
+            .map(|range| {
+                let index_entries = (0..(range.count as usize))
+                    .map(|item_index| {
+                        let item = &self.items[range.offset as usize + item_index];
+                        DataIndexEntry::new(
+                            item.target_module_index as usize,
+                            item.data_internal_index as usize,
+                            item.target_data_section_type,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                DataIndexListEntry::new(index_entries)
+            })
+            .collect::<Vec<_>>()
     }
 
     pub fn convert_from_entries(
@@ -366,5 +385,8 @@ mod tests {
                 .get_item_target_module_index_and_data_internal_index_and_data_section_type(1, 1),
             (23, 29, DataSectionType::ReadWrite)
         );
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 }

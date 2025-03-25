@@ -37,7 +37,7 @@
 
 use crate::{
     datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
-    entry::FunctionIndexListEntry,
+    entry::{FunctionIndexEntry, FunctionIndexListEntry},
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
 };
 
@@ -119,6 +119,24 @@ impl FunctionIndexSection<'_> {
             item.target_module_index as usize,
             item.function_internal_index as usize,
         )
+    }
+
+    pub fn convert_to_entries(&self) -> Vec<FunctionIndexListEntry> {
+        self.ranges
+            .iter()
+            .map(|range| {
+                let index_entries = (0..(range.count as usize))
+                    .map(|item_index| {
+                        let item = &self.items[range.offset as usize + item_index];
+                        FunctionIndexEntry::new(
+                            item.target_module_index as usize,
+                            item.function_internal_index as usize,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                FunctionIndexListEntry::new(index_entries)
+            })
+            .collect::<Vec<_>>()
     }
 
     pub fn convert_from_entries(
@@ -307,5 +325,8 @@ mod tests {
             section.get_item_target_module_index_and_function_internal_index(1, 2),
             (23, 29)
         );
+
+        let entries_restore = section.convert_to_entries();
+        assert_eq!(entries_restore, entries);
     }
 }

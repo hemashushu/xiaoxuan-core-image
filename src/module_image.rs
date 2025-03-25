@@ -122,7 +122,7 @@ use crate::{
         read_section_with_table_and_data_area, write_section_with_table_and_data_area,
     },
     index_sections::{
-        data_index_section::DataIndexSection, dynamic_link_module_section::DependentModuleSection,
+        data_index_section::DataIndexSection, dynamic_link_module_section::DynamicLinkModuleSection,
         entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,
@@ -521,11 +521,11 @@ impl<'a> ModuleImage<'a> {
     }
 
     // essential section (application only)
-    pub fn get_dynamic_link_module_list_section(&'a self) -> DependentModuleSection<'a> {
+    pub fn get_dynamic_link_module_list_section(&'a self) -> DynamicLinkModuleSection<'a> {
         self.get_section_data_by_id(ModuleSectionId::DynamicLinkModule)
             .map_or_else(
                 || panic!("Can not find the index property section."),
-                DependentModuleSection::read,
+                DynamicLinkModuleSection::read,
             )
     }
 
