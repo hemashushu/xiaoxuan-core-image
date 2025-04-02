@@ -384,13 +384,13 @@ mod tests {
 
         // 32 bits
         let code1 = BytecodeWriterHelper::new()
-            .append_opcode_i16(Opcode::memory_load_i64, 7)
+            .append_opcode_i16(Opcode::add_imm_i32, 7)
             .to_bytes();
 
         assert_eq!(
             code1,
             vec![
-                0x00, 0x02, // opcode
+                0x02, 0x03, // opcode
                 7, 0, // param
             ]
         );

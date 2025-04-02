@@ -122,7 +122,8 @@ use crate::{
         read_section_with_table_and_data_area, write_section_with_table_and_data_area,
     },
     index_sections::{
-        data_index_section::DataIndexSection, dynamic_link_module_section::DynamicLinkModuleSection,
+        data_index_section::DataIndexSection,
+        dynamic_link_module_section::DynamicLinkModuleSection,
         entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
         external_function_section::UnifiedExternalFunctionSection,
@@ -157,8 +158,17 @@ use crate::{
 //              | ...                                                  |
 //              |------------------------------------------------------|
 
-pub const DATA_ALIGN_BYTES: usize = 4;
-pub const IMAGE_FILE_MAGIC_NUMBER: &[u8; 8] = b"ancmod\0\0"; // stands for the "XiaoXuan Core Module"
+// each record in the table must be multiple of this value.
+// note: the image file consists of many sections, each section is actually a table,
+// and each table consists of many records. this alignment is used to ensure that
+// each record is aligned to the boundary.
+pub const TABLE_RECORD_ALIGN_BYTES: usize = 4;
+
+// each data item (i.e., items in ".rodata", ".data" and ".bss") must be multiple of this value.
+pub const DATA_ITEM_ALIGN_BYTES: usize = 8;
+
+// the magic number in the image file header, "ancmod" stands for the "XiaoXuan Core Module".
+pub const IMAGE_FILE_MAGIC_NUMBER: &[u8; 8] = b"ancmod\0\0";
 
 pub const BASE_MODULE_HEADER_LENGTH: usize = 16;
 pub const BASE_SECTION_HEADER_LENGTH: usize = 8;

@@ -34,12 +34,12 @@
 use anc_isa::MemoryDataType;
 
 use crate::{
-    entry::{InitedDataEntry, UninitDataEntry},
-    module_image::{ModuleSectionId, SectionEntry},
     datatableaccess::{
         read_section_with_one_table, read_section_with_table_and_data_area,
         write_section_with_one_table, write_section_with_table_and_data_area,
     },
+    entry::{InitedDataEntry, UninitDataEntry},
+    module_image::{ModuleSectionId, SectionEntry, DATA_ITEM_ALIGN_BYTES},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -70,12 +70,15 @@ pub struct DataItem {
 
     _padding0: u8,
 
+    // the alignment of a data item itself.
+    //
     // the align field is not necessary for data loading and storing at runtime,
     // because the value of 'data_offset' is implied the 'align' at compilation time,
+    // and the 'data_offset' is align to DATA_ITEM_ALIGN_BYTES, which is 8 bytes.
     // but it is also necessary in this table, because when data is copied into other memory, such as
     // copied a struct from data section into heap, the alignment is needed.
     //
-    // the value of this field depeonds the data type, and it should never be '0'
+    // the value of this field depends the data type, and it should never be '0'
     //
     // | type    | size | alignment |
     // |---------|------|-----------|
@@ -85,8 +88,9 @@ pub struct DataItem {
     // | f64     | 8    | 8         |
     // | bytes   | -    | -         |
     //
-    // if the content of data is "struct", the data type "byte" should be used, and
-    // the alignment should be speicified.
+    // if the content of data is "struct" or other structure object, the data type "byte" should be used, and
+    // the alignment should be speicified, it is usually equal to the max length of fields, for instance,
+    // it is 8 if a struct contains a i64 field..
     pub data_align: u16,
 }
 
@@ -209,14 +213,6 @@ fn convert_to_inited_data_entries(items: &[DataItem], datas: &[u8]) -> Vec<Inite
 }
 
 fn convert_from_inited_data_entries(entries: &[InitedDataEntry]) -> (Vec<DataItem>, Vec<u8>) {
-    // | type  | size | alignment |
-    // |-------|------|-----------|
-    // | i32   | 4    | 4         |
-    // | i64   | 8    | 8         |
-    // | f32   | 4    | 4         |
-    // | f64   | 8    | 8         |
-    // | bytes | -    | -         |
-
     let mut next_offset: u32 = 0;
 
     // get the position '(padding, data_offset, data_length)'
@@ -224,17 +220,24 @@ fn convert_from_inited_data_entries(entries: &[InitedDataEntry]) -> (Vec<DataIte
     let positions = entries
         .iter()
         .map(|entry| {
-            let remainder = next_offset % (entry.align as u32); // remainder
-            let padding = if remainder != 0 {
-                (entry.align as u32) - remainder
+            // the alignment of record should be multiple of 8 DATA_ITEM_ALIGN_BYTES
+            let entry_align = entry.align as u32;
+            let head_align = DATA_ITEM_ALIGN_BYTES as u32;
+            let actual_align = (entry_align / head_align
+                + if entry_align % head_align != 0 { 1 } else { 0 })
+                * head_align;
+
+            let remainder = next_offset % actual_align; // remainder
+            let head_padding = if remainder != 0 {
+                actual_align - remainder
             } else {
                 0
             };
 
-            let data_offset = next_offset + padding; // the data offset after aligning
+            let data_offset = next_offset + head_padding; // the data offset after aligning
             let data_length = entry.length;
             next_offset = data_offset + data_length;
-            (padding, data_offset, data_length)
+            (head_padding, data_offset, data_length)
         })
         .collect::<Vec<(u32, u32, u32)>>();
 
@@ -277,14 +280,6 @@ impl UninitDataSection<'_> {
     }
 
     pub fn convert_from_entries(entries: &[UninitDataEntry]) -> Vec<DataItem> {
-        // | type  | size | alignment |
-        // |-------|------|-----------|
-        // | i32   | 4    | 4         |
-        // | i64   | 8    | 8         |
-        // | f32   | 4    | 4         |
-        // | f64   | 8    | 8         |
-        // | bytes | -    | -         |
-
         let mut next_offset: u32 = 0;
 
         // get the position '(padding, data_offset, data_length)'
@@ -292,17 +287,24 @@ impl UninitDataSection<'_> {
         let positions = entries
             .iter()
             .map(|entry| {
-                let remainder = next_offset % (entry.align as u32); // remainder
-                let padding = if remainder != 0 {
-                    (entry.align as u32) - remainder
+                // the alignment of record should be multiple of 8 DATA_ITEM_ALIGN_BYTES
+                let entry_align = entry.align as u32;
+                let head_align = DATA_ITEM_ALIGN_BYTES as u32;
+                let actual_align = (entry_align / head_align
+                    + if entry_align % head_align != 0 { 1 } else { 0 })
+                    * head_align;
+
+                let remainder = next_offset % actual_align; // remainder
+                let head_padding = if remainder != 0 {
+                    actual_align - remainder
                 } else {
                     0
                 };
 
-                let data_offset = next_offset + padding; // the data offset after aligning
+                let data_offset = next_offset + head_padding; // the data offset after aligning
                 let data_length = entry.length;
                 next_offset = data_offset + data_length;
-                (padding, data_offset, data_length)
+                (head_padding, data_offset, data_length)
             })
             .collect::<Vec<(u32, u32, u32)>>();
 

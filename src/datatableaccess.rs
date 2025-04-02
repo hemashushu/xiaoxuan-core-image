@@ -6,7 +6,7 @@
 
 use std::ptr::slice_from_raw_parts;
 
-use crate::module_image::{BASE_SECTION_HEADER_LENGTH, DATA_ALIGN_BYTES};
+use crate::module_image::{BASE_SECTION_HEADER_LENGTH, TABLE_RECORD_ALIGN_BYTES};
 
 /// load a section that contains two tables.
 ///
@@ -42,7 +42,7 @@ pub fn read_section_with_two_tables<T0, T1>(section_data: &[u8]) -> (&[T0], &[T1
     let total_length_in_bytes0 = one_record_length_in_bytes0 * item_count0;
 
     // 8 bytes is the base length of section header
-    // 4 bytes `item_count` + 4 bytes extra header length.
+    // 4 bytes for `item_count` + 4 bytes for "extra header length".
     let items0_data = &section_data
         [BASE_SECTION_HEADER_LENGTH..(BASE_SECTION_HEADER_LENGTH + total_length_in_bytes0)];
     let items1_data = &section_data[(BASE_SECTION_HEADER_LENGTH + total_length_in_bytes0)..];
@@ -84,7 +84,7 @@ pub fn write_section_with_two_tables<T0, T1>(
     // write header
     let item_count0 = items0.len();
     writer.write_all(&(item_count0 as u32).to_le_bytes())?; // item count
-    writer.write_all(&[0u8; 4])?; // 4 bytes extra header length
+    writer.write_all(&[0u8; 4])?; // 4 bytes, for storing extra header length
 
     write_items(items0, writer)?;
     write_items(items1, writer)?;
@@ -113,7 +113,7 @@ pub fn read_section_with_table_and_data_area<T>(section_data: &[u8]) -> (&[T], &
     let total_length_in_bytes = one_record_length_in_bytes * item_count as usize;
 
     // 8 bytes is the base length of section header,
-    // 4 bytes `item_count` + 4 bytes extra header length.
+    // 4 bytes for `item_count` + 4 bytes for "extra header length".
     let items_data = &section_data
         [BASE_SECTION_HEADER_LENGTH..(BASE_SECTION_HEADER_LENGTH + total_length_in_bytes)];
     let additional_data = &section_data[(BASE_SECTION_HEADER_LENGTH + total_length_in_bytes)..];
@@ -133,9 +133,9 @@ pub fn read_section_with_table_and_data_area<T>(section_data: &[u8]) -> (&[T], &
 /// | record 1                                      |
 /// | ...                                           |
 /// |-----------------------------------------------|
-/// | variable length data area                     | <-- data length must be a multiple of 0x4
+/// | variable length data area                     | <-- the total length of data must be a multiple of 0x4.
 /// | ...                                           |     if the length is not 4x, byte '\0' will
-/// |-----------------------------------------------|     be appended automatically by this function.
+/// |-----------------------------------------------|     be appended automatically.
 /// ```
 pub fn write_section_with_table_and_data_area<T>(
     items: &[T],
@@ -145,15 +145,15 @@ pub fn write_section_with_table_and_data_area<T>(
     // write header
     let item_count = items.len();
     writer.write_all(&(item_count as u32).to_le_bytes())?; // item count
-    writer.write_all(&[0u8; 4])?; // 4 bytes extra header length
+    writer.write_all(&[0u8; 4])?; // 4 bytes, store the extra header length
 
     write_items::<T>(items, writer)?;
     writer.write_all(additional_data)?;
 
-    let remainder = additional_data.len() % DATA_ALIGN_BYTES; // remainder
-
+    // padding the data area to make it a multiple of 4 bytes
+    let remainder = additional_data.len() % TABLE_RECORD_ALIGN_BYTES; // remainder
     if remainder != 0 {
-        let padding = DATA_ALIGN_BYTES - remainder;
+        let padding = TABLE_RECORD_ALIGN_BYTES - remainder;
         for _count in 0..padding {
             // writer.write(b"\0")?;
             writer.write_all(b"\0")?;
@@ -182,7 +182,7 @@ pub fn read_section_with_one_table<T>(section_data: &[u8]) -> &[T] {
     let total_length_in_bytes = one_record_length_in_bytes * item_count as usize;
 
     // 8 bytes is the base length of section header,
-    // 4 bytes `item_count` + 4 bytes extra header length
+    // 4 bytes for `item_count` + 4 bytes for "extra header length".
     let items_data = &section_data
         [BASE_SECTION_HEADER_LENGTH..(BASE_SECTION_HEADER_LENGTH + total_length_in_bytes)];
     let items = read_items::<T>(items_data, item_count);
@@ -208,7 +208,7 @@ pub fn write_section_with_one_table<T>(
     // write header
     let item_count = items.len();
     writer.write_all(&(item_count as u32).to_le_bytes())?; // item count
-    writer.write_all(&[0u8; 4])?; // 4 bytes extra header length
+    writer.write_all(&[0u8; 4])?; // 4 bytes, for storing extra header length
 
     write_items::<T>(items, writer)?;
     Ok(())
