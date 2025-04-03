@@ -4,101 +4,68 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-// a module consists of two parts, data and code (i.e., instructions), which
-// are divided into several sections:
+// A module consists of two main parts: data and code (instructions), divided into several sections:
 //
-// - type section
-//   the signature of a function, the types are also applied to the code blocks and external functions.
-// - local variables section
-//   a function is consists of a type, a list of local variables, and instructions
-// - function section
-// - data sections
-//   there are 3 types of data sections:
-//   - read-only
-//   - read-write
-//   - uninit(uninitialized)
-//   all data is thread-local, so the read-write section will be cloned and the
-//   uninitialized section will be reallocated when a new thread is created.
-// - import module section
-// - import function section
-// - import data section
-// - export function section
-// - export data section
-// - relocate section
-// - external library section
-// - external function section
-// - property section
+// - Type Section: Contains function signatures (used for functions, blocks, and external functions).
+// - Local Variables Section: Defines local variables for functions or blocks.
+// - Function Section: Contains the bytecode of functions.
+// - Data Sections: Includes three types:
+//   - Read-Only Data: Immutable data.
+//   - Read-Write Data: Mutable data, cloned for each thread.
+//   - Uninitialized Data: Memory allocated but not initialized.
+// - Import/Export Sections: Define imported and exported functions and data.
+// - Relocation Section: Contains relocation information for linking.
+// - External Library/Function Sections: Define external dependencies.
+// - Property Section: Contains metadata about the module.
 //
-// a minimal module needs only 4 sections:
+// A minimal module requires only the following sections:
+// - Type Section
+// - Local Variables Section
+// - Function Section
+// - Property Section
 //
-// - type section
-// - local variable section
-// - function section
-// - property section
+// Optional sections include:
+// - Data Sections (Read-Only, Read-Write, Uninitialized)
+// - Import/Export Sections (for linking and debugging)
+// - Relocation Section (for linking)
+// - External Library/Function Sections (for linking)
 //
-// data sections are optional:
+// Applications consist of one or more modules. When linked, all imports are resolved, and additional sections are created:
+// - Function Index Section
+// - Entry Point Section
+// - Dynamic Link Module Section
 //
-// - read-only data section
-// - read-write data section
-// - uninitialized data section
-//
-// other sections are not needed at the runtime,
-// they are used for debugging and linking:
-//
-// - export function section
-// - export data section
-// - relocate section
-// - import module section
-// - import function section
-// - import data section
-// - external library section
-// - external function section
-//
-// note that if the 'bridge function feature' is enable, the
-// export function section and the export data section are required.
+// Optional sections for applications include:
+// - Data Index Section
+// - Unified External Library/Function/Type Sections
+// - External Function Index Section
 
-// an application consists of one or more modules,
-// when the main module and other modules are linked,
-// all import data and functions are resolved and
-// stored in the following sections:
+// The binary layout of a module image file:
 //
-// - function index section
-// - entry point section
-// - dynamic link module section
+// Header:
 //
-// there are also some optional sections:
+// |-------------------------------------------------------------|
+// | Magic Number (u64)                                          | 8 bytes, offset=0
+// |-------------------------------------------------------------|
+// | Image Type (u16)        | Extra Header Length (u16)         | 4 bytes, offset=8
+// | Image Format Minor Ver (u16) | Image Format Major Ver (u16) | 4 bytes, offset=12
+// |-------------------------------------------------------------|
 //
-// - data index section
-// - external function index section
-// - unified external library section
-// - unified external function section
-
-// the design of the module
-// ------------------------
+// Base Header Length = 16 bytes
 //
-// loading and starting XiaoXuan Core modules is extremely fast, because:
-// - there is no parsing process and copying overhead, the load process actually
-//   does only two things: maps the module image file into memory, and
-//   locates the start and end positions of each section.
-// - the instructions are executed directly on the bytecode.
+// Body:
 //
-// this allows the XiaoXuan Core applications to have almost no startup delay.
-//
-// since the XiaoXuan Core application starts almost instantly, it is suitable for
-// use as a 'function' in other applications.
-
-// the data type of section fields
-// -------------------------------
-//
-// - u8
-//   data type, data section type, module share type
-// - u16
-//   'local variables' and 'data' store/load offset, data align,
-//   block break/recur skip depth, params count, results count
-// - u32
-//   section id, syscall number, env call number,
-//   module index, function type index, data index, local (variable list) index,
-//   function index, dynamic function index, external function index
+// |------------------------------------------------------|
+// | Section Item Count (u32) | Extra Header Length (u32) | 8 bytes, offset=16
+// |------------------------------------------------------|
+// | Section ID 0 (u32) | Offset 0 (u32) | Length 0 (u32) | <-- Table
+// | Section ID 1       | Offset 1       | Length 1       |
+// | ...                                                  |
+// |------------------------------------------------------|
+// | Section Data 0                                       | <-- Data
+// | Section Data 1                                       |
+// | ...                                                  |
+// |------------------------------------------------------|
 
 use anc_isa::{IMAGE_FORMAT_MAJOR_VERSION, IMAGE_FORMAT_MINOR_VERSION};
 
@@ -134,58 +101,36 @@ use crate::{
     ImageError, ImageErrorType,
 };
 
-// the "module image file" binary layout:
-//
-//                 header
-//              |---------------------------------------------------|
-//              | magic number (u64)                                | 8 bytes, off=0
-//              |---------------------------------------------------|
-//              | image type (u16)        | extra header len (u16)  | 4 bytes, off=8
-//              | img fmt minor ver (u16) | img fmt major ver (u16) | 4 bytes, off=12
-//              |---------------------------------------------------|
-//                 base header length = 16 bytes
-
-//                 body
-//              |------------------------------------------------------|
-//              | section item count (u32) | extra header length (u32) | 8 bytes, off=16
-//              |------------------------------------------------------|
-//   item 0 --> | section id 0 (u32) | offset 0 (u32) | length 0 (u32) | <-- table
-//   item 1 --> | section id 1       | offset 1       | length 1       |
-//              | ...                                                  |
-//              |------------------------------------------------------|
-// offset 0 --> | section data 0                                       | <-- data
-// offset 1 --> | section data 1                                       |
-//              | ...                                                  |
-//              |------------------------------------------------------|
-
-// each record in the table must be multiple of this value.
-// note: the image file consists of many sections, each section is actually a table,
-// and each table consists of many records. this alignment is used to ensure that
+// Each record in the table must be multiple of this value.
+// Note: The image file consists of many sections, each section is actually a table,
+// and each table consists of many records. This alignment ensures that
 // each record is aligned to the boundary.
 pub const TABLE_RECORD_ALIGN_BYTES: usize = 4;
 
-// each data item (i.e., items in ".rodata", ".data" and ".bss") must be multiple of this value.
+// Each data item (i.e., items in ".rodata", ".data" and ".bss") must be multiple of this value.
 pub const DATA_ITEM_ALIGN_BYTES: usize = 8;
 
-// the magic number in the image file header, "ancmod" stands for the "XiaoXuan Core Module".
+// The magic number in the image file header, "ancmod" stands for the "XiaoXuan Core Module".
 pub const IMAGE_FILE_MAGIC_NUMBER: &[u8; 8] = b"ancmod\0\0";
 
 pub const BASE_MODULE_HEADER_LENGTH: usize = 16;
 pub const BASE_SECTION_HEADER_LENGTH: usize = 8;
 
+// Represents a module image, including its type, section items, and section data.
 #[derive(Debug, PartialEq)]
 pub struct ModuleImage<'a> {
-    pub image_type: ImageType,
-    pub items: &'a [ModuleSectionItem],
-    pub sections_data: &'a [u8],
+    pub image_type: ImageType, // Type of the image (e.g., Application, SharedModule, ObjectFile).
+    pub items: &'a [ModuleSectionItem], // Section metadata.
+    pub sections_data: &'a [u8], // Raw section data.
 }
 
+// Represents a single section item in the module, including its ID, offset, and length.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ModuleSectionItem {
-    pub id: ModuleSectionId, // u32
-    pub offset: u32,
-    pub length: u32,
+    pub id: ModuleSectionId, // Section ID (e.g., Type, Function, Data).
+    pub offset: u32,         // Offset of the section data in bytes.
+    pub length: u32,         // Length of the section data in bytes.
 }
 
 impl ModuleSectionItem {
@@ -194,130 +139,77 @@ impl ModuleSectionItem {
     }
 }
 
+// Represents the ID of a module section.
 #[repr(u32)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ModuleSectionId {
-    // essential
-    Property = 0x0010, // 0x10
-    Type,              // 0x11
-    LocalVariable,     // 0x12
-    Function,          // 0x13
+    // Essential sections
+    Property = 0x0010, // Metadata about the module.
+    Type,              // Function signatures.
+    LocalVariable,     // Local variables for functions or blocks.
+    Function,          // Function bytecode.
 
-    // optional
-    ReadOnlyData = 0x0020, // 0x20
-    ReadWriteData,         // 0x21
-    UninitData,            // 0x22
+    // Optional sections
+    ReadOnlyData = 0x0020, // Immutable data.
+    ReadWriteData,         // Mutable data.
+    UninitData,            // Uninitialized data.
 
-    // optional (for debug and linking)
-    //
-    // if the feature 'bridge function' is required (i.e.,
-    // embed the XiaoXuan Core VM in another Rust applicaton) ,
-    // the section 'ExportFunction' and 'ExportData' are required also.
-    ExportFunction = 0x0030, // 0x30
-    ExportData,              // 0x31
-    Relocate,                // 0x32
+    // Optional sections for linking and debugging
+    ExportFunction = 0x0030, // Exported functions.
+    ExportData,              // Exported data.
+    Relocate,                // Relocation information.
 
-    // optional (for debug and linking)
-    ImportModule = 0x0040, // 0x40
-    ImportFunction,        // 0x41
-    ImportData,            // 0x42
-    ExternalLibrary,       // 0x43
-    ExternalFunction,      // 0x43
+    // Optional sections for linking
+    ImportModule = 0x0040, // Imported modules.
+    ImportFunction,        // Imported functions.
+    ImportData,            // Imported data.
+    ExternalLibrary,       // External libraries.
+    ExternalFunction,      // External functions.
 
-    /*
-     essential (application only)
-    */
-    EntryPoint = 0x0080, // 0x80
-    FunctionIndex,       // 0x81
-    DynamicLinkModule,   // 0x82
+    // Essential sections for applications
+    EntryPoint = 0x0080, // Entry points.
+    FunctionIndex,       // Function index mapping.
+    DynamicLinkModule,   // Dynamically linked modules.
 
-    /*
-    optional (application only)
-    */
-    DataIndex = 0x0090, // 0x90
-
-    UnifiedExternalType = 0x00a0, // 0xa0
-    UnifiedExternalLibrary,       // 0xa1
-    UnifiedExternalFunction,      // 0xa2
-
-    // the section ExternalFunctionIndex is used for mapping
-    // 'external function' to 'unified external function'
-    ExternalFunctionIndex, // 0xa3
+    // Optional sections for applications
+    DataIndex = 0x0090,           // Data index mapping.
+    UnifiedExternalType = 0x00a0, // Unified external types.
+    UnifiedExternalLibrary,       // Unified external libraries.
+    UnifiedExternalFunction,      // Unified external functions.
+    ExternalFunctionIndex,        // Mapping of external functions to unified external functions.
 }
 
+// Represents the type of a module image (e.g., Application, SharedModule, ObjectFile).
 #[repr(u16)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ImageType {
-    // `*.anca`
-    Application,
-
-    // `*.ancm`
-    SharedModule,
-
-    // `*.anco`
-    ObjectFile,
+    Application,  // `*.anca`
+    SharedModule, // `*.ancm`
+    ObjectFile,   // `*.anco`
 }
 
-/// The visibility of function and data between shared modules.
+// Represents the visibility of functions and data between shared modules.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Visibility {
-    /// Disallows functions and data to be shared between
-    /// different modules.
-    ///
-    /// Note that all functions and data (within different submodules) are accessible
-    /// in the same module, even if the value of `Visibility` is `Private`.
-    /// In particular, this is also true when merging (statically linking) two modules.
-    Private,
-
-    /// Allows functions and data to be shared between
-    /// different modules.
-    Public,
+    Private, // Accessible only within the same module.
+    Public,  // Accessible across different modules.
 }
 
-// About re-locating
-// -----------------
-//
-// there are indices in the instructions need to re-locate (re-map) when linking
-//
-// ## type_index and local_variable_list_index
-//
-// - block                   (param type_index:i32, local_variable_list_index:i32) NO_RETURN
-// - block_alt               (param type_index:i32, local_variable_list_index:i32, next_inst_offset:i32) NO_RETURN
-// - block_nez               (param local_variable_list_index:i32, next_inst_offset:i32) NO_RETURN
-//
-// ## function_public_index
-//
-// - call                    (param function_public_index:i32) (operand args...) -> (values)
-// - get_function            (param function_public_index:i32) -> i32
-// - host_addr_function      (param function_public_index:i32) -> i64
-//
-// ## external_function_index
-//
-// - extcall                 (param external_function_index:i32) (operand args...) -> return_value:void/i32/i64/f32/f64
-//
-// ## data_public_index
-//
-// - data_load_*             (param offset_bytes:i16 data_public_index:i32) -> i64
-// - data_store_*            (param offset_bytes:i16 data_public_index:i32) (operand value:i64) -> (remain_values)
-// - host_addr_data          (param offset_bytes:i16 data_public_index:i32) -> i64
-// - data_load_extend_*      (param data_public_index:i32) (operand offset_bytes:i64) -> i64
-// - data_store_extend_*     (param data_public_index:i32) (operand offset_bytes:i64 value:i64) -> (remain_values)
-// - host_addr_data_extend   (param data_public_index:i32) (operand offset_bytes:i64) -> i64
-//
+// Represents the type of relocation required for linking.
 #[repr(u8)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RelocateType {
-    TypeIndex,
-    LocalVariableListIndex,
-    FunctionPublicIndex,
-    ExternalFunctionIndex,
-    DataPublicIndex,
+    TypeIndex,              // Relocation for type indices.
+    LocalVariableListIndex, // Relocation for local variable list indices.
+    FunctionPublicIndex,    // Relocation for public function indices.
+    ExternalFunctionIndex,  // Relocation for external function indices.
+    DataPublicIndex,        // Relocation for public data indices.
 }
 
-// `RangeItem` is used for data index section and function index section
+// `RangeItem` is used for data index section and function index section.
 //
-// note that one range item per module, e.g., consider the following items:
+// Note that one range item per module, e.g., consider the following items:
 //
 // module 0 ----- index item 0
 //            |-- index item 1
@@ -326,14 +218,14 @@ pub enum RelocateType {
 // module 1 ----- index item 3
 //            |-- index item 4
 //
-// since there are 2 modules, so there will be
+// Since there are 2 modules, there will be
 // 2 range items as the following:
 //
 // range 0 = {offset:0, count:3}
 // range 1 = {offset:3, count:2}
 //
-// use the C style struct memory layout
-// see also:
+// Use the C style struct memory layout.
+// See also:
 // https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
 #[repr(C)]
 #[derive(Debug, PartialEq)]
@@ -349,16 +241,6 @@ impl RangeItem {
 }
 
 pub trait SectionEntry<'a> {
-    // there is a approach to 'downcast' a section entry to section object, e.g.
-    //
-    // ```rust
-    // fn downcast_section_entry<'a, T>(entry: &'a dyn SectionEntry) -> &'a T {
-    //     /* the 'entry' is a fat pointer, it contains (object_pointer, vtable) */
-    //     let ptr = entry as *const dyn SectionEntry as *const T; /* get the first part of the fat pointer */
-    //     unsafe { &*ptr }
-    // }
-    // ```
-
     fn id(&'a self) -> ModuleSectionId;
     fn read(section_data: &'a [u8]) -> Self
     where
@@ -373,13 +255,6 @@ impl<'a> ModuleImage<'a> {
             return Err(ImageError::new(ImageErrorType::InvalidImage));
         }
 
-        // there is another safe approach for obtaining the version number:
-        //
-        // ```rust
-        //     let version_data: [u8;4] = (&image_binary[4..8]).try_into().unwrap();
-        //     let version = u32::from_le_bytes(version_data);
-        // ```
-
         let ptr = image_binary.as_ptr();
 
         let ptr_image_type = unsafe { ptr.offset(8) };
@@ -393,7 +268,7 @@ impl<'a> ModuleImage<'a> {
             unsafe { std::ptr::read(ptr_declared_module_format_image_version as *const u32) };
 
         let supported_module_format_image_version =
-            ((IMAGE_FORMAT_MAJOR_VERSION as u32) << 16) | (IMAGE_FORMAT_MINOR_VERSION as u32); // supported version 1.0
+            ((IMAGE_FORMAT_MAJOR_VERSION as u32) << 16) | (IMAGE_FORMAT_MINOR_VERSION as u32);
         if declared_module_image_version > supported_module_format_image_version {
             return Err(ImageError::new(ImageErrorType::RequireNewVersionRuntime));
         }
@@ -401,11 +276,6 @@ impl<'a> ModuleImage<'a> {
         let image_body =
             &image_binary[(BASE_MODULE_HEADER_LENGTH + extra_header_length as usize)..];
 
-        // since the structure of module image and a section are the same,
-        // that is, the module image itself can be thought of
-        // as a 'big' section that contains many child sections.
-        // so we can load module by reusing function
-        // `load_section_with_table_and_data_area` as well.
         let (items, sections_data) =
             read_section_with_table_and_data_area::<ModuleSectionItem>(image_body);
 
@@ -419,7 +289,6 @@ impl<'a> ModuleImage<'a> {
     pub fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         const EXTRA_HEADER_LENGTH: u16 = 0;
 
-        // write header
         writer.write_all(IMAGE_FILE_MAGIC_NUMBER)?;
         writer.write_all(&(self.image_type as u16).to_le_bytes())?;
         writer.write_all(&EXTRA_HEADER_LENGTH.to_le_bytes())?;
@@ -434,7 +303,6 @@ impl<'a> ModuleImage<'a> {
     ) -> (Vec<ModuleSectionItem>, Vec<u8>) {
         let mut image_binary: Vec<u8> = vec![];
 
-        // len0, len0+1, len0+1+2..., len total
         let mut data_increment_lengths: Vec<usize> = vec![];
 
         for entry in entries {
@@ -485,142 +353,122 @@ impl<'a> ModuleImage<'a> {
         })
     }
 
-    // essential section
     pub fn get_property_section(&'a self) -> PropertySection {
         self.get_section_data_by_id(ModuleSectionId::Property)
             .map_or_else(
-                || panic!("Can not find the common property section."),
+                || panic!("Cannot find the common property section."),
                 PropertySection::read,
             )
     }
 
-    // essential section
     pub fn get_type_section(&'a self) -> TypeSection<'a> {
         self.get_section_data_by_id(ModuleSectionId::Type)
             .map_or_else(
-                || panic!("Can not find the type section."),
+                || panic!("Cannot find the type section."),
                 TypeSection::read,
             )
     }
 
-    // essential section
     pub fn get_local_variable_section(&'a self) -> LocalVariableSection<'a> {
         self.get_section_data_by_id(ModuleSectionId::LocalVariable)
             .map_or_else(
-                || panic!("Can not find the local variable section."),
+                || panic!("Cannot find the local variable section."),
                 LocalVariableSection::read,
             )
     }
 
-    // essential section
     pub fn get_function_section(&'a self) -> FunctionSection<'a> {
         self.get_section_data_by_id(ModuleSectionId::Function)
             .map_or_else(
-                || panic!("Can not find the function section."),
+                || panic!("Cannot find the function section."),
                 FunctionSection::read,
             )
     }
 
-    // essential section (application only)
     pub fn get_entry_point_section(&'a self) -> EntryPointSection<'a> {
         self.get_section_data_by_id(ModuleSectionId::EntryPoint)
             .map_or_else(
-                || panic!("Can not find the entry point section."),
+                || panic!("Cannot find the entry point section."),
                 EntryPointSection::read,
             )
     }
 
-    // essential section (application only)
     pub fn get_dynamic_link_module_list_section(&'a self) -> DynamicLinkModuleSection<'a> {
         self.get_section_data_by_id(ModuleSectionId::DynamicLinkModule)
             .map_or_else(
-                || panic!("Can not find the index property section."),
+                || panic!("Cannot find the index property section."),
                 DynamicLinkModuleSection::read,
             )
     }
 
-    // essential section (application only)
     pub fn get_function_index_section(&'a self) -> FunctionIndexSection<'a> {
         self.get_section_data_by_id(ModuleSectionId::FunctionIndex)
             .map_or_else(
-                || panic!("Can not find the function index section."),
+                || panic!("Cannot find the function index section."),
                 FunctionIndexSection::read,
             )
     }
 
-    // optional section
     pub fn get_optional_read_only_data_section(&'a self) -> Option<ReadOnlyDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ReadOnlyData)
             .map(ReadOnlyDataSection::read)
     }
 
-    // optional section
     pub fn get_optional_read_write_data_section(&'a self) -> Option<ReadWriteDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ReadWriteData)
             .map(ReadWriteDataSection::read)
     }
 
-    // optional section
     pub fn get_optional_uninit_data_section(&'a self) -> Option<UninitDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::UninitData)
             .map(UninitDataSection::read)
     }
 
-    // optional section (for debug, link only and bridge function calling)
     pub fn get_optional_export_function_section(&'a self) -> Option<ExportFunctionSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExportFunction)
             .map(ExportFunctionSection::read)
     }
 
-    // optional section (for debug, link only and bridge function calling)
     pub fn get_optional_export_data_section(&'a self) -> Option<ExportDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExportData)
             .map(ExportDataSection::read)
     }
 
-    // optional section (for debug and link only)
     pub fn get_optional_relocate_section(&'a self) -> Option<RelocateSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::Relocate)
             .map(RelocateSection::read)
     }
 
-    // optional section (for debug and link only)
     pub fn get_optional_import_module_section(&'a self) -> Option<ImportModuleSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ImportModule)
             .map(ImportModuleSection::read)
     }
 
-    // optional section (for debug and link only)
     pub fn get_optional_import_function_section(&'a self) -> Option<ImportFunctionSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ImportFunction)
             .map(ImportFunctionSection::read)
     }
 
-    // optional section (for debug and link only)
     pub fn get_optional_import_data_section(&'a self) -> Option<ImportDataSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ImportData)
             .map(ImportDataSection::read)
     }
 
-    // optional section (for debug and link only)
     pub fn get_optional_external_library_section(&'a self) -> Option<ExternalLibrarySection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExternalLibrary)
             .map(ExternalLibrarySection::read)
     }
 
-    // optional section (for debug and link only)
     pub fn get_optional_external_function_section(&'a self) -> Option<ExternalFunctionSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::ExternalFunction)
             .map(ExternalFunctionSection::read)
     }
 
-    // optional section (application only)
     pub fn get_optional_data_index_section(&'a self) -> Option<DataIndexSection<'a>> {
         self.get_section_data_by_id(ModuleSectionId::DataIndex)
             .map(DataIndexSection::read)
     }
 
-    // optional section (application only)
     pub fn get_optional_unified_external_type_section(
         &'a self,
     ) -> Option<UnifiedExternalTypeSection<'a>> {
@@ -628,7 +476,6 @@ impl<'a> ModuleImage<'a> {
             .map(UnifiedExternalTypeSection::read)
     }
 
-    // optional section (application only)
     pub fn get_optional_unified_external_library_section(
         &'a self,
     ) -> Option<UnifiedExternalLibrarySection<'a>> {
@@ -636,7 +483,6 @@ impl<'a> ModuleImage<'a> {
             .map(UnifiedExternalLibrarySection::read)
     }
 
-    // optional section (application only)
     pub fn get_optional_unified_external_function_section(
         &'a self,
     ) -> Option<UnifiedExternalFunctionSection<'a>> {
@@ -644,7 +490,6 @@ impl<'a> ModuleImage<'a> {
             .map(UnifiedExternalFunctionSection::read)
     }
 
-    // optional section (application only)
     pub fn get_optional_external_function_index_section(
         &'a self,
     ) -> Option<ExternalFunctionIndexSection<'a>> {
@@ -672,11 +517,8 @@ mod tests {
 
     #[test]
     fn test_module_image_read_and_write() {
-        // build property section
         let property_section = PropertySection::new("bar", *RUNTIME_EDITION, 7, 11, 13, 17, 19);
 
-        // build TypeSection instance
-        // note: arbitrary types
         let type_entries = vec![
             TypeEntry {
                 params: vec![OperandDataType::I32, OperandDataType::I64],
@@ -694,8 +536,6 @@ mod tests {
             types_data: &types_data,
         };
 
-        // build LocalVariableSection instance
-        // note: arbitrary local variables
         let local_variable_list_entries = vec![
             LocalVariableListEntry::new(vec![
                 LocalVariableEntry::from_i32(),
@@ -711,7 +551,6 @@ mod tests {
             list_data: &local_variable_list_data,
         };
 
-        // build ModuleImage instance
         let section_entries: Vec<&dyn SectionEntry> =
             vec![&type_section, &local_variable_section, &property_section];
 
@@ -723,27 +562,23 @@ mod tests {
             sections_data: &sections_data,
         };
 
-        // save
         let mut image_binary: Vec<u8> = vec![];
         module_image.write(&mut image_binary).unwrap();
 
         assert_eq!(&image_binary[0..8], IMAGE_FILE_MAGIC_NUMBER);
-        assert_eq!(&image_binary[8..10], &[2, 0]); // image type
-        assert_eq!(&image_binary[10..12], &[0, 0]); // extra header length
-        assert_eq!(&image_binary[12..14], &[0, 0]); // image format minor version number, little endian
-        assert_eq!(&image_binary[14..16], &[1, 0]); // image format major version number, little endian
+        assert_eq!(&image_binary[8..10], &[2, 0]);
+        assert_eq!(&image_binary[10..12], &[0, 0]);
+        assert_eq!(&image_binary[12..14], &[0, 0]);
+        assert_eq!(&image_binary[14..16], &[1, 0]);
 
-        // body
         let extra_header_length: u16 =
             u16::from_le_bytes((&image_binary[10..12]).try_into().unwrap());
         let remains = &image_binary[(BASE_MODULE_HEADER_LENGTH + extra_header_length as usize)..];
 
-        // section count
         let (section_count_data, remains) = remains.split_at(8);
-        assert_eq!(&section_count_data[0..4], &[3, 0, 0, 0]); // section item count
-        assert_eq!(&section_count_data[4..8], &[0, 0, 0, 0]); // padding
+        assert_eq!(&section_count_data[0..4], &[3, 0, 0, 0]);
+        assert_eq!(&section_count_data[4..8], &[0, 0, 0, 0]);
 
-        // section table length = 12 (the record length) * 3= 36
         let (section_table_data, remains) = remains.split_at(36);
 
         // section table
@@ -849,7 +684,6 @@ mod tests {
 
         assert_eq!(&remains[..28], &expected_property_section_data);
 
-        // load
         let module_image_restore = ModuleImage::read(&image_binary).unwrap();
         assert_eq!(module_image_restore.items.len(), 3);
         assert_eq!(module_image_restore.image_type, ImageType::ObjectFile);

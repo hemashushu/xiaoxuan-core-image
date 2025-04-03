@@ -9,12 +9,68 @@ use std::io::Write;
 use anc_isa::opcode::Opcode;
 
 pub struct BytecodeWriter {
-    buffer: Vec<u8>, // trait std::io::Write
+    buffer: Vec<u8>, // Implements the trait std::io::Write
 }
 
-/// note that the word 'i32' in these function names indicate it's a 32-bit integer,
-/// which is equivalent to the 'uint32_t' in C or 'u32' in Rust.
-/// do not confuse it with 'i32' in Rust, the same applies to the words 'i8', 'i16' and 'i64'.
+// About the padding
+// -----------------
+// Instructions containing 'i32' parameters will insert padding automatically
+// for 4-byte alignment.
+//
+// Summary:
+//
+// Without padding:
+// - write_opcode
+// - write_opcode_i16
+// - write_opcode_i16_i16_i16
+//
+// With alignment check:
+// - write_opcode_i32
+// - write_opcode_i16_i32
+// - write_opcode_i32_i32
+// - write_opcode_i32_i32_i32
+// - write_opcode_i64
+// - write_opcode_f32
+// - write_opcode_f64
+
+// About the stubs
+// ---------------
+//
+// The following instructions include the "next_inst_offset" parameter:
+//
+// - block_alt (param type_index: i32, next_inst_offset: i32)
+// - block_nez (param local_variable_list_index: i32, next_inst_offset: i32)
+// - break (param reversed_index: i16, next_inst_offset: i32)
+// - break_alt (param next_inst_offset: i32)
+//
+// When generating bytecode for these instructions, the value of the
+// "next_inst_offset" parameter is initially UNKNOWN and can only be determined
+// when the "end" instruction is emitted.
+//
+// To handle this, the assembler first writes a placeholder value of `0`
+// (referred to as a "stub") for the "next_inst_offset" parameter and records
+// the positions of these instructions. Later, when the "end" instruction is
+// generated, the placeholder `0` is replaced with the actual value.
+//
+// The "ControlFlowStack" structure is designed to facilitate this process.
+//
+// Notes:
+//
+// 1. The "recur" instruction does not require stubs because the value of the
+//    "start_inst_offset" parameter can be determined immediately using the
+//    "ControlFlowStack" structure.
+//
+// 2. If the target layer of a "break" instruction is "function", no stub is
+//    needed, and the "ControlFlowStack" is unnecessary because the VM ignores
+//    the "next_inst_offset" in this case.
+//
+// 3. Similarly, if the target layer of a "recur" instruction is "function",
+//    no stub is needed, and the "ControlFlowStack" is unnecessary because the
+//    VM ignores the "start_inst_offset" in this case.
+
+/// Note: The word 'i32' in the function names below refers to a 32-bit integer,
+/// equivalent to 'uint32_t' in C or 'u32' in Rust. Do not confuse it with Rust's 'i32',
+/// which represents a signed 32-bit integer. The same applies to 'i8', 'i16', and 'i64'.
 impl BytecodeWriter {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -23,92 +79,77 @@ impl BytecodeWriter {
         }
     }
 
+    // Writes a 16-bit unsigned integer to the buffer in little-endian format.
     fn put_i16(&mut self, value: u16) {
         let data = value.to_le_bytes();
         self.buffer.write_all(&data).unwrap();
     }
 
+    // Writes a 32-bit unsigned integer to the buffer in little-endian format.
     fn put_i32(&mut self, value: u32) {
         let data = value.to_le_bytes();
         self.buffer.write_all(&data).unwrap();
     }
 
+    // Writes a 64-bit unsigned integer to the buffer in little-endian format.
     fn put_i64(&mut self, value: u64) {
         let data = value.to_le_bytes();
         self.buffer.write_all(&data).unwrap();
     }
 
+    // Writes a 32-bit floating-point number to the buffer in little-endian format.
     fn put_f32(&mut self, value: f32) {
         let data = value.to_le_bytes();
         self.buffer.write_all(&data).unwrap();
     }
 
+    // Writes a 64-bit floating-point number to the buffer in little-endian format.
     fn put_f64(&mut self, value: f64) {
         let data = value.to_le_bytes();
         self.buffer.write_all(&data).unwrap();
     }
 
+    // Writes an opcode to the buffer and returns the address of the instruction.
     fn put_opcode(&mut self, opcode: Opcode) -> usize {
         let addr = self.get_addr();
         self.put_i16(opcode as u16);
         addr
     }
 
+    // Writes an opcode with padding to ensure alignment and returns the address.
     fn put_opcode_with_padding(&mut self, opcode: Opcode) -> usize {
         let addr = self.put_opcode(opcode);
-        self.put_i16(0);
+        self.put_i16(0); // Adds padding
         addr
     }
 
-    // insert the padding instruction 'nop' if
-    // the current position of byte stream is not 4-byte alignment.
+    // Inserts a padding instruction ('nop') if the current buffer position is not 4-byte aligned.
     //
-    // NOTE:
-    // only instructions contains 'i32' parameters require this alignment.
-    //
-    // summary:
-    //
-    // without padding:
-    // - write_opcode
-    // - write_opcode_i16
-    // - write_opcode_i16_i16_i16
-    //
-    // with alignment check:
-    // - write_opcode_i32
-    // - write_opcode_i16_i32
-    // - write_opcode_i32_i32
-    // - write_opcode_i32_i32_i32
-    // - write_opcode_i64
-    // - write_opcode_f32
-    // - write_opcode_f64
+    // Note: Only instructions with 'i32' parameters require this alignment.
     fn insert_padding_if_necessary(&mut self) -> usize {
         let addr_of_next_inst = self.get_addr();
 
         if self.buffer.len() % 4 != 0 {
-            self.put_i16(Opcode::nop as u16);
+            self.put_i16(Opcode::nop as u16); // Inserts 'nop' for alignment
             addr_of_next_inst + 2
         } else {
             addr_of_next_inst
         }
     }
 
-    /// 16-bit instruction
-    ///
-    /// return the address of instruction
+    /// Writes a 16-bit instruction and returns its address.
     pub fn write_opcode(&mut self, opcode: Opcode) -> usize {
         self.put_opcode(opcode)
     }
 
-    /// 32-bit instruction
-    /// opcode 16 + param 16
+    /// Writes a 32-bit instruction (opcode + 16-bit parameter) and returns its address.
     pub fn write_opcode_i16(&mut self, opcode: Opcode, value: u16) -> usize {
         let addr = self.put_opcode(opcode);
         self.put_i16(value);
         addr
     }
 
-    /// 64-bit instruction
-    /// opcode 16 + padding 16 + param 32
+    /// Writes a 64-bit instruction (opcode + padding + 32-bit parameter) and returns its address.
     pub fn write_opcode_i32(&mut self, opcode: Opcode, value: u32) -> usize {
         let addr = self.insert_padding_if_necessary();
         self.put_opcode_with_padding(opcode);
@@ -116,8 +157,7 @@ impl BytecodeWriter {
         addr
     }
 
-    /// 64-bit instruction
-    /// opcode 16 + param0 16 + param1 32
+    /// Writes a 64-bit instruction (opcode + 16-bit parameter + 32-bit parameter) and returns its address.
     pub fn write_opcode_i16_i32(&mut self, opcode: Opcode, param0: u16, param1: u32) -> usize {
         let addr = self.insert_padding_if_necessary();
         self.put_opcode(opcode);
@@ -126,8 +166,7 @@ impl BytecodeWriter {
         addr
     }
 
-    /// 64-bit instruction
-    /// opcode 16 + param0 16 + param1 16 + param2 16
+    /// Writes a 64-bit instruction (opcode + three 16-bit parameters) and returns its address.
     pub fn write_opcode_i16_i16_i16(
         &mut self,
         opcode: Opcode,
@@ -142,8 +181,7 @@ impl BytecodeWriter {
         addr
     }
 
-    /// 96-bit instruction
-    /// opcode 16 + padding 16 + param0 32 + param1 32
+    /// Writes a 96-bit instruction (opcode + padding + two 32-bit parameters) and returns its address.
     pub fn write_opcode_i32_i32(&mut self, opcode: Opcode, param0: u32, param1: u32) -> usize {
         let addr = self.insert_padding_if_necessary();
         self.put_opcode_with_padding(opcode);
@@ -152,8 +190,7 @@ impl BytecodeWriter {
         addr
     }
 
-    /// 128-bit instruction
-    /// opcode 16 + padding 16 + param0 32 + param1 32 + param2 32
+    /// Writes a 128-bit instruction (opcode + padding + three 32-bit parameters) and returns its address.
     pub fn write_opcode_i32_i32_i32(
         &mut self,
         opcode: Opcode,
@@ -169,11 +206,10 @@ impl BytecodeWriter {
         addr
     }
 
-    // imm_i64, imm_f32 and imm_f64 are actually pesudo instructions,
-    // because there is no i64/f32/f64 parameters in this ISA.
+    // Pseudo-instructions for handling i64, f32, and f64 parameters.
+    // These are not native to the ISA but are represented as combinations of smaller parameters.
 
-    /// 96-bit pesudo instruction
-    /// opcode 16 + padding 16 + (param0 32 + param1 32)
+    /// Writes a 96-bit pseudo-instruction (opcode + padding + 64-bit parameter) and returns its address.
     pub fn write_opcode_i64(&mut self, opcode: Opcode, value: u64) -> usize {
         let addr = self.insert_padding_if_necessary();
         self.put_opcode_with_padding(opcode);
@@ -181,8 +217,7 @@ impl BytecodeWriter {
         addr
     }
 
-    /// 64-bit pesudo instruction
-    /// opcode 16 + padding 16 + param0 32
+    /// Writes a 64-bit pseudo-instruction (opcode + padding + 32-bit parameter) and returns its address.
     pub fn write_opcode_f32(&mut self, opcode: Opcode, value: f32) -> usize {
         let addr = self.insert_padding_if_necessary();
         self.put_opcode_with_padding(opcode);
@@ -190,8 +225,7 @@ impl BytecodeWriter {
         addr
     }
 
-    /// 96-bit pesudo instruction
-    /// opcode 16 + padding 16 + (param0 32 + param1 32)
+    /// Writes a 96-bit pseudo-instruction (opcode + padding + 64-bit parameter) and returns its address.
     pub fn write_opcode_f64(&mut self, opcode: Opcode, value: f64) -> usize {
         let addr = self.insert_padding_if_necessary();
         self.put_opcode_with_padding(opcode);
@@ -199,24 +233,29 @@ impl BytecodeWriter {
         addr
     }
 
+    /// Converts the buffer into a byte vector.
     pub fn to_bytes(self) -> Vec<u8> {
         self.buffer
     }
 
+    /// Writes the buffer to an external writer.
     pub fn write(&self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         writer.write_all(&self.buffer)
     }
 }
 
 impl BytecodeWriter {
+    // Rewrites a 32-bit value at a specific address in the buffer.
     fn rewrite_buffer(&mut self, addr: usize, value: u32) {
         self.buffer[addr..(addr + 4)].copy_from_slice(value.to_le_bytes().as_ref());
     }
 
+    /// Returns the current address in the buffer.
     pub fn get_addr(&self) -> usize {
         self.buffer.len()
     }
 
+    /// Returns the next aligned address in the buffer.
     pub fn get_addr_with_align(&self) -> usize {
         let addr_of_next_inst = self.get_addr();
         if addr_of_next_inst % 4 != 0 {
@@ -226,45 +265,9 @@ impl BytecodeWriter {
         }
     }
 
-    // About the stubs
-    // ---------------
-    //
-    // the following instructions contain the "next_inst_offset" parameter:
-    //
-    // - block_alt (param type_index:i32, next_inst_offset:i32)
-    // - block_nez (param local_variable_list_index:i32, next_inst_offset:i32)
-    // - break (param reversed_index:i16, next_inst_offset:i32)
-    // - break_alt (param next_inst_offset:i32)
-    //
-    // When emitting the byte code for these instructions, the value of
-    // this parameter is UNKNOWN and it can be only determined when the "end"
-    // instruction is generated.
-    //
-    // Therefore, when the assembler generates the byte code for these
-    // instructions, it first fills the parameter with the number `0`
-    // (these blank spaces are called "stubs") and records the addresses (positions)
-    // of these instructions. Then, when generating the "end"
-    // instruction, the `0` in the stub is replaced with the actual number.
-    //
-    // The structure "ControlFlowStack" is designed to implement the above purpose.
-    //
-    // Note:
-    //
-    // 1. Generating the "recur" instruction does not require
-    //    inserting stubs because the value of the parameter "start_inst_offset" can
-    //    be obtained immediately through the structure "ControlFlowStack".
-    //
-    // 2. If the target layer of "break" is "function", no stub needs to be inserted,
-    //    and the "ControlFlowStack" is not needed because the "next_inst_offset" in
-    //    this case is directly ignored by the VM.
-    //
-    // 3. If the target layer of "recur" is "function", no stub needs to be inserted,
-    //    and the "ControlFlowStack" is not needed because the "start_inst_offset" in
-    //    this case is directly ignored by the VM.
-    //
     pub fn fill_break_stub(&mut self, addr: usize, next_inst_offset: u32) {
         // (opcode:i16 reversed_index:i16, next_inst_offset:i32)
-        // also for instruction 'break_alt'
+        // Also applies to the 'break_alt' instruction.
         self.rewrite_buffer(addr + 4, next_inst_offset);
     }
 
@@ -283,7 +286,7 @@ pub struct BytecodeWriterHelper {
     writer: BytecodeWriter,
 }
 
-/// chain calling style
+/// Chain calling style for appending opcodes.
 impl BytecodeWriterHelper {
     pub fn new() -> Self {
         BytecodeWriterHelper {
@@ -472,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_bytecode_writer_with_i64_f32_f64_params() {
-        // pesudo f32
+        // Pseudo f32
         let code0 = BytecodeWriterHelper::new()
             .append_opcode_f32(Opcode::imm_f32, std::f32::consts::PI)
             .to_bytes();
@@ -520,26 +523,7 @@ mod tests {
 
     #[test]
     fn test_bytecode_writer_auto_padding() {
-        // instructions contains 'i32' parameters will insert padding automatically
-        // for 4-bytes align.
-        //
-        // summary:
-        //
-        // without padding:
-        // - write_opcode
-        // - write_opcode_i16
-        // - write_opcode_i16_i16_i16
-        //
-        // with alignment check:
-        // - write_opcode_i32
-        // - write_opcode_i16_i32
-        // - write_opcode_i32_i32
-        // - write_opcode_i32_i32_i32
-        // - write_opcode_i64
-        // - write_opcode_f32
-        // - write_opcode_f64
-
-        // test
+        // Test
         // - write_opcode
         // - write_opcode_i16
         // - write_opcode_i16_i16_i16
@@ -560,7 +544,7 @@ mod tests {
             );
         }
 
-        // test
+        // Test
         // - write_opcode_i32
         // - write_opcode_i16_i32
         // - write_opcode_i32_i32
@@ -622,7 +606,7 @@ mod tests {
             );
         }
 
-        // test
+        // Test
         // - write_opcode_i64
         // - write_opcode_f32
         // - write_opcode_f64

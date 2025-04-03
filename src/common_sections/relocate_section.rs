@@ -28,9 +28,11 @@
 //          |--------|     |-------------------------------------------------------|
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::{RelocateEntry, RelocateListEntry},
     module_image::{ModuleSectionId, RelocateType, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -50,19 +52,17 @@ pub struct RelocateList {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct RelocateItem {
-    // offset in functions
-    // this 'code_offset' is different from the 'code_offset' in the FunctionItem, which
-    // is the offset in the function bytecode area.
-    pub code_offset: u32,
+    // offset in one function
+    pub offset_in_function: u32,
     pub relocate_type: RelocateType,
 
     _padding0: [u8; 3],
 }
 
 impl RelocateItem {
-    pub fn new(code_offset: u32, relocate_type: RelocateType) -> Self {
+    pub fn new(offset_in_function: u32, relocate_type: RelocateType) -> Self {
         Self {
-            code_offset,
+            offset_in_function,
             relocate_type,
             _padding0: [0_u8; 3],
         }
@@ -130,7 +130,7 @@ impl<'a> RelocateSection<'a> {
                 let relocate_entries = items_ref
                     .iter()
                     .map(|item| RelocateEntry {
-                        code_offset: item.code_offset as usize,
+                        offset_in_function: item.offset_in_function as usize,
                         relocate_type: item.relocate_type,
                     })
                     .collect();
@@ -154,7 +154,10 @@ impl<'a> RelocateSection<'a> {
                     .relocate_entries
                     .iter()
                     .map(|var_entry| {
-                        RelocateItem::new(var_entry.code_offset as u32, var_entry.relocate_type)
+                        RelocateItem::new(
+                            var_entry.offset_in_function as u32,
+                            var_entry.relocate_type,
+                        )
                     })
                     .collect::<Vec<RelocateItem>>()
             })

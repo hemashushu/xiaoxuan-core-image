@@ -6,10 +6,13 @@
 
 use anc_isa::opcode::Opcode;
 
-// format the bytecode with fixed length hex:
-//
-// 0x0008  00 11 22 33  44 55 66 77
-// 0x0000  88 99 aa bb  cc dd ee ff
+/// Formats the bytecode as binary with fixed-length hexadecimal representation.
+///
+/// Example output:
+/// ```text
+/// 0x0000  00 11 22 33  44 55 66 77
+/// 0x0008  88 99 aa bb  cc dd ee ff
+/// ```
 pub fn format_bytecode_as_binary(codes: &[u8]) -> String {
     codes
         .chunks(8)
@@ -19,13 +22,8 @@ pub fn format_bytecode_as_binary(codes: &[u8]) -> String {
                 .iter()
                 .enumerate()
                 .map(|(idx, byte)| {
-                    // format the bytes as the following text:
+                    // Formats bytes as:
                     // 00 11 22 33  44 55 66 77
-                    // 00 11 22 33
-                    // 00 11
-                    //
-                    // Rust std format!()
-                    // https://doc.rust-lang.org/std/fmt/
                     if idx == 4 {
                         format!("  {:02x}", byte)
                     } else if idx == 0 {
@@ -43,26 +41,25 @@ pub fn format_bytecode_as_binary(codes: &[u8]) -> String {
         .join("\n")
 }
 
-// format the bytecode with instruction hex and instruction text:
-//
-// 0x0000  00 07                       i32.add
-// 0x0002  00 04 02 00                 heap.load       off:0x02
-// 0x0006  08 04 03 00                 heap.store      off:0x03
+/// Formats the bytecode as text with instruction hex and corresponding instruction names.
+///
+/// Example output:
+/// ```text
+/// 0x0000  00 07                       i32.add
+/// 0x0002  00 04 02 00                 heap.load       off:0x02
+/// 0x0006  08 04 03 00                 heap.store      off:0x03
+/// ```
 pub fn format_bytecode_as_text(codes: &[u8]) -> String {
     let mut lines: Vec<String> = vec![];
 
-    let code_length = codes.len(); // in bytes
-    let mut offset = 0; // in bytes
+    let code_length = codes.len(); // Total bytecode length
+    let mut offset = 0; // Current offset in the bytecode
 
-    loop {
-        if offset == code_length {
-            break;
-        };
-
+    while offset < code_length {
         let (offset_param, opcode) = read_opcode(codes, offset);
 
         let (offset_next, param_text) = match opcode {
-            // fundemental
+            // Fundamental instructions
             Opcode::nop => (offset_param, String::new()),
             Opcode::terminate => {
                 let (offset_next, code) = continue_read_param_i32(codes, offset_param);
@@ -79,7 +76,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                     format!("low:0x{:08x}  high:0x{:08x}", v_low, v_high),
                 )
             }
-            // local load/store
+            // Local load/store instructions
             Opcode::local_load_i64
             | Opcode::local_load_i32_s
             | Opcode::local_load_i32_u
@@ -128,7 +125,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                     format!("rev:{:<2}  idx:{}", reversed_index, index),
                 )
             }
-            // data load/store
+            // Data load/store instructions
             Opcode::data_load_i64
             | Opcode::data_load_i32_s
             | Opcode::data_load_i32_u
@@ -166,7 +163,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 let (offset_next, index) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", index))
             }
-            // data dynamic
+            // Data dynamic instructions
             Opcode::data_load_dynamic_i64
             | Opcode::data_load_dynamic_i32_s
             | Opcode::data_load_dynamic_i32_u
@@ -182,14 +179,14 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             | Opcode::data_store_dynamic_i8
             | Opcode::data_store_dynamic_f64
             | Opcode::data_store_dynamic_f32 => (offset_param, String::new()),
-            // heap memory
+            // Heap memory instructions
             Opcode::memory_allocate
             | Opcode::memory_resize
             | Opcode::memory_free
             | Opcode::memory_fill
             | Opcode::memory_copy => (offset_param, String::new()),
 
-            // conversion
+            // Conversion instructions
             Opcode::truncate_i64_to_i32
             | Opcode::extend_i32_s_to_i64
             | Opcode::extend_i32_u_to_i64
@@ -211,7 +208,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             | Opcode::convert_i32_u_to_f64
             | Opcode::convert_i64_s_to_f64
             | Opcode::convert_i64_u_to_f64 => (offset_param, String::new()),
-            // comparsion
+            // Comparison instructions
             Opcode::eqz_i32
             | Opcode::nez_i32
             | Opcode::eq_i32
