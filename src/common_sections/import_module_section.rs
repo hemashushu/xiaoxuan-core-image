@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "import module section" binary layout
+// "Import Module Section" binary layout:
 //
 //              |------------------------------------------------|
 //              | item count (u32) | extra header length (u32)   |
@@ -39,20 +39,14 @@ pub struct ImportModuleSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ImportModuleItem {
-    pub name_offset: u32, // the offset of the name string in data area
-    pub name_length: u32, // the length (in bytes) of the name string in data area
-    pub value_offset: u32,
-    pub value_length: u32,
+    pub name_offset: u32,  // Offset of the name string in the data area
+    pub name_length: u32,  // Length (in bytes) of the name string in the data area
+    pub value_offset: u32, // Offset of the value string in the data area
+    pub value_length: u32, // Length (in bytes) of the value string in the data area
 }
 
 impl ImportModuleItem {
-    pub fn new(
-        name_offset: u32,
-        name_length: u32,
-        value_offset: u32,
-        value_length: u32,
-        // module_dependent_type: ModuleDependencyType,
-    ) -> Self {
+    pub fn new(name_offset: u32, name_length: u32, value_offset: u32, value_length: u32) -> Self {
         Self {
             name_offset,
             name_length,
@@ -82,6 +76,7 @@ impl<'a> SectionEntry<'a> for ImportModuleSection<'a> {
 }
 
 impl<'a> ImportModuleSection<'a> {
+    /// Retrieves the name and value of an item at the specified index.
     pub fn get_item_name_and_value(&'a self, idx: usize) -> (&'a str, &'a [u8]) {
         let items = self.items;
         let items_data = self.items_data;
@@ -95,6 +90,7 @@ impl<'a> ImportModuleSection<'a> {
         (std::str::from_utf8(name_data).unwrap(), value_data)
     }
 
+    /// Converts the section into a vector of `ImportModuleEntry` objects.
     pub fn convert_to_entries(&self) -> Vec<ImportModuleEntry> {
         let items = self.items;
         let items_data = self.items_data;
@@ -114,6 +110,7 @@ impl<'a> ImportModuleSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `ImportModuleEntry` objects into the section's internal representation.
     pub fn convert_from_entries(entries: &[ImportModuleEntry]) -> (Vec<ImportModuleItem>, Vec<u8>) {
         let mut name_bytes = entries
             .iter()
@@ -193,22 +190,16 @@ mod tests {
         let section = ImportModuleSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(
-            section.items[0],
-            ImportModuleItem::new(0, 3, 3, 5) //, ModuleDependencyType::Local)
-        );
-        assert_eq!(
-            section.items[1],
-            ImportModuleItem::new(8, 4, 12, 6) //, ModuleDependencyType::Remote,)
-        );
+        assert_eq!(section.items[0], ImportModuleItem::new(0, 3, 3, 5));
+        assert_eq!(section.items[1], ImportModuleItem::new(8, 4, 12, 6));
         assert_eq!(section.items_data, "foohello.bar.world".as_bytes())
     }
 
     #[test]
     fn test_write_section() {
         let items = vec![
-            ImportModuleItem::new(0, 3, 3, 5), //, ModuleDependencyType::Local),
-            ImportModuleItem::new(8, 4, 12, 6), // ModuleDependencyType::Remote),
+            ImportModuleItem::new(0, 3, 3, 5),
+            ImportModuleItem::new(8, 4, 12, 6),
         ];
 
         let section = ImportModuleSection {

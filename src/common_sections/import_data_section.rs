@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "import data section" binary layout
+// "Import Data Section" binary layout:
 //
 //              |--------------------------------------------------------------------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                                                                         |
@@ -21,9 +21,11 @@
 use anc_isa::{DataSectionType, MemoryDataType};
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::ImportDataEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -35,21 +37,21 @@ pub struct ImportDataSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ImportDataItem {
-    // about the "full_name" and "name_path"
+    // Defination of the "full_name":
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
     //
-    // e.g.
-    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
-    // and the full name is "myapp::utils::add"
-    pub full_name_offset: u32, // the offset of the name string in data area
-    pub full_name_length: u32, // the length (in bytes) of the name string in data area
-    pub import_module_index: u32,
-    pub data_section_type: DataSectionType,
-    pub memory_data_type: MemoryDataType,
-    _padding0: [u8; 2],
+    // Example:
+    // For a data item "config" in submodule "myapp::settings", the name path is "settings::config",
+    // and the full name is "myapp::settings::config".
+    pub full_name_offset: u32, // Offset of the full name string in the data area
+    pub full_name_length: u32, // Length (in bytes) of the full name string in the data area
+    pub import_module_index: u32, // Index of the import module
+    pub data_section_type: DataSectionType, // Type of the data section
+    pub memory_data_type: MemoryDataType, // Type of the memory data
+    _padding0: [u8; 2],        // Padding for alignment
 }
 
 impl ImportDataItem {
@@ -91,6 +93,7 @@ impl<'a> SectionEntry<'a> for ImportDataSection<'a> {
 }
 
 impl<'a> ImportDataSection<'a> {
+    /// Retrieves the full name, import module index, data section type, and memory data type of an item at the specified index.
     pub fn get_item_full_name_and_import_module_index_and_data_section_type_and_memory_data_type(
         &'a self,
         idx: usize,
@@ -110,6 +113,7 @@ impl<'a> ImportDataSection<'a> {
         )
     }
 
+    /// Converts the section into a vector of `ImportDataEntry` objects.
     pub fn convert_to_entries(&self) -> Vec<ImportDataEntry> {
         let items = self.items;
         let full_names_data = self.full_names_data;
@@ -130,6 +134,7 @@ impl<'a> ImportDataSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `ImportDataEntry` objects into the section's internal representation.
     pub fn convert_from_entries(entries: &[ImportDataEntry]) -> (Vec<ImportDataItem>, Vec<u8>) {
         let full_name_bytes = entries
             .iter()
@@ -186,14 +191,14 @@ mod tests {
             11, 0, 0, 0, // import module index
             0, // data section type
             0, // mem data type
-            0, 0, // pading
+            0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
             13, 0, 0, 0, // import module index
             1, // data section type
             1, // mem data type
-            0, 0, // pading
+            0, 0, // padding
         ];
 
         section_data.extend_from_slice(b"foo");
@@ -237,14 +242,14 @@ mod tests {
             11, 0, 0, 0, // import module index
             0, // data section type
             0, // mem data type
-            0, 0, // pading
+            0, 0, // padding
             //
             3, 0, 0, 0, // name offset (item 1)
             5, 0, 0, 0, // name length
             13, 0, 0, 0, // import module index
             1, // data section type
             1, // mem data type
-            0, 0, // pading
+            0, 0, // padding
         ];
 
         expect_data.extend_from_slice(b"foo");

@@ -4,9 +4,16 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-//! this section list all internal functions.
+// This section lists all internal functions.
+//
+// Note: The function public index is a combination of:
+// - Imported functions
+// - Internal functions
+//
+// The `function_public_index` is calculated as:
+// `function_public_index = (number of all imported functions) + function_internal_index`
 
-// "function name section" binary layout
+// "Export Function Section" binary layout:
 //
 //              |---------------------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                          |
@@ -21,9 +28,11 @@
 //              |---------------------------------------------------------------------------------------|
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::ExportFunctionEntry,
     module_image::{ModuleSectionId, SectionEntry, Visibility},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -32,23 +41,23 @@ pub struct ExportFunctionSection<'a> {
     pub full_names_data: &'a [u8],
 }
 
-// this table only contains the internal functions,
-// imported functions will not be list in this table.
+// This table only contains internal functions.
+// Imported functions are not listed in this table.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ExportFunctionItem {
-    // about the "full_name" and "name_path"
-    // -------------------------------------
+    // Explanation of "full_name" and "name_path":
+    // ------------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
     //
-    // e.g.
-    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
-    // and the full name is "myapp::utils::add"
+    // Example:
+    // For a function "add" in the submodule "myapp::utils":
+    // - The name path is "utils::add".
+    // - The full name is "myapp::utils::add".
     pub full_name_offset: u32,
     pub full_name_length: u32,
-
     pub visibility: Visibility,
     _padding0: [u8; 3],
 }
@@ -84,14 +93,7 @@ impl<'a> SectionEntry<'a> for ExportFunctionSection<'a> {
 }
 
 impl<'a> ExportFunctionSection<'a> {
-    /// the item index is the `function internal index`
-    ///
-    /// the function public index is mixed by the following items:
-    /// - the imported functions
-    /// - the internal functions
-    ///
-    /// therefore:
-    /// function_public_index = (all import functions) + function_internal_index
+    /// Retrieves the item index and visibility for a given function full name.
     pub fn get_item_index_and_visibility(
         &'a self,
         expected_full_name: &str,
@@ -113,6 +115,7 @@ impl<'a> ExportFunctionSection<'a> {
         })
     }
 
+    /// Retrieves the full name and visibility of a function by its internal index.
     pub fn get_item_full_name_and_visibility(
         &self,
         function_internal_index: usize,
@@ -127,6 +130,7 @@ impl<'a> ExportFunctionSection<'a> {
         (full_name, item.visibility)
     }
 
+    /// Converts the section into a vector of `ExportFunctionEntry`.
     pub fn convert_to_entries(&self) -> Vec<ExportFunctionEntry> {
         let items = self.items;
         let full_names_data = self.full_names_data;
@@ -143,6 +147,7 @@ impl<'a> ExportFunctionSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `ExportFunctionEntry` into section data.
     pub fn convert_from_entries(
         entries: &[ExportFunctionEntry],
     ) -> (Vec<ExportFunctionItem>, Vec<u8>) {

@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "type section" binary layout
+// "Type Section" binary layout:
 //
 //                     |-----------------------------------------------------------------------------------------------|
 //                     | item count (u32) | extra header length (u32)                                                  |
@@ -13,10 +13,10 @@
 //          item 1 --> | params count 1       | results count 1       | params offset 1       | results offset 1       |
 //                     | ...                                                                                           |
 //                     |-----------------------------------------------------------------------------------------------|
-// param offset 0 -->  | parameters data type list 0                                                                   | <-- data area
-// result offset 0 --> | results data type list 0                                                                      |
-// param offset 1 -->  | parameters data type list 1                                                                   |
-// result offset 1 --> | results data type list 1                                                                      |
+// param offset 0 -->  | parameter data type list 0                                                                    | <-- data area
+// result offset 0 --> | result data type list 0                                                                       |
+// param offset 1 -->  | parameter data type list 1                                                                    |
+// result offset 1 --> | result data type list 1                                                                       |
 //                     | ...                                                                                           |
 //                     |-----------------------------------------------------------------------------------------------|
 
@@ -25,9 +25,11 @@ use std::ptr::slice_from_raw_parts;
 use anc_isa::OperandDataType;
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::TypeEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -39,17 +41,18 @@ pub struct TypeSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct TypeItem {
-    // the amount of parameters, because the size of 'data type' is 1 byte, so this value is also
-    // the length (in bytes) of the "parameters type list" in data area
+    // Number of parameters. Since each 'data type' is 1 byte, this value also represents
+    // the length (in bytes) of the "parameter type list" in the data area.
     pub params_count: u16,
 
-    // the amount of results, it's also the length (in bytes) of the "results type list" in data area
+    // Number of results. Similarly, this value represents the length (in bytes) of the
+    // "result type list" in the data area.
     pub results_count: u16,
 
-    // the offset of the "parameters type list" in data area
+    // Offset of the "parameter type list" in the data area.
     pub params_offset: u32,
 
-    // the offset of the "results type list" in data area
+    // Offset of the "result type list" in the data area.
     pub results_offset: u32,
 }
 
@@ -85,6 +88,7 @@ impl<'a> SectionEntry<'a> for TypeSection<'a> {
 }
 
 impl<'a> TypeSection<'a> {
+    // Retrieves the parameter and result types for a specific item by index.
     pub fn get_item_params_and_results(
         &'a self,
         idx: usize,
@@ -116,15 +120,7 @@ impl<'a> TypeSection<'a> {
         (params_slice, results_slice)
     }
 
-    // // for inspect
-    // pub fn get_type_entry(&self, idx: usize) -> TypeEntry {
-    //     let (params, results) = self.get_item_params_and_results(idx);
-    //     TypeEntry {
-    //         params: params.to_vec(),
-    //         results: results.to_vec(),
-    //     }
-    // }
-
+    // Converts the section into a vector of `TypeEntry` objects for easier manipulation.
     pub fn convert_to_entries(&self) -> Vec<TypeEntry> {
         let items = &self.items;
         let types_data = &self.types_data;
@@ -159,6 +155,7 @@ impl<'a> TypeSection<'a> {
             .collect()
     }
 
+    // Converts a vector of `TypeEntry` objects back into the binary layout of the section.
     pub fn convert_from_entries(entries: &[TypeEntry]) -> (Vec<TypeItem>, Vec<u8>) {
         let mut next_offset: u32 = 0;
 

@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "import function section" binary layout
+// "Import Function Section" binary layout:
 //
 //              |------------------------------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                                   |
@@ -19,9 +19,11 @@
 //              |------------------------------------------------------------------------------------------------|
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::ImportFunctionEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -33,19 +35,19 @@ pub struct ImportFunctionSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ImportFunctionItem {
-    // about the "full_name" and "name_path"
+    // Defination of the "full_name":
     // -------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
     //
-    // e.g.
-    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
-    // and the full name is "myapp::utils::add"
-    pub full_name_offset: u32, // the offset of the name string in data area
-    pub full_name_length: u32, // the length (in bytes) of the name string in data area
-    pub import_module_index: u32,
-    pub type_index: u32, // the function type
+    // Example:
+    // For a function "add" in submodule "myapp::utils", the name path is "utils::add",
+    // and the full name is "myapp::utils::add".
+    pub full_name_offset: u32, // Offset of the full name string in the data area
+    pub full_name_length: u32, // Length (in bytes) of the full name string in the data area
+    pub import_module_index: u32, // Index of the import module
+    pub type_index: u32,       // Index of the function type
 }
 
 impl ImportFunctionItem {
@@ -84,6 +86,7 @@ impl<'a> SectionEntry<'a> for ImportFunctionSection<'a> {
 }
 
 impl<'a> ImportFunctionSection<'a> {
+    /// Retrieves the full name, import module index, and type index of an item at the specified index.
     pub fn get_item_full_name_and_import_module_index_and_type_index(
         &'a self,
         idx: usize,
@@ -102,6 +105,7 @@ impl<'a> ImportFunctionSection<'a> {
         )
     }
 
+    /// Converts the section into a vector of `ImportFunctionEntry` objects.
     pub fn convert_to_entries(&self) -> Vec<ImportFunctionEntry> {
         let items = self.items;
         let full_names_data = self.full_names_data;
@@ -121,6 +125,7 @@ impl<'a> ImportFunctionSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `ImportFunctionEntry` objects into the section's internal representation.
     pub fn convert_from_entries(
         entries: &[ImportFunctionEntry],
     ) -> (Vec<ImportFunctionItem>, Vec<u8>) {

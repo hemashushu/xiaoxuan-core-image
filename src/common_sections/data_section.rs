@@ -4,7 +4,9 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-// "read-only data section" binary layout
+// "Data Section" binary layout:
+//
+// For read-only and read-write data:
 //
 //              |------------------------------------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                                         |
@@ -18,9 +20,7 @@
 // offset 1 ----|----------|                                                                                           |
 //              |------------------------------------------------------------------------------------------------------|
 //
-// the "read-write data section" binary layout is the same as "read-only data section".
-//
-// "uninit data section" binary layout
+// For uninitialized data:
 //
 //              |------------------------------------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                                         |
@@ -44,43 +44,43 @@ use crate::{
 
 #[derive(Debug, PartialEq, Default)]
 pub struct ReadOnlyDataSection<'a> {
-    pub items: &'a [DataItem],
-    pub datas_data: &'a [u8],
+    pub items: &'a [DataItem], // Array of data items in the section
+    pub datas_data: &'a [u8],  // Raw data area of the section
 }
 
 #[derive(Debug, PartialEq, Default)]
 pub struct ReadWriteDataSection<'a> {
-    pub items: &'a [DataItem],
-    pub datas_data: &'a [u8],
+    pub items: &'a [DataItem], // Array of data items in the section
+    pub datas_data: &'a [u8],  // Raw data area of the section
 }
 
 #[derive(Debug, PartialEq, Default)]
 pub struct UninitDataSection<'a> {
-    pub items: &'a [DataItem],
+    pub items: &'a [DataItem], // Array of data items in the section
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct DataItem {
-    pub data_offset: u32, // the offset of a data item in the section's "data area"
-    pub data_length: u32, // the length (in bytes) of a data item in the section's "data area"
+    pub data_offset: u32, // Offset of the data item in the section's "data area"
+    pub data_length: u32, // Length (in bytes) of the data item in the section's "data area"
 
-    // the data type field is not necessary at runtime, though it is helpful for debugging.
+    // The data type field is not required at runtime but is useful for debugging.
     pub memory_data_type: MemoryDataType,
 
-    _padding0: u8,
+    _padding0: u8, // Padding for alignment
 
-    // the alignment of a data item itself.
+    // Alignment of the data item itself.
     //
-    // the align field is not necessary for data loading and storing at runtime,
-    // because the value of 'data_offset' is implied the 'align' at compilation time,
-    // and the 'data_offset' is align to DATA_ITEM_ALIGN_BYTES, which is 8 bytes.
-    // but it is also necessary in this table, because when data is copied into other memory, such as
-    // copied a struct from data section into heap, the alignment is needed.
+    // This field is not required for runtime data loading and storing because the `data_offset`
+    // already implies the alignment at compilation time. The `data_offset` is aligned to
+    // `DATA_ITEM_ALIGN_BYTES` (8 bytes). However, this field is necessary for cases where data
+    // is copied into other memory (e.g., copying a struct from the data section into the heap),
+    // as the alignment is needed.
     //
-    // the value of this field depends the data type, and it should never be '0'
+    // The value of this field depends on the data type and should never be `0`.
     //
-    // | type    | size | alignment |
+    // | Type    | Size | Alignment |
     // |---------|------|-----------|
     // | i32     | 4    | 4         |
     // | i64     | 8    | 8         |
@@ -88,9 +88,9 @@ pub struct DataItem {
     // | f64     | 8    | 8         |
     // | bytes   | -    | -         |
     //
-    // if the content of data is "struct" or other structure object, the data type "byte" should be used, and
-    // the alignment should be speicified, it is usually equal to the max length of fields, for instance,
-    // it is 8 if a struct contains a i64 field..
+    // If the content of the data is a "struct" or other structured object, the data type "byte"
+    // should be used, and the alignment should be specified. It is usually equal to the maximum
+    // alignment of the fields. For instance, it is 8 if a struct contains an `i64` field.
     pub data_align: u16,
 }
 
@@ -215,26 +215,25 @@ fn convert_to_inited_data_entries(items: &[DataItem], datas: &[u8]) -> Vec<Inite
 fn convert_from_inited_data_entries(entries: &[InitedDataEntry]) -> (Vec<DataItem>, Vec<u8>) {
     let mut next_offset: u32 = 0;
 
-    // get the position '(padding, data_offset, data_length)'
-
+    // Calculate the position `(padding, data_offset, data_length)` for each entry
     let positions = entries
         .iter()
         .map(|entry| {
-            // the alignment of record should be multiple of 8 DATA_ITEM_ALIGN_BYTES
+            // The alignment of the record should be a multiple of `DATA_ITEM_ALIGN_BYTES` (8 bytes)
             let entry_align = entry.align as u32;
             let head_align = DATA_ITEM_ALIGN_BYTES as u32;
             let actual_align = (entry_align / head_align
                 + if entry_align % head_align != 0 { 1 } else { 0 })
                 * head_align;
 
-            let remainder = next_offset % actual_align; // remainder
+            let remainder = next_offset % actual_align; // Remainder
             let head_padding = if remainder != 0 {
                 actual_align - remainder
             } else {
                 0
             };
 
-            let data_offset = next_offset + head_padding; // the data offset after aligning
+            let data_offset = next_offset + head_padding; // Data offset after aligning
             let data_length = entry.length;
             next_offset = data_offset + data_length;
             (head_padding, data_offset, data_length)
@@ -282,26 +281,25 @@ impl UninitDataSection<'_> {
     pub fn convert_from_entries(entries: &[UninitDataEntry]) -> Vec<DataItem> {
         let mut next_offset: u32 = 0;
 
-        // get the position '(padding, data_offset, data_length)'
-
+        // Calculate the position `(padding, data_offset, data_length)` for each entry
         let positions = entries
             .iter()
             .map(|entry| {
-                // the alignment of record should be multiple of 8 DATA_ITEM_ALIGN_BYTES
+                // The alignment of the record should be a multiple of `DATA_ITEM_ALIGN_BYTES` (8 bytes)
                 let entry_align = entry.align as u32;
                 let head_align = DATA_ITEM_ALIGN_BYTES as u32;
                 let actual_align = (entry_align / head_align
                     + if entry_align % head_align != 0 { 1 } else { 0 })
                     * head_align;
 
-                let remainder = next_offset % actual_align; // remainder
+                let remainder = next_offset % actual_align; // Remainder
                 let head_padding = if remainder != 0 {
                     actual_align - remainder
                 } else {
                     0
                 };
 
-                let data_offset = next_offset + head_padding; // the data offset after aligning
+                let data_offset = next_offset + head_padding; // Data offset after aligning
                 let data_length = entry.length;
                 next_offset = data_offset + data_length;
                 (head_padding, data_offset, data_length)

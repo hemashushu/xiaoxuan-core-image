@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "local variable section" binary layout
+// "Local Variable Section" binary layout:
 //
 //              |-----------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                |
@@ -18,34 +18,46 @@
 //              | ...                                                                         |
 //              |-----------------------------------------------------------------------------|
 //
+// Each "list data" is also a table, the layout of "list data" is:
 //
-// the "list" is also a table, the layout of "list":
+//                |--------|
+// list data 0 -> | item 0 |
+//                | item 1 |
+//                | ...    |
+//                |--------|
+// list data 1 -> | item 0 |
+//                | item 1 |
+//                | ...    |
+//                |--------|
 //
-//          |--------|     |----------------------------------------------------------------------------------------------------------|
-// list     | item 0 | --> | var offset 0 (u32) | var actual length 0 (u32) | mem data type 0 (u8) | pad (1 byte) | var align 0 (u16) |
-// data0 -> | item 1 | --> | var offset 1       | var actual length 1       | mem data type 1      |              | var align 1       |
-//          | ...    |     | ...                                                                                                      |
-//          |--------|     |----------------------------------------------------------------------------------------------------------|
+// The details of each list data:
 //
-// note:
-// - all variables in the 'local variable area' MUST be 8-byte aligned,
-//   and their size should be padded to a multiple of 8.
-//   for example, an i32 will be padded to 8 bytes, and a struct with 12 bytes will
-//   be padded to 16 (= 8 * 2) bytes.
-//   this is because the current VM implementation allocates 'local variables area' on the stack frame,
+//             list data 0
+//            |----------------------------------------------------------------------------------------------------------|
+// item 0 --> | var offset 0 (u32) | var actual length 0 (u32) | mem data type 0 (u8) | pad (1 byte) | var align 0 (u16) |
+// item 1 --> | var offset 1       | var actual length 1       | mem data type 1      |              | var align 1       |
+//            | ...                                                                                                      |
+//            |----------------------------------------------------------------------------------------------------------|
+
+// Notes:
+// - All variables in the 'local variable area' MUST be 8-byte aligned, and their size should be padded to a multiple of 8.
+//   For example, an i32 will be padded to 8 bytes, and a struct with 12 bytes will be padded to 16 bytes.
+//   This is because the current VM implementation allocates the 'local variable area' on the stack frame,
 //   and the stack address is 8-byte aligned.
-// - the local variable list also includes the functions arguments. the compiler will
-//   put arguments to the beginning of the list as local variables automatically.
-// - both function and block can contain a local variables list.
+// - The local variable list also includes function arguments. The compiler automatically places arguments
+//   at the beginning of the list as local variables.
+// - Both functions and blocks can contain a local variable list.
 
 use std::mem::size_of;
 
 use anc_isa::{MemoryDataType, OPERAND_SIZE_IN_BYTES};
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::{LocalVariableEntry, LocalVariableListEntry},
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -54,52 +66,42 @@ pub struct LocalVariableSection<'a> {
     pub list_data: &'a [u8],
 }
 
-// a list per function
+// A list per function
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct LocalVariableList {
     pub list_offset: u32,
     pub list_item_count: u32,
 
-    // note that all variables in the 'local variable area' MUST be 8-byte aligned,
-    // and their size are padded to a multiple of 8.
-    // so the value of this filed will be always the multiple of 8.
+    // Note that all variables in the 'local variable area' MUST be 8-byte aligned,
+    // and their size is padded to a multiple of 8.
+    // So the value of this field will always be a multiple of 8.
     pub vars_allocate_bytes: u32,
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct LocalVariableItem {
-    pub var_offset: u32, // the offset of a data item in the "local variables area"
+    pub var_offset: u32, // Offset of the variable in the "local variable area"
 
-    // 'var_actual_length' is the actual length (in bytes) of a variable/data,
-    // not the length of the item in the local variable area.
-    // also note that all variable is allocated with the length (in bytes) of multiple of 8.
-    //
-    // e.g.
-    // - the actual length of 'i32' is 4 bytes, but in the local variable area, 'i32' occurs 8 byets.
-    // - the actual length of 'i64' is 8 bytes, and occurs 8 bytes in the local variable area.
-    // - the actual length of a struct is `size_of(struct)`, note that the size contains the padding
-    //   either between fields or after the last field.
-    //   e.g. the actual length of 'struct {u8, u16}' is '1 + 1 padding + 2' = 4 bytes,
-    //   which includes 1 byte between the two fields.
-    //   and in the local variable area, this struct occurs 8 bytes, that is, there are
-    //   extra 4 bytes added to the end.
+    // 'var_actual_length' is the actual size (in bytes) of the variable, not the padded size in the local variable area.
+    // For example:
+    // - An i32 has an actual length of 4 bytes but occupies 8 bytes in the local variable area.
+    // - An i64 has an actual length of 8 bytes and occupies 8 bytes in the local variable area.
+    // - A struct's actual length includes padding between fields or after the last field.
+    //   For example, a struct `{u8, u16}` has an actual length of 4 bytes (1 byte + 1 padding + 2 bytes),
+    //   but it occupies 8 bytes in the local variable area (4 bytes of extra padding added at the end).
     pub var_actual_length: u32,
 
-    // the memory_data_type field is not necessary at runtime, though it is helpful for debugging.
-    pub memory_data_type: MemoryDataType,
+    pub memory_data_type: MemoryDataType, // Type of the variable (e.g., i32, i64, etc.)
+    _padding0: u8,                        // Padding for alignment
 
-    _padding0: u8,
-
-    // the var_align field is not necessary for local variables loading and storing,
-    // the local variable is always 8-byte aligned in the local variable area currently,
-    // but it is needed for copying data into other memory, such as
-    // copying a struct from local variables area to heap.
-    //
-    // if the content of data is a byte array (includes string), the value should be 1,
-    // if the content of data is a struct, the value should be the max one of the length of its fields.
-    // currently the MAX value of align is 8, MIN value is 1.
+    // 'var_align' specifies the alignment of the variable. It is not required for loading/storing local variables
+    // (since they are always 8-byte aligned in the local variable area), but it is needed when copying data
+    // into other memory (e.g., copying a struct from the local variable area to the heap).
+    // - For byte arrays (including strings), the value should be 1.
+    // - For structs, the value should be the maximum alignment of its fields.
+    // - The maximum alignment value is 8, and the minimum is 1.
     pub var_align: u16,
 }
 
@@ -153,6 +155,7 @@ impl<'a> SectionEntry<'a> for LocalVariableSection<'a> {
 }
 
 impl<'a> LocalVariableSection<'a> {
+    /// Retrieves the local variable list at the specified index.
     pub fn get_local_variable_list(&'a self, idx: usize) -> &'a [LocalVariableItem] {
         let list = &self.lists[idx];
 
@@ -165,24 +168,7 @@ impl<'a> LocalVariableSection<'a> {
         unsafe { &*items }
     }
 
-    //     // for inspect
-    //     pub fn get_local_variable_list_entry(&self, idx: usize) -> LocalVariableListEntry {
-    //         let items = self.get_local_variable_list(idx);
-    //
-    //         let local_variable_entries = items
-    //             .iter()
-    //             .map(|item| LocalVariableEntry {
-    //                 memory_data_type: item.memory_data_type,
-    //                 length: item.var_actual_length,
-    //                 align: item.var_align,
-    //             })
-    //             .collect::<Vec<_>>();
-    //
-    //         LocalVariableListEntry {
-    //             local_variable_entries,
-    //         }
-    //     }
-
+    /// Converts the section into a vector of `LocalVariableListEntry` objects.
     pub fn convert_to_entries(&self) -> Vec<LocalVariableListEntry> {
         let lists = &self.lists;
         let list_data = &self.list_data;
@@ -214,19 +200,20 @@ impl<'a> LocalVariableSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `LocalVariableListEntry` objects into the section's internal representation.
     pub fn convert_from_entries(
-        entiress: &[LocalVariableListEntry],
+        entries: &[LocalVariableListEntry],
     ) -> (Vec<LocalVariableList>, Vec<u8>) {
         const LOCAL_VARIABLE_ITEM_LENGTH_IN_BYTES: usize = size_of::<LocalVariableItem>();
 
-        // generate a list of (list, vars_allocate_bytes)
-        let items_list_with_vars_allocate_bytes = entiress
+        // Generate a list of (list, vars_allocate_bytes)
+        let items_list_with_vars_allocate_bytes = entries
             .iter()
             .map(|list_entry| {
-                // a function contains a variable list
-                // a list contains several entries
+                // A function contains a variable list
+                // A list contains several entries
 
-                // the offset in the list
+                // The offset in the list
                 let mut var_offset_next: u32 = 0;
 
                 let items = list_entry
@@ -240,9 +227,9 @@ impl<'a> LocalVariableSection<'a> {
                             var_entry.align,
                         );
 
-                        // pad the length of variable/data to the multiple of 8
+                        // Pad the length of variable/data to the multiple of 8
                         let padding = {
-                            let remainder = var_entry.length % OPERAND_SIZE_IN_BYTES as u32; // remainder
+                            let remainder = var_entry.length % OPERAND_SIZE_IN_BYTES as u32; // Remainder
                             if remainder != 0 {
                                 OPERAND_SIZE_IN_BYTES as u32 - remainder
                             } else {
@@ -256,12 +243,12 @@ impl<'a> LocalVariableSection<'a> {
                     })
                     .collect::<Vec<LocalVariableItem>>();
 
-                // now 'var_offset_next' is the 'vars_allocate_bytes'
+                // Now 'var_offset_next' is the 'vars_allocate_bytes'
                 (items, var_offset_next)
             })
             .collect::<Vec<(Vec<LocalVariableItem>, u32)>>();
 
-        // make lists
+        // Make lists
         let mut list_offset_next: u32 = 0;
         let lists = items_list_with_vars_allocate_bytes
             .iter()
@@ -278,16 +265,15 @@ impl<'a> LocalVariableSection<'a> {
             })
             .collect::<Vec<LocalVariableList>>();
 
-        // make data
+        // Make data
         let list_data = items_list_with_vars_allocate_bytes
             .iter()
             .flat_map(|(list, _)| {
                 let list_item_count = list.len();
                 let total_length_in_bytes = list_item_count * LOCAL_VARIABLE_ITEM_LENGTH_IN_BYTES;
 
-                // let mut buf: Vec<u8> = vec![0u8; total_length_in_bytes];
                 let mut buf: Vec<u8> = Vec::with_capacity(total_length_in_bytes);
-                let dst = buf.as_mut_ptr(); // as *mut u8;
+                let dst = buf.as_mut_ptr();
                 let src = list.as_ptr() as *const u8;
 
                 unsafe {
@@ -353,118 +339,118 @@ mod tests {
             section_data,
             vec![
                 //
-                // header
+                // Header
                 //
-                7u8, 0, 0, 0, // item count
-                0, 0, 0, 0, // extra section header len (i32)
+                7u8, 0, 0, 0, // Item count
+                0, 0, 0, 0, // Extra section header len (i32)
                 //
-                // table
+                // Table
                 //
-                0, 0, 0, 0, // offset
-                4, 0, 0, 0, // count
-                32, 0, 0, 0, // slot bytes
+                0, 0, 0, 0, // Offset
+                4, 0, 0, 0, // Count
+                32, 0, 0, 0, // Slot bytes
                 //
-                48, 0, 0, 0, // offset = 4 (count) * 12 (bytes/record)
-                6, 0, 0, 0, // count
-                56, 0, 0, 0, // slot bytes
+                48, 0, 0, 0, // Offset = 4 (count) * 12 (bytes/record)
+                6, 0, 0, 0, // Count
+                56, 0, 0, 0, // Slot bytes
                 //
-                120, 0, 0, 0, // offset = 48 + (6 * 12)
-                0, 0, 0, 0, // count
-                0, 0, 0, 0, // slot bytes
+                120, 0, 0, 0, // Offset = 48 + (6 * 12)
+                0, 0, 0, 0, // Count
+                0, 0, 0, 0, // Slot bytes
                 //
-                120, 0, 0, 0, // offset = 120 + 0
-                1, 0, 0, 0, // count
-                8, 0, 0, 0, // slot bytes
+                120, 0, 0, 0, // Offset = 120 + 0
+                1, 0, 0, 0, // Count
+                8, 0, 0, 0, // Slot bytes
                 //
-                132, 0, 0, 0, // offset = 120 + (1 * 12)
-                0, 0, 0, 0, // count
-                0, 0, 0, 0, // slot bytes
+                132, 0, 0, 0, // Offset = 120 + (1 * 12)
+                0, 0, 0, 0, // Count
+                0, 0, 0, 0, // Slot bytes
                 //
-                132, 0, 0, 0, // offset = 132 + 0
-                0, 0, 0, 0, // count
-                0, 0, 0, 0, // slot bytes
+                132, 0, 0, 0, // Offset = 132 + 0
+                0, 0, 0, 0, // Count
+                0, 0, 0, 0, // Slot bytes
                 //
-                132, 0, 0, 0, // offset = 132 + 0
-                1, 0, 0, 0, // count
-                8, 0, 0, 0, // slot bytes
+                132, 0, 0, 0, // Offset = 132 + 0
+                1, 0, 0, 0, // Count
+                8, 0, 0, 0, // Slot bytes
                 //
-                // data
+                // Data
                 //
-                // list 0
-                0, 0, 0, 0, // var offset (i32)
-                4, 0, 0, 0, // var len
-                0, // data type
-                0, // padding
-                4, 0, // align
+                // List 0
+                0, 0, 0, 0, // Var offset (i32)
+                4, 0, 0, 0, // Var len
+                0, // Data type
+                0, // Padding
+                4, 0, // Align
                 //
-                8, 0, 0, 0, // var offset (i64)
-                8, 0, 0, 0, // var len
-                1, // data type
-                0, // padding
-                8, 0, // align
+                8, 0, 0, 0, // Var offset (i64)
+                8, 0, 0, 0, // Var len
+                1, // Data type
+                0, // Padding
+                8, 0, // Align
                 //
-                16, 0, 0, 0, // var offset (f32)
-                4, 0, 0, 0, // var len
-                2, // data type
-                0, // padding
-                4, 0, // align
+                16, 0, 0, 0, // Var offset (f32)
+                4, 0, 0, 0, // Var len
+                2, // Data type
+                0, // Padding
+                4, 0, // Align
                 //
-                24, 0, 0, 0, // var offset (f64)
-                8, 0, 0, 0, // var len
-                3, // data type
-                0, // padding
-                8, 0, // align
+                24, 0, 0, 0, // Var offset (f64)
+                8, 0, 0, 0, // Var len
+                3, // Data type
+                0, // Padding
+                8, 0, // Align
                 //
-                // list 1
-                0, 0, 0, 0, // var offset (i32)
-                4, 0, 0, 0, // var len
-                0, // data type
-                0, // padding
-                4, 0, // align
+                // List 1
+                0, 0, 0, 0, // Var offset (i32)
+                4, 0, 0, 0, // Var len
+                0, // Data type
+                0, // Padding
+                4, 0, // Align
                 //
-                8, 0, 0, 0, // var offset (byte len 1 align 2)
-                1, 0, 0, 0, // var len
-                4, // data type
-                0, // padding
-                2, 0, // align
+                8, 0, 0, 0, // Var offset (byte len 1 align 2)
+                1, 0, 0, 0, // Var len
+                4, // Data type
+                0, // Padding
+                2, 0, // Align
                 //
-                16, 0, 0, 0, // var offset (i32)
-                4, 0, 0, 0, // var len
-                0, // data type
-                0, // padding
-                4, 0, // align
+                16, 0, 0, 0, // Var offset (i32)
+                4, 0, 0, 0, // Var len
+                0, // Data type
+                0, // Padding
+                4, 0, // Align
                 //
-                24, 0, 0, 0, // var offset (byte len 6 align 12)
-                6, 0, 0, 0, // var len
-                4, // data type
-                0, // padding
-                12, 0, // align
+                24, 0, 0, 0, // Var offset (byte len 6 align 12)
+                6, 0, 0, 0, // Var len
+                4, // Data type
+                0, // Padding
+                12, 0, // Align
                 //
-                32, 0, 0, 0, // var offset (byte len 12 align 16)
-                12, 0, 0, 0, // var len
-                4, // data type
-                0, // padding
-                16, 0, // align
+                32, 0, 0, 0, // Var offset (byte len 12 align 16)
+                12, 0, 0, 0, // Var len
+                4, // Data type
+                0, // Padding
+                16, 0, // Align
                 //
-                48, 0, 0, 0, // var offset (i32)
-                4, 0, 0, 0, // var len
-                0, // data type
-                0, // padding
-                4, 0, // align
+                48, 0, 0, 0, // Var offset (i32)
+                4, 0, 0, 0, // Var len
+                0, // Data type
+                0, // Padding
+                4, 0, // Align
                 //
-                // list 3
-                0, 0, 0, 0, // var offset (byte len 1 align 4)
-                1, 0, 0, 0, // var len
-                4, // data type
-                0, // padding
-                4, 0, // align
+                // List 3
+                0, 0, 0, 0, // Var offset (byte len 1 align 4)
+                1, 0, 0, 0, // Var len
+                4, // Data type
+                0, // Padding
+                4, 0, // Align
                 //
-                // list 6
-                0, 0, 0, 0, // var offset (i32)
-                4, 0, 0, 0, // var len
-                0, // data type
-                0, // padding
-                4, 0 // align
+                // List 6
+                0, 0, 0, 0, // Var offset (i32)
+                4, 0, 0, 0, // Var len
+                0, // Data type
+                0, // Padding
+                4, 0 // Align
             ]
         );
     }
@@ -473,125 +459,125 @@ mod tests {
     fn test_read_section() {
         let section_data = vec![
             //
-            // header
+            // Header
             //
-            7u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // extra section header len (i32)
+            7u8, 0, 0, 0, // Item count
+            0, 0, 0, 0, // Extra section header len (i32)
             //
-            // table
+            // Table
             //
-            0, 0, 0, 0, // offset
-            4, 0, 0, 0, // count
-            32, 0, 0, 0, // slot bytes
+            0, 0, 0, 0, // Offset
+            4, 0, 0, 0, // Count
+            32, 0, 0, 0, // Slot bytes
             //
-            48, 0, 0, 0, // offset = 4 (count) * 12 (bytes/record)
-            6, 0, 0, 0, // count
-            56, 0, 0, 0, // slot bytes
+            48, 0, 0, 0, // Offset = 4 (count) * 12 (bytes/record)
+            6, 0, 0, 0, // Count
+            56, 0, 0, 0, // Slot bytes
             //
-            120, 0, 0, 0, // offset = 48 + (6 * 12)
-            0, 0, 0, 0, // count
-            0, 0, 0, 0, // slot bytes
+            120, 0, 0, 0, // Offset = 48 + (6 * 12)
+            0, 0, 0, 0, // Count
+            0, 0, 0, 0, // Slot bytes
             //
-            120, 0, 0, 0, // offset = 120 + 0
-            1, 0, 0, 0, // count
-            8, 0, 0, 0, // slot bytes
+            120, 0, 0, 0, // Offset = 120 + 0
+            1, 0, 0, 0, // Count
+            8, 0, 0, 0, // Slot bytes
             //
-            132, 0, 0, 0, // offset = 120 + (1 * 12)
-            0, 0, 0, 0, // count
-            0, 0, 0, 0, // slot bytes
+            132, 0, 0, 0, // Offset = 120 + (1 * 12)
+            0, 0, 0, 0, // Count
+            0, 0, 0, 0, // Slot bytes
             //
-            132, 0, 0, 0, // offset = 132 + 0
-            0, 0, 0, 0, // count
-            0, 0, 0, 0, // slot bytes
+            132, 0, 0, 0, // Offset = 132 + 0
+            0, 0, 0, 0, // Count
+            0, 0, 0, 0, // Slot bytes
             //
-            132, 0, 0, 0, // offset = 132 + 0
-            1, 0, 0, 0, // count
-            8, 0, 0, 0, // slot bytes
+            132, 0, 0, 0, // Offset = 132 + 0
+            1, 0, 0, 0, // Count
+            8, 0, 0, 0, // Slot bytes
             //
-            // data
+            // Data
             //
-            // list 0
-            0, 0, 0, 0, // var offset (i32)
-            4, 0, 0, 0, // var len
-            0, // data type
-            0, // padding
-            4, 0, // align
+            // List 0
+            0, 0, 0, 0, // Var offset (i32)
+            4, 0, 0, 0, // Var len
+            0, // Data type
+            0, // Padding
+            4, 0, // Align
             //
-            8, 0, 0, 0, // var offset (i64)
-            8, 0, 0, 0, // var len
-            1, // data type
-            0, // padding
-            8, 0, // align
+            8, 0, 0, 0, // Var offset (i64)
+            8, 0, 0, 0, // Var len
+            1, // Data type
+            0, // Padding
+            8, 0, // Align
             //
-            16, 0, 0, 0, // var offset (f32)
-            4, 0, 0, 0, // var len
-            2, // data type
-            0, // padding
-            4, 0, // align
+            16, 0, 0, 0, // Var offset (f32)
+            4, 0, 0, 0, // Var len
+            2, // Data type
+            0, // Padding
+            4, 0, // Align
             //
-            24, 0, 0, 0, // var offset (f64)
-            8, 0, 0, 0, // var len
-            3, // data type
-            0, // padding
-            8, 0, // align
+            24, 0, 0, 0, // Var offset (f64)
+            8, 0, 0, 0, // Var len
+            3, // Data type
+            0, // Padding
+            8, 0, // Align
             //
-            // list 1
-            0, 0, 0, 0, // var offset (i32)
-            4, 0, 0, 0, // var len
-            0, // data type
-            0, // padding
-            4, 0, // align
+            // List 1
+            0, 0, 0, 0, // Var offset (i32)
+            4, 0, 0, 0, // Var len
+            0, // Data type
+            0, // Padding
+            4, 0, // Align
             //
-            8, 0, 0, 0, // var offset (byte len 1 align 2)
-            1, 0, 0, 0, // var len
-            4, // data type
-            0, // padding
-            2, 0, // align
+            8, 0, 0, 0, // Var offset (byte len 1 align 2)
+            1, 0, 0, 0, // Var len
+            4, // Data type
+            0, // Padding
+            2, 0, // Align
             //
-            16, 0, 0, 0, // var offset (i32)
-            4, 0, 0, 0, // var len
-            0, // data type
-            0, // padding
-            4, 0, // align
+            16, 0, 0, 0, // Var offset (i32)
+            4, 0, 0, 0, // Var len
+            0, // Data type
+            0, // Padding
+            4, 0, // Align
             //
-            24, 0, 0, 0, // var offset (byte len 6 align 12)
-            6, 0, 0, 0, // var len
-            4, // data type
-            0, // padding
-            12, 0, // align
+            24, 0, 0, 0, // Var offset (byte len 6 align 12)
+            6, 0, 0, 0, // Var len
+            4, // Data type
+            0, // Padding
+            12, 0, // Align
             //
-            32, 0, 0, 0, // var offset (byte len 12 align 16)
-            12, 0, 0, 0, // var len
-            4, // data type
-            0, // padding
-            16, 0, // align
+            32, 0, 0, 0, // Var offset (byte len 12 align 16)
+            12, 0, 0, 0, // Var len
+            4, // Data type
+            0, // Padding
+            16, 0, // Align
             //
-            48, 0, 0, 0, // var offset (i32)
-            4, 0, 0, 0, // var len
-            0, // data type
-            0, // padding
-            4, 0, // align
+            48, 0, 0, 0, // Var offset (i32)
+            4, 0, 0, 0, // Var len
+            0, // Data type
+            0, // Padding
+            4, 0, // Align
             //
-            // list 3
-            0, 0, 0, 0, // var offset (byte len 1 align 4)
-            1, 0, 0, 0, // var len
-            4, // data type
-            0, // padding
-            4, 0, // align
+            // List 3
+            0, 0, 0, 0, // Var offset (byte len 1 align 4)
+            1, 0, 0, 0, // Var len
+            4, // Data type
+            0, // Padding
+            4, 0, // Align
             //
-            // list 6
-            0, 0, 0, 0, // var offset (i32)
-            4, 0, 0, 0, // var len
-            0, // data type
-            0, // padding
-            4, 0, // align
+            // List 6
+            0, 0, 0, 0, // Var offset (i32)
+            4, 0, 0, 0, // Var len
+            0, // Data type
+            0, // Padding
+            4, 0, // Align
         ];
 
         let section = LocalVariableSection::read(&section_data);
 
         assert_eq!(section.lists.len(), 7);
 
-        // check lists
+        // Check lists
 
         assert_eq!(
             section.lists[0],
@@ -656,7 +642,7 @@ mod tests {
             }
         );
 
-        // check var items
+        // Check var items
 
         let list0 = section.get_local_variable_list(0);
         assert_eq!(

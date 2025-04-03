@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "relocate section" binary layout
+// "Relocate Section" binary layout:
 //
 //              |-----------------------------------------------|
 //              | item count (u32) | extra header length (u32)  |
@@ -18,14 +18,26 @@
 //              | ...                                           |
 //              |-----------------------------------------------|
 //
+// Each "list data" is a table with the following layout:
 //
-// the "list" is also a table, the layout of "list":
+//                |--------|
+// list data 0 -> | item 0 |
+//                | item 1 |
+//                | ...    |
+//                |--------|
+// list data 1 -> | item 0 |
+//                | item 1 |
+//                | ...    |
+//                |--------|
 //
-//          |--------|     |-------------------------------------------------------|
-// list     | item 0 | --> | stub offset 0 (u32) | stub type 0 (u8) | pad (3 byte) |
-// data0 -> | item 1 | --> | stub offset 1       | stub type 1      |              |
-//          | ...    |     | ...                                                   |
-//          |--------|     |-------------------------------------------------------|
+// The details of each list data:
+//
+//             list data 0
+//            |--------------------------------------------------------|
+// item 0 --> | stub offset 0 (u32) | stub type 0 (u8) | pad (3 bytes) |
+// item 1 --> | stub offset 1       | stub type 1      |               |
+//            | ...                                                    |
+//            |--------------------------------------------------------|
 
 use crate::{
     datatableaccess::{
@@ -41,7 +53,7 @@ pub struct RelocateSection<'a> {
     pub list_data: &'a [u8],
 }
 
-// a list per function
+// A list per function
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct RelocateList {
@@ -52,10 +64,13 @@ pub struct RelocateList {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct RelocateItem {
-    // offset in one function
+    // Offset within a function where relocation is required.
     pub offset_in_function: u32,
+
+    // Type of relocation (e.g., type index, function index, etc.).
     pub relocate_type: RelocateType,
 
+    // Padding to ensure proper alignment (3 bytes).
     _padding0: [u8; 3],
 }
 
@@ -100,6 +115,7 @@ impl<'a> SectionEntry<'a> for RelocateSection<'a> {
 }
 
 impl<'a> RelocateSection<'a> {
+    // Retrieves the relocation list for a specific function by index.
     pub fn get_relocate_list(&'a self, idx: usize) -> &'a [RelocateItem] {
         let list = &self.lists[idx];
 
@@ -112,6 +128,7 @@ impl<'a> RelocateSection<'a> {
         unsafe { &*items }
     }
 
+    // Converts the section into a vector of `RelocateListEntry` objects for easier manipulation.
     pub fn convert_to_entries(&self) -> Vec<RelocateListEntry> {
         let lists = &self.lists;
         let list_data = &self.list_data;
@@ -140,6 +157,7 @@ impl<'a> RelocateSection<'a> {
             .collect()
     }
 
+    // Converts a vector of `RelocateListEntry` objects back into the binary layout of the section.
     pub fn convert_from_entries(entires: &[RelocateListEntry]) -> (Vec<RelocateList>, Vec<u8>) {
         const RELOCATE_ITEM_LENGTH_IN_BYTES: usize = size_of::<RelocateItem>();
 
@@ -148,8 +166,8 @@ impl<'a> RelocateSection<'a> {
         let items_list = entires
             .iter()
             .map(|list_entry| {
-                // a function contains a relocate item list
-                // a list contains several relocate entries
+                // A function contains a relocate item list.
+                // A list contains several relocate entries.
                 list_entry
                     .relocate_entries
                     .iter()
@@ -163,7 +181,7 @@ impl<'a> RelocateSection<'a> {
             })
             .collect::<Vec<_>>();
 
-        // make lists
+        // Make lists
         let lists = items_list
             .iter()
             .map(|list| {
@@ -178,7 +196,7 @@ impl<'a> RelocateSection<'a> {
             })
             .collect::<Vec<_>>();
 
-        // make data
+        // Make data
         let list_data = items_list
             .iter()
             .flat_map(|list| {
@@ -253,85 +271,85 @@ mod tests {
             section_data,
             vec![
                 //
-                // header
+                // Header
                 //
-                7, 0, 0, 0, // item count
-                0, 0, 0, 0, // extra section header len (i32)
+                7, 0, 0, 0, // Item count
+                0, 0, 0, 0, // Extra section header len (i32)
                 //
-                // table
+                // Table
                 //
-                0, 0, 0, 0, // offset 0
-                4, 0, 0, 0, // count
+                0, 0, 0, 0, // Offset 0
+                4, 0, 0, 0, // Count
                 //
-                32, 0, 0, 0, // offset 1 = 4 (count) * 8 (bytes/record)
-                2, 0, 0, 0, // count
+                32, 0, 0, 0, // Offset 1 = 4 (count) * 8 (bytes/record)
+                2, 0, 0, 0, // Count
                 //
-                48, 0, 0, 0, // offset 2
-                0, 0, 0, 0, // count
+                48, 0, 0, 0, // Offset 2
+                0, 0, 0, 0, // Count
                 //
-                48, 0, 0, 0, // offset 3
-                2, 0, 0, 0, // count
+                48, 0, 0, 0, // Offset 3
+                2, 0, 0, 0, // Count
                 //
-                64, 0, 0, 0, // offset 4
-                0, 0, 0, 0, // count
+                64, 0, 0, 0, // Offset 4
+                0, 0, 0, 0, // Count
                 //
-                64, 0, 0, 0, // offset 5
-                0, 0, 0, 0, // count
+                64, 0, 0, 0, // Offset 5
+                0, 0, 0, 0, // Count
                 //
-                64, 0, 0, 0, // offset 6
-                3, 0, 0, 0, // count
+                64, 0, 0, 0, // Offset 6
+                3, 0, 0, 0, // Count
                 //
-                // data, list 0
+                // Data, list 0
                 //
-                11, 0, 0, 0, // relocate offsetr
-                0, // relocate type
-                0, 0, 0, // padding
+                11, 0, 0, 0, // Relocate offset
+                0, // Relocate type
+                0, 0, 0, // Padding
                 //
-                13, 0, 0, 0, // relocate offsetr
-                1, // relocate type
-                0, 0, 0, // padding
+                13, 0, 0, 0, // Relocate offset
+                1, // Relocate type
+                0, 0, 0, // Padding
                 //
-                17, 0, 0, 0, // relocate offsetr
-                2, // relocate type
-                0, 0, 0, // padding
+                17, 0, 0, 0, // Relocate offset
+                2, // Relocate type
+                0, 0, 0, // Padding
                 //
-                19, 0, 0, 0, // relocate offsetr
-                4, // relocate type
-                0, 0, 0, // padding
+                19, 0, 0, 0, // Relocate offset
+                4, // Relocate type
+                0, 0, 0, // Padding
                 //
-                // data, list 1
+                // Data, list 1
                 //
-                23, 0, 0, 0, // relocate offsetr
-                3, // relocate type
-                0, 0, 0, // padding
+                23, 0, 0, 0, // Relocate offset
+                3, // Relocate type
+                0, 0, 0, // Padding
                 //
-                29, 0, 0, 0, // relocate offsetr
-                2, // relocate type
-                0, 0, 0, // padding
+                29, 0, 0, 0, // Relocate offset
+                2, // Relocate type
+                0, 0, 0, // Padding
                 //
-                // data, list 3
+                // Data, list 3
                 //
-                31, 0, 0, 0, // relocate offsetr
-                4, // relocate type
-                0, 0, 0, // padding
+                31, 0, 0, 0, // Relocate offset
+                4, // Relocate type
+                0, 0, 0, // Padding
                 //
-                37, 0, 0, 0, // relocate offsetr
-                2, // relocate type
-                0, 0, 0, // padding
+                37, 0, 0, 0, // Relocate offset
+                2, // Relocate type
+                0, 0, 0, // Padding
                 //
-                // data, list 6
+                // Data, list 6
                 //
-                41, 0, 0, 0, // relocate offsetr
-                0, // relocate type
-                0, 0, 0, // padding
+                41, 0, 0, 0, // Relocate offset
+                0, // Relocate type
+                0, 0, 0, // Padding
                 //
-                43, 0, 0, 0, // relocate offsetr
-                1, // relocate type
-                0, 0, 0, // padding
+                43, 0, 0, 0, // Relocate offset
+                1, // Relocate type
+                0, 0, 0, // Padding
                 //
-                47, 0, 0, 0, // relocate offsetr
-                4, // relocate type
-                0, 0, 0 // padding
+                47, 0, 0, 0, // Relocate offset
+                4, // Relocate type
+                0, 0, 0 // Padding
             ]
         );
     }
@@ -340,92 +358,92 @@ mod tests {
     fn test_read_section() {
         let section_data = vec![
             //
-            // header
+            // Header
             //
-            7, 0, 0, 0, // item count
-            0, 0, 0, 0, // extra section header len (i32)
+            7, 0, 0, 0, // Item count
+            0, 0, 0, 0, // Extra section header len (i32)
             //
-            // table
+            // Table
             //
-            0, 0, 0, 0, // offset 0
-            4, 0, 0, 0, // count
+            0, 0, 0, 0, // Offset 0
+            4, 0, 0, 0, // Count
             //
-            32, 0, 0, 0, // offset 1 = 4 (count) * 8 (bytes/record)
-            2, 0, 0, 0, // count
+            32, 0, 0, 0, // Offset 1 = 4 (count) * 8 (bytes/record)
+            2, 0, 0, 0, // Count
             //
-            48, 0, 0, 0, // offset 2
-            0, 0, 0, 0, // count
+            48, 0, 0, 0, // Offset 2
+            0, 0, 0, 0, // Count
             //
-            48, 0, 0, 0, // offset 3
-            2, 0, 0, 0, // count
+            48, 0, 0, 0, // Offset 3
+            2, 0, 0, 0, // Count
             //
-            64, 0, 0, 0, // offset 4
-            0, 0, 0, 0, // count
+            64, 0, 0, 0, // Offset 4
+            0, 0, 0, 0, // Count
             //
-            64, 0, 0, 0, // offset 5
-            0, 0, 0, 0, // count
+            64, 0, 0, 0, // Offset 5
+            0, 0, 0, 0, // Count
             //
-            64, 0, 0, 0, // offset 6
-            3, 0, 0, 0, // count
+            64, 0, 0, 0, // Offset 6
+            3, 0, 0, 0, // Count
             //
-            // data, list 0
+            // Data, list 0
             //
-            11, 0, 0, 0, // relocate offsetr
-            0, // relocate type
-            0, 0, 0, // padding
+            11, 0, 0, 0, // Relocate offset
+            0, // Relocate type
+            0, 0, 0, // Padding
             //
-            13, 0, 0, 0, // relocate offsetr
-            1, // relocate type
-            0, 0, 0, // padding
+            13, 0, 0, 0, // Relocate offset
+            1, // Relocate type
+            0, 0, 0, // Padding
             //
-            17, 0, 0, 0, // relocate offsetr
-            2, // relocate type
-            0, 0, 0, // padding
+            17, 0, 0, 0, // Relocate offset
+            2, // Relocate type
+            0, 0, 0, // Padding
             //
-            19, 0, 0, 0, // relocate offsetr
-            4, // relocate type
-            0, 0, 0, // padding
+            19, 0, 0, 0, // Relocate offset
+            4, // Relocate type
+            0, 0, 0, // Padding
             //
-            // data, list 1
+            // Data, list 1
             //
-            23, 0, 0, 0, // relocate offsetr
-            3, // relocate type
-            0, 0, 0, // padding
+            23, 0, 0, 0, // Relocate offset
+            3, // Relocate type
+            0, 0, 0, // Padding
             //
-            29, 0, 0, 0, // relocate offsetr
-            2, // relocate type
-            0, 0, 0, // padding
+            29, 0, 0, 0, // Relocate offset
+            2, // Relocate type
+            0, 0, 0, // Padding
             //
-            // data, list 3
+            // Data, list 3
             //
-            31, 0, 0, 0, // relocate offsetr
-            4, // relocate type
-            0, 0, 0, // padding
+            31, 0, 0, 0, // Relocate offset
+            4, // Relocate type
+            0, 0, 0, // Padding
             //
-            37, 0, 0, 0, // relocate offsetr
-            2, // relocate type
-            0, 0, 0, // padding
+            37, 0, 0, 0, // Relocate offset
+            2, // Relocate type
+            0, 0, 0, // Padding
             //
-            // data, list 6
+            // Data, list 6
             //
-            41, 0, 0, 0, // relocate offsetr
-            0, // relocate type
-            0, 0, 0, // padding
+            41, 0, 0, 0, // Relocate offset
+            0, // Relocate type
+            0, 0, 0, // Padding
             //
-            43, 0, 0, 0, // relocate offsetr
-            1, // relocate type
-            0, 0, 0, // padding
+            43, 0, 0, 0, // Relocate offset
+            1, // Relocate type
+            0, 0, 0, // Padding
             //
-            47, 0, 0, 0, // relocate offsetr
-            4, // relocate type
-            0, 0, 0, // padding
+            47, 0, 0, 0, // Relocate offset
+            4, // Relocate type
+            0, 0, 0, // Padding
         ];
 
         let section = RelocateSection::read(&section_data);
 
         assert_eq!(section.lists.len(), 7);
 
-        // check lists
+        // Check lists
 
         assert_eq!(
             section.lists[0],
@@ -483,7 +501,7 @@ mod tests {
             }
         );
 
-        // check var items
+        // Check var items
 
         let list0 = section.get_relocate_list(0);
         assert_eq!(

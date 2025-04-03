@@ -1,22 +1,22 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "external function section" binary layout
+// "External Function Section" binary layout:
 //
-//              |-----------------------------------------------------------------------------------------------|
-//              | item count (u32) | extra header length (u32)                                                  |
-//              |-----------------------------------------------------------------------------------------------|
-//  item 0 -->  | fn name off 0 (u32) | fn name len 0 (u32) | external library idx 0 (u32) | type index 0 (u32) | <-- table
-//  item 1 -->  | fn name off 1       | fn name len 1       | external library idx 1       | type index 1       |
-//              | ...                                                                                           |
-//              |-----------------------------------------------------------------------------------------------|
-// offset 0 --> | name string 0 (UTF-8)                                                                         | <-- data area
-// offset 1 --> | name string 1                                                                                 |
-//              | ...                                                                                           |
-//              |-----------------------------------------------------------------------------------------------|
+//              |-------------------------------------------------------------------------------------------------------|
+//              | item count (u32) | extra header length (u32)                                                          |
+//              |-------------------------------------------------------------------------------------------------------|
+//  item 0 -->  | fn name offset 0 (u32) | fn name length 0 (u32) | external library index 0 (u32) | type index 0 (u32) | <-- table
+//  item 1 -->  | fn name offset 1       | fn name length 1       | external library index 1       | type index 1       |
+//              | ...                                                                                                   |
+//              |-------------------------------------------------------------------------------------------------------|
+// offset 0 --> | function name string 0 (UTF-8)                                                                        | <-- data area
+// offset 1 --> | function name string 1                                                                                |
+//              | ...                                                                                                   |
+//              |-------------------------------------------------------------------------------------------------------|
 
 use crate::{
     entry::ExternalFunctionEntry,
@@ -26,17 +26,17 @@ use crate::{
 
 #[derive(Debug, PartialEq, Default)]
 pub struct ExternalFunctionSection<'a> {
-    pub items: &'a [ExternalFunctionItem],
-    pub names_data: &'a [u8],
+    pub items: &'a [ExternalFunctionItem], // Array of function items
+    pub names_data: &'a [u8],              // UTF-8 encoded function names
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ExternalFunctionItem {
-    pub name_offset: u32, // the offset of the name string in data area
-    pub name_length: u32, // the length (in bytes) of the name string in data area
-    pub external_library_index: u32,
-    pub type_index: u32, // the function type
+    pub name_offset: u32, // Offset of the function name string in the data area
+    pub name_length: u32, // Length (in bytes) of the function name string in the data area
+    pub external_library_index: u32, // Index of the external library
+    pub type_index: u32, // Index of the function type
 }
 
 impl ExternalFunctionItem {
@@ -72,6 +72,7 @@ impl<'a> SectionEntry<'a> for ExternalFunctionSection<'a> {
 }
 
 impl<'a> ExternalFunctionSection<'a> {
+    /// Retrieves the function name, external library index, and type index for a given item index.
     pub fn get_item_name_and_external_library_index_and_type_index(
         &'a self,
         idx: usize,
@@ -90,6 +91,7 @@ impl<'a> ExternalFunctionSection<'a> {
         )
     }
 
+    /// Converts the section into a vector of `ExternalFunctionEntry` objects.
     pub fn convert_to_entries(&self) -> Vec<ExternalFunctionEntry> {
         let items = self.items;
         let names_data = self.names_data;
@@ -110,6 +112,7 @@ impl<'a> ExternalFunctionSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `ExternalFunctionEntry` objects into section items and data.
     pub fn convert_from_entries(
         entries: &[ExternalFunctionEntry],
     ) -> (Vec<ExternalFunctionItem>, Vec<u8>) {

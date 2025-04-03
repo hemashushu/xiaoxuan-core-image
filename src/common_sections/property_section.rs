@@ -1,8 +1,8 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
 use crate::module_image::{ModuleSectionId, SectionEntry};
 
@@ -13,40 +13,33 @@ pub const MODULE_NAME_BUFFER_LENGTH: usize = 256;
 pub struct PropertySection {
     pub edition: [u8; 8],
 
-    // note:
-    // avoid using the u64 integer, it is because
-    // both instructions and image data are 4-byte aligned.
+    // Avoid using u64 integers because both instructions and image data are 4-byte aligned.
     pub version_patch: u16,
     pub version_minor: u16,
     pub version_major: u16,
-    _padding0: [u8; 2], // for 4-byte align
+    _padding0: [u8; 2], // Padding for 4-byte alignment.
 
-    // the "module name", "import data count" and "import function count" are
-    // used for find the public index of function and data in
-    // the bridge function call.
-    //
-    // it's also possible to get these information from the `import*`
-    // sections, but they are optional in the runtime.
+    // The "module name", "import data count", and "import function count" are used to locate
+    // the public index of functions and data in bridge function calls.
+    // These details can also be derived from the `import*` sections, but those are optional at runtime.
     pub import_data_count: u32,
     pub import_function_count: u32,
 
-    // Note that this is the name of module/package,
-    // it CANNOT be the name of submodule (i.e. namespace) even if the current image is
-    // a "object module", it also CANNOT be the full name or name path.
+    pub module_name_length: u32,
+
+    // This is the name of the module/package. It cannot be the name of a submodule (namespace),
+    // even if the current image is an "object module". It also cannot be the full name or name path.
     //
-    // about the "full_name" and "name_path"
-    // -------------------------------------
+    // Definitions:
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
     //
-    // e.g.
-    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
-    // and the full name is "myapp::utils::add"
+    // Example:
+    // For a function "add" in submodule "myapp::utils", the name path is "utils::add",
+    // and the full name is "myapp::utils::add".
     //
-    // Note that only [a-zA-Z0-9_] and unicode chars are allowed for the (sub)module(/source file) name.
-    pub module_name_length: u32,
-
+    // Only [a-zA-Z0-9_] and Unicode characters are allowed for module/submodule names.
     pub module_name_buffer: [u8; 256],
 }
 
@@ -63,6 +56,7 @@ impl PropertySection {
         let module_name_src = module_name.as_bytes();
         let mut module_name_dest = [0u8; MODULE_NAME_BUFFER_LENGTH];
 
+        // Copy the module name into the buffer.
         unsafe {
             std::ptr::copy(
                 module_name_src.as_ptr(),
@@ -85,12 +79,14 @@ impl PropertySection {
     }
 
     pub fn get_module_name(&self) -> &str {
+        // Extract the module name as a UTF-8 string.
         std::str::from_utf8(&self.module_name_buffer[..(self.module_name_length as usize)]).unwrap()
     }
 }
 
 impl<'a> SectionEntry<'a> for PropertySection {
     fn read(section_data: &'a [u8]) -> Self {
+        // Read the PropertySection from raw bytes.
         let property_section_ptr = unsafe {
             std::mem::transmute::<*const u8, *const PropertySection>(section_data.as_ptr())
         };
@@ -99,6 +95,7 @@ impl<'a> SectionEntry<'a> for PropertySection {
     }
 
     fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        // Write the PropertySection to a writer as raw bytes.
         let mut section_data = [0u8; std::mem::size_of::<PropertySection>()];
         let src = self as *const PropertySection as *const u8;
         let dst = section_data.as_mut_ptr();
@@ -122,6 +119,7 @@ mod tests {
 
     #[test]
     fn test_write_section() {
+        // Test writing a PropertySection to raw bytes.
         let section = PropertySection::new("bar", *RUNTIME_EDITION, 7, 11, 13, 17, 19);
 
         let mut section_data: Vec<u8> = vec![];
@@ -143,7 +141,7 @@ mod tests {
             0x62, 0x61, 0x72, // name buffer
         ]);
 
-        // extend the data
+        // Extend the data to match the size of PropertySection.
         expect_data.resize(std::mem::size_of::<PropertySection>(), 0);
 
         assert_eq!(section_data, expect_data);
@@ -151,6 +149,7 @@ mod tests {
 
     #[test]
     fn test_read_section() {
+        // Test reading a PropertySection from raw bytes.
         let mut section_data = vec![];
         section_data.append(&mut RUNTIME_EDITION.to_vec());
         section_data.append(&mut vec![
@@ -166,7 +165,7 @@ mod tests {
             0x62, 0x61, 0x72, // name buffer
         ]);
 
-        // extend the data
+        // Extend the data to match the size of PropertySection.
         section_data.resize(std::mem::size_of::<PropertySection>(), 0);
 
         let section = PropertySection::read(&section_data);

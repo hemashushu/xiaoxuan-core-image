@@ -1,48 +1,50 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "external library section" binary layout
+// "External Library Section" binary layout:
 //
-//              |-----------------------------------------------------------------------------|
-//              | item count (u32) | extra header length (u32)                                |
-//              |-----------------------------------------------------------------------------|
-//  item 0 -->  | lib name off 0 (u32) | lib name len 0 (u32)                                 | <-- table
-//              | value offset 0 (u32) | value length 0 (u32) | lib type 0 (u8) | pad 3 bytes |
-//  item 1 -->  | lib name off 1       | lib name len 1                                       |
-//              | value offset 0 (u32) | value length 0 (u32) | lib type 0 (u8) | pad 3 bytes |
-//              | ...                                                                         |
-//              |-----------------------------------------------------------------------------|
-// offset 0 --> | name string 0 (UTF-8) | value string 0 (UTF-8)                              | <-- data area
-// offset 1 --> | name string 1         | value string 1 (UTF-8)                              |
-//              | ...                                                                         |
-//              |-----------------------------------------------------------------------------|
+//              |-----------------------------------------------------------------------------------|
+//              | item count (u32) | extra header length (u32)                                      |
+//              |-----------------------------------------------------------------------------------|
+//  item 0 -->  | lib name offset 0 (u32) | lib name length 0 (u32)                                 | <-- table
+//              | value offset 0 (u32) | value length 0 (u32) | lib type 0 (u8) | padding (3 bytes) |
+//  item 1 -->  | lib name offset 1       | lib name length 1                                       |
+//              | value offset 1 (u32) | value length 1 (u32) | lib type 1 (u8) | padding (3 bytes) |
+//              | ...                                                                               |
+//              |-----------------------------------------------------------------------------------|
+// offset 0 --> | library name string 0 (UTF-8) | value string 0 (UTF-8)                            | <-- data area
+// offset 1 --> | library name string 1         | value string 1                                    |
+//              | ...                                                                               |
+//              |-----------------------------------------------------------------------------------|
 
 use anc_isa::{ExternalLibraryDependency, ExternalLibraryDependencyType};
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::ExternalLibraryEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
 pub struct ExternalLibrarySection<'a> {
-    pub items: &'a [ExternalLibraryItem],
-    pub items_data: &'a [u8],
+    pub items: &'a [ExternalLibraryItem], // Array of library items
+    pub items_data: &'a [u8],             // UTF-8 encoded library names and values
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ExternalLibraryItem {
-    pub name_offset: u32, // the offset of the name string in data area
-    pub name_length: u32, // the length (in bytes) of the name string in data area
-    pub value_offset: u32,
-    pub value_length: u32,
-    pub external_library_dependent_type: ExternalLibraryDependencyType, // u8
-    _padding0: [u8; 3],
+    pub name_offset: u32,  // Offset of the library name string in the data area
+    pub name_length: u32,  // Length (in bytes) of the library name string in the data area
+    pub value_offset: u32, // Offset of the value string in the data area
+    pub value_length: u32, // Length (in bytes) of the value string in the data area
+    pub external_library_dependent_type: ExternalLibraryDependencyType, // Type of dependency (e.g., Local, Remote)
+    _padding0: [u8; 3],                                                 // Padding for alignment
 }
 
 impl ExternalLibraryItem {

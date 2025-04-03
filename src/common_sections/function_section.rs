@@ -1,10 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "function section" binary layout
+// "Function Section" binary layout:
 //
 //              |-------------------------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                              |
@@ -19,9 +19,11 @@
 //              |-------------------------------------------------------------------------------------------|
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::FunctionEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq)]
@@ -33,10 +35,10 @@ pub struct FunctionSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct FunctionItem {
-    pub code_offset: u32,               // the offset of the code in data area
-    pub code_length: u32,               // the length (in bytes) of the code in data area
-    pub type_index: u32,                // the index of the type (of function)
-    pub local_variable_list_index: u32, // the index of the 'local variable list'
+    pub code_offset: u32, // Offset of the function's code in the data area
+    pub code_length: u32, // Length (in bytes) of the function's code in the data area
+    pub type_index: u32,  // Index of the function's type
+    pub local_variable_list_index: u32, // Index of the function's local variable list
 }
 
 impl FunctionItem {
@@ -72,6 +74,7 @@ impl<'a> SectionEntry<'a> for FunctionSection<'a> {
 }
 
 impl<'a> FunctionSection<'a> {
+    /// Retrieves the type index, local variable list index, and code of a function at the specified index.
     pub fn get_item_type_index_and_local_variable_list_index_and_code(
         &'a self,
         idx: usize,
@@ -90,20 +93,7 @@ impl<'a> FunctionSection<'a> {
         )
     }
 
-    //     // for inspect
-    //     pub fn get_function_entry(&self, idx: usize) -> FunctionEntry {
-    //         let item = &self.items[idx];
-    //         let code = self.codes_data
-    //             [item.code_offset as usize..(item.code_offset + item.code_length) as usize]
-    //             .to_vec();
-    //
-    //         FunctionEntry {
-    //             type_index: item.type_index as usize,
-    //             local_variable_list_index: item.local_variable_list_index as usize,
-    //             code,
-    //         }
-    //     }
-
+    /// Converts the section into a vector of `FunctionEntry` objects.
     pub fn convert_to_entries(&self) -> Vec<FunctionEntry> {
         let items = self.items;
         let codes_data = self.codes_data;
@@ -124,6 +114,7 @@ impl<'a> FunctionSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `FunctionEntry` objects into the section's internal representation.
     pub fn convert_from_entries(entries: &[FunctionEntry]) -> (Vec<FunctionItem>, Vec<u8>) {
         let mut next_offset: u32 = 0;
 

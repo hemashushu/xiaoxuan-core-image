@@ -4,13 +4,39 @@
 // the Mozilla Public License version 2.0 and additional exceptions,
 // more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
 
-//! this section list all internal data.
-//! the data names should follow these order:
-//! 1. internal read-only data
-//! 2. internal read-write data
-//! 3. internal uninit data
+// This section lists all internal data.
+//
+// The data names are ordered as follows:
+// 1. Internal read-only data
+// 2. Internal read-write data
+// 3. Internal uninitialized data
 
-// "data name section" binary layout
+// Note: The data internal index is combined with:
+// - Internal read-only data
+// - Internal read-write data
+// - Internal uninitialized data
+//
+// The `data_internal_index` is calculated as:
+//
+// ```text
+// data_internal_index =
+//     (number of internal read-only data) +
+//     (number of internal read-write data) +
+//     (number of internal uninitialized data)
+// ```
+
+// Note: The data public index is a combination of:
+// - Imported read-only data
+// - Imported read-write data
+// - Imported uninitialized data
+// - Internal read-only data
+// - Internal read-write data
+// - Internal uninitialized data
+//
+// The `data_public_index` is calculated as:
+// `data_public_index = (number of all imported data) + mixed_data_internal_index`
+
+// "Export Data Section" binary layout:
 //
 //              |--------------------------------------------------------------------------------------------------|
 //              | item count (u32) | extra header length (u32)                                                     |
@@ -30,8 +56,10 @@ use crate::entry::ExportDataEntry;
 
 use crate::module_image::Visibility;
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -40,23 +68,23 @@ pub struct ExportDataSection<'a> {
     pub full_names_data: &'a [u8],
 }
 
-// this table only contains the internal data,
-// imported data will not be list in this table.
+// This table only contains internal data.
+// Imported data is not listed in this table.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ExportDataItem {
-    // about the "full_name" and "name_path"
-    // -------------------------------------
+    // Explanation of "full_name" and "name_path":
+    // ------------------------------------------
     // - "full_name" = "module_name::name_path"
     // - "name_path" = "namespace::identifier"
     // - "namespace" = "sub_module_name"{0,N}
     //
-    // e.g.
-    // the name path of function "add" in submodule "myapp:utils" is "utils::add",
-    // and the full name is "myapp::utils::add"
+    // Example:
+    // For a data item "config" in the submodule "myapp::settings":
+    // - The name path is "settings::config".
+    // - The full name is "myapp::settings::config".
     pub full_name_offset: u32,
     pub full_name_length: u32,
-
     pub visibility: Visibility,
     pub section_type: DataSectionType,
     _padding0: [u8; 2],
@@ -99,23 +127,7 @@ impl<'a> SectionEntry<'a> for ExportDataSection<'a> {
 }
 
 impl<'a> ExportDataSection<'a> {
-    /// the item index is the 'mixed data internal index'
-    ///
-    /// the data items in the `export_data_section` are ordered by:
-    /// 1. internal read-only data
-    /// 2. internal read-write data
-    /// 3. internal uninit data
-    ///
-    /// note that the data public index is mixed the following items:
-    /// - imported read-only data items
-    /// - imported read-write data items
-    /// - imported uninitilized data items
-    /// - internal read-only data items
-    /// - internal read-write data items
-    /// - internal uninitilized data items
-    ///
-    /// therefore:
-    /// data_public_index = (all import datas) + mixed_data_internal_index
+    /// Retrieves the item index, visibility, and section type for a given data full name.
     pub fn get_item_index_and_visibility_and_section_type(
         &'a self,
         expected_full_name: &str,
@@ -137,7 +149,7 @@ impl<'a> ExportDataSection<'a> {
         })
     }
 
-    /// the item index is the 'mixed data internal index'
+    /// Retrieves the full name, visibility, and section type of a data item by its internal index.
     pub fn get_item_full_name_and_visibility_and_section_type(
         &self,
         data_internal_index: usize,
@@ -152,6 +164,7 @@ impl<'a> ExportDataSection<'a> {
         (full_name, item.visibility, item.section_type)
     }
 
+    /// Converts the section into a vector of `ExportDataEntry`.
     pub fn convert_to_entries(&self) -> Vec<ExportDataEntry> {
         let items = self.items;
         let full_names_data = self.full_names_data;
@@ -166,6 +179,7 @@ impl<'a> ExportDataSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `ExportDataEntry` into section data.
     pub fn convert_from_entries(entries: &[ExportDataEntry]) -> (Vec<ExportDataItem>, Vec<u8>) {
         let full_name_bytes = entries
             .iter()
