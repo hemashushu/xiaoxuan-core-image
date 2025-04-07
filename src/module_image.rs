@@ -71,32 +71,26 @@ use anc_isa::{IMAGE_FORMAT_MAJOR_VERSION, IMAGE_FORMAT_MINOR_VERSION};
 
 use crate::{
     common_sections::{
-        data_section::{ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection},
-        export_data_section::ExportDataSection,
-        export_function_section::ExportFunctionSection,
-        external_function_section::ExternalFunctionSection,
+        data_name_section::DataNameSection, external_function_section::ExternalFunctionSection,
         external_library_section::ExternalLibrarySection,
-        function_section::FunctionSection,
-        import_data_section::ImportDataSection,
-        import_function_section::ImportFunctionSection,
-        import_module_section::ImportModuleSection,
-        local_variable_section::LocalVariableSection,
-        property_section::PropertySection,
-        relocate_section::RelocateSection,
-        type_section::TypeSection,
+        function_name_section::FunctionNameSection, function_section::FunctionSection,
+        import_data_section::ImportDataSection, import_function_section::ImportFunctionSection,
+        import_module_section::ImportModuleSection, local_variable_section::LocalVariableSection,
+        property_section::PropertySection, read_only_data_section::ReadOnlyDataSection,
+        read_write_data_section::ReadWriteDataSection, relocate_section::RelocateSection,
+        type_section::TypeSection, uninit_data_section::UninitDataSection,
     },
     datatableaccess::{
         read_section_with_table_and_data_area, write_section_with_table_and_data_area,
     },
-    index_sections::{
-        data_index_section::DataIndexSection,
-        dynamic_link_module_section::DynamicLinkModuleSection,
-        entry_point_section::EntryPointSection,
+    linking_sections::{
+        data_index_section::DataIndexSection, entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
-        external_function_section::UnifiedExternalFunctionSection,
-        external_library_section::UnifiedExternalLibrarySection,
-        external_type_section::UnifiedExternalTypeSection,
         function_index_section::FunctionIndexSection,
+        linking_module_section::LinkingModuleSection,
+        unified_external_function_section::UnifiedExternalFunctionSection,
+        unified_external_library_section::UnifiedExternalLibrarySection,
+        unified_external_type_section::UnifiedExternalTypeSection,
     },
     ImageError, ImageErrorType,
 };
@@ -155,9 +149,9 @@ pub enum ModuleSectionId {
     UninitData,            // Uninitialized data.
 
     // Optional sections for linking and debugging
-    ExportFunction = 0x0030, // Exported functions.
-    ExportData,              // Exported data.
-    Relocate,                // Relocation information.
+    FunctionName = 0x0030, // Exported functions.
+    DataName,              // Exported data.
+    Relocate,              // Relocation information.
 
     // Optional sections for linking
     ImportModule = 0x0040, // Imported modules.
@@ -169,7 +163,7 @@ pub enum ModuleSectionId {
     // Essential sections for applications
     EntryPoint = 0x0080, // Entry points.
     FunctionIndex,       // Function index mapping.
-    DynamicLinkModule,   // Dynamically linked modules.
+    LinkingModule,       // Dynamically linked modules.
 
     // Optional sections for applications
     DataIndex = 0x0090,           // Data index mapping.
@@ -393,11 +387,11 @@ impl<'a> ModuleImage<'a> {
             )
     }
 
-    pub fn get_dynamic_link_module_list_section(&'a self) -> DynamicLinkModuleSection<'a> {
-        self.get_section_data_by_id(ModuleSectionId::DynamicLinkModule)
+    pub fn get_dynamic_link_module_list_section(&'a self) -> LinkingModuleSection<'a> {
+        self.get_section_data_by_id(ModuleSectionId::LinkingModule)
             .map_or_else(
                 || panic!("Cannot find the index property section."),
-                DynamicLinkModuleSection::read,
+                LinkingModuleSection::read,
             )
     }
 
@@ -424,14 +418,14 @@ impl<'a> ModuleImage<'a> {
             .map(UninitDataSection::read)
     }
 
-    pub fn get_optional_export_function_section(&'a self) -> Option<ExportFunctionSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::ExportFunction)
-            .map(ExportFunctionSection::read)
+    pub fn get_optional_export_function_section(&'a self) -> Option<FunctionNameSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::FunctionName)
+            .map(FunctionNameSection::read)
     }
 
-    pub fn get_optional_export_data_section(&'a self) -> Option<ExportDataSection<'a>> {
-        self.get_section_data_by_id(ModuleSectionId::ExportData)
-            .map(ExportDataSection::read)
+    pub fn get_optional_export_data_section(&'a self) -> Option<DataNameSection<'a>> {
+        self.get_section_data_by_id(ModuleSectionId::DataName)
+            .map(DataNameSection::read)
     }
 
     pub fn get_optional_relocate_section(&'a self) -> Option<RelocateSection<'a>> {
@@ -517,7 +511,8 @@ mod tests {
 
     #[test]
     fn test_module_image_read_and_write() {
-        let property_section = PropertySection::new("bar", *RUNTIME_EDITION, 7, 11, 13, 17, 19);
+        let property_section =
+            PropertySection::new("bar", *RUNTIME_EDITION, 7, 11, 13 /* 17, 19 */);
 
         let type_entries = vec![
             TypeEntry {
@@ -595,7 +590,7 @@ mod tests {
                 //
                 0x10, 0, 0, 0, // section id, common property section
                 104, 0, 0, 0, // offset: 104
-                28, 1, 0, 0 // length: prop 28 + name 256
+                20, 1, 0, 0 // length: prop 20 + name 256
             ]
         );
 
@@ -676,13 +671,15 @@ mod tests {
             13, 0, // version major
             0, 0, // version padding
             //
+            /*
             17, 0, 0, 0, // import_data_count
             19, 0, 0, 0, // import_function_count
+             */
             //
             3, 0, 0, 0, // name length
         ]);
 
-        assert_eq!(&remains[..28], &expected_property_section_data);
+        assert_eq!(&remains[..20], &expected_property_section_data);
 
         let module_image_restore = ModuleImage::read(&image_binary).unwrap();
         assert_eq!(module_image_restore.items.len(), 3);
@@ -730,8 +727,8 @@ mod tests {
         assert_eq!(property_section_restore.version_patch, 7);
         assert_eq!(property_section_restore.version_minor, 11);
         assert_eq!(property_section_restore.version_major, 13);
-        assert_eq!(property_section_restore.import_data_count, 17);
-        assert_eq!(property_section_restore.import_function_count, 19);
+        // assert_eq!(property_section_restore.import_data_count, 17);
+        // assert_eq!(property_section_restore.import_function_count, 19);
         assert_eq!(property_section_restore.get_module_name(), "bar");
     }
 }

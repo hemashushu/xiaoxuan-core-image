@@ -13,7 +13,7 @@
 //  item 1 -->  | list offset 1       | list item count 1       |
 //              | ...                                           |
 //              |-----------------------------------------------|
-// offset 0 --> | list data 0                                   | <-- data area
+// offset 0 --> | list data 0                                   | <-- data
 // offset 1 --> | list data 1                                   |
 //              | ...                                           |
 //              |-----------------------------------------------|
@@ -32,7 +32,7 @@
 //
 // The details of each list data:
 //
-//             list data 0
+//             the details of list data 0
 //            |--------------------------------------------------------|
 // item 0 --> | stub offset 0 (u32) | stub type 0 (u8) | pad (3 bytes) |
 // item 1 --> | stub offset 1       | stub type 1      |               |

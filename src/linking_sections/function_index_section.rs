@@ -1,25 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-//! this section is used to map the:
-//! `(module[current_module_index]).call(function_public_index)`
-//! to
-//! `target_module_index` and `function_internal_index`
-//!
-//! where
-//! - `current_module_index` == `index_of_range_item`
-//! - `items[range.offset + function_public_index]` is the entry for the `function_public_index`
-//!
-//! the function public index is mixed by the following items (and are sorted by the following order):
-//! - the imported functions
-//! - the internal functions
-//!
-//! `function_public_index` = 'the amount of imported functions' + 'function internal index'
-
-// "function index section" binary layout
+// "Function Index Section" binary layout:
 //
 //         |----------------------------------------------|
 //         | item count (u32) | extra header length (u32) |
@@ -29,11 +14,15 @@
 //         | ...                                          |
 //         |----------------------------------------------|
 //
-//         |--------------------------------------------------------|
-//         | target mod idx 0 (u32) | function internal idx 0 (u32) | <-- table 1
-//         | target mod idx 1       | function internal idx 1       |
-//         | ...                                                    |
-//         |--------------------------------------------------------|
+//           |--------------------------------------------------------|
+//         / | target mod idx 0 (u32) | function internal idx 0 (u32) | <-- table 1
+// range 0 | | target mod idx 1       | function internal idx 1       |
+//         \ | ...                                                    |
+//           |--------------------------------------------------------|
+//         / | ...                                                    |
+// range 1 | | ...                                                    |
+//         \ | ...                                                    |
+//           |--------------------------------------------------------|
 
 use crate::{
     datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
@@ -41,46 +30,32 @@ use crate::{
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
 };
 
-#[derive(Debug, PartialEq)]
-pub struct FunctionIndexSection<'a> {
-    pub ranges: &'a [RangeItem],
-    pub items: &'a [FunctionIndexItem],
-}
-
-/// the index for this item is the `function_public_index`.
-///
-/// the function public index is mixed by the following items (and are sorted by the following order):
-/// - the imported functions
-/// - the internal functions
-///
-/// `function_public_index` = 'the amount of imported functions' + 'function internal index'
+/// The index for this item in a specific range is the `function_public_index`.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct FunctionIndexItem {
-    // pub function_public_index: u32,
-
-    // target module index
+    // Target module index.
     pub target_module_index: u32,
 
-    // the index of the internal function in a specified module
-    //
-    // this index is the actual index of the internal functions in a specified module
-    // i.e., it excludes the imported functions.
+    // Index of the internal function in the module.
     pub function_internal_index: u32,
 }
 
 impl FunctionIndexItem {
-    pub fn new(
-        // function_public_index: u32,
-        target_module_index: u32,
-        function_internal_index: u32,
-    ) -> Self {
+    /// Creates a new `FunctionIndexItem`.
+    pub fn new(target_module_index: u32, function_internal_index: u32) -> Self {
         Self {
-            // function_public_index,
             target_module_index,
             function_internal_index,
         }
     }
+}
+
+/// The index of range is the current `module_index`.
+#[derive(Debug, PartialEq)]
+pub struct FunctionIndexSection<'a> {
+    pub ranges: &'a [RangeItem],        // Array of range items.
+    pub items: &'a [FunctionIndexItem], // Array of function index items.
 }
 
 impl<'a> SectionEntry<'a> for FunctionIndexSection<'a> {
@@ -101,11 +76,14 @@ impl<'a> SectionEntry<'a> for FunctionIndexSection<'a> {
 }
 
 impl FunctionIndexSection<'_> {
+    /// Returns the number of items in a specific range (module index).
     pub fn get_items_count(&self, module_index: usize) -> usize {
         let range = &self.ranges[module_index];
         range.count as usize
     }
 
+    /// Retrieves the target module index and internal function index
+    /// for a specific item in a range.
     pub fn get_item_target_module_index_and_function_internal_index(
         &self,
         module_index: usize,
@@ -121,6 +99,7 @@ impl FunctionIndexSection<'_> {
         )
     }
 
+    /// Converts the section into a list of entries.
     pub fn convert_to_entries(&self) -> Vec<FunctionIndexListEntry> {
         self.ranges
             .iter()
@@ -139,6 +118,7 @@ impl FunctionIndexSection<'_> {
             .collect::<Vec<_>>()
     }
 
+    /// Converts a list of entries into ranges and items.
     pub fn convert_from_entries(
         sorted_entries: &[FunctionIndexListEntry],
     ) -> (Vec<RangeItem>, Vec<FunctionIndexItem>) {
@@ -174,7 +154,7 @@ mod tests {
 
     use crate::{
         entry::FunctionIndexEntry,
-        index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection},
+        linking_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection},
         module_image::{RangeItem, SectionEntry},
     };
 
@@ -191,15 +171,12 @@ mod tests {
             2, 0, 0, 0, // offset 1 (item 1)
             1, 0, 0, 0, // count 1
             //
-            // 1, 0, 0, 0, // function pub idx 0, item 0 (little endian)
             2, 0, 0, 0, // target module idx 0
             3, 0, 0, 0, // function internal idx 0
             //
-            // 5, 0, 0, 0, // function pub idx 1, item 1
             5, 0, 0, 0, // target module idx 1
             7, 0, 0, 0, // function internal idx 1
             //
-            // 13, 0, 0, 0, // function pub idx 2, item 2
             11, 0, 0, 0, // target module idx 2
             13, 0, 0, 0, // function internal idx 2
         ];
@@ -265,15 +242,12 @@ mod tests {
                 2, 0, 0, 0, // offset 1 (item 1)
                 1, 0, 0, 0, // count 1
                 //
-                // 1, 0, 0, 0, // function puc idx 0, item 0 (little endian)
                 2, 0, 0, 0, // target module idx 0
                 3, 0, 0, 0, // function internal idx 0
                 //
-                // 5, 0, 0, 0, // function puc idx 1, item 1
                 5, 0, 0, 0, // target module idx 1
                 7, 0, 0, 0, // function internal idx 1
                 //
-                // 13, 0, 0, 0, // function puc idx 2, item 2
                 11, 0, 0, 0, // target module idx 2
                 13, 0, 0, 0, // function internal idx 2
             ]

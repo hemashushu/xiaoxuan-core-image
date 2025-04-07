@@ -6,22 +6,26 @@
 
 // "External Function Section" binary layout:
 //
-//              |-------------------------------------------------------------------------------------------------------|
-//              | item count (u32) | extra header length (u32)                                                          |
-//              |-------------------------------------------------------------------------------------------------------|
-//  item 0 -->  | fn name offset 0 (u32) | fn name length 0 (u32) | external library index 0 (u32) | type index 0 (u32) | <-- table
-//  item 1 -->  | fn name offset 1       | fn name length 1       | external library index 1       | type index 1       |
-//              | ...                                                                                                   |
-//              |-------------------------------------------------------------------------------------------------------|
-// offset 0 --> | function name string 0 (UTF-8)                                                                        | <-- data area
-// offset 1 --> | function name string 1                                                                                |
-//              | ...                                                                                                   |
-//              |-------------------------------------------------------------------------------------------------------|
+//              |-----------------------------------------------------|
+//              | item count (u32) | extra header length (u32)        |
+//              |-----------------------------------------------------|
+//  item 0 -->  | fn name offset 0 (u32) | fn name length 0 (u32)     |
+//              | external library index 0 (u32) | type index 0 (u32) | <-- table
+//  item 1 -->  | fn name offset 1       | fn name length 1           |
+//              | external library index 1       | type index 1       |
+//              | ...                                                 |
+//              |-----------------------------------------------------|
+// offset 0 --> | function name string 0 (UTF-8)                      | <-- data
+// offset 1 --> | function name string 1                              |
+//              | ...                                                 |
+//              |-----------------------------------------------------|
 
 use crate::{
+    datatableaccess::{
+        read_section_with_table_and_data_area, write_section_with_table_and_data_area,
+    },
     entry::ExternalFunctionEntry,
     module_image::{ModuleSectionId, SectionEntry},
-    datatableaccess::{read_section_with_table_and_data_area, write_section_with_table_and_data_area},
 };
 
 #[derive(Debug, PartialEq, Default)]
@@ -36,7 +40,7 @@ pub struct ExternalFunctionItem {
     pub name_offset: u32, // Offset of the function name string in the data area
     pub name_length: u32, // Length (in bytes) of the function name string in the data area
     pub external_library_index: u32, // Index of the external library
-    pub type_index: u32, // Index of the function type
+    pub type_index: u32,  // Index of the function type
 }
 
 impl ExternalFunctionItem {
@@ -75,12 +79,12 @@ impl<'a> ExternalFunctionSection<'a> {
     /// Retrieves the function name, external library index, and type index for a given item index.
     pub fn get_item_name_and_external_library_index_and_type_index(
         &'a self,
-        idx: usize,
+        external_function_index: usize,
     ) -> (&'a str, usize, usize) {
         let items = self.items;
         let names_data = self.names_data;
 
-        let item = &items[idx];
+        let item = &items[external_function_index];
         let name_data =
             &names_data[item.name_offset as usize..(item.name_offset + item.name_length) as usize];
 

@@ -6,17 +6,19 @@
 
 // "Function Section" binary layout:
 //
-//              |-------------------------------------------------------------------------------------------|
-//              | item count (u32) | extra header length (u32)                                              |
-//              |-------------------------------------------------------------------------------------------|
-//   item 0 --> | code offset 0 (u32) | code length 0 (u32) | type index 0 (u32) | local list index 0 (u32) |  <-- table
-//   item 1 --> | code offset 1       | code length 1       | type index 1       | local list index 1       |
-//              | ...                                                                                       |
-//              |-------------------------------------------------------------------------------------------|
-// offset 0 --> | code 0                                                                                    | <-- data area
-// offset 1 --> | code 1                                                                                    |
-//              | ...                                                                                       |
-//              |-------------------------------------------------------------------------------------------|
+//              |-----------------------------------------------|
+//              | item count (u32) | extra header length (u32)  |
+//              |-----------------------------------------------|
+//   item 0 --> | code offset 0 (u32) | code length 0 (u32)     |
+//              | type index 0 (u32) | local list index 0 (u32) | <-- table
+//   item 1 --> | code offset 1       | code length 1           |
+//              | type index 1       | local list index 1       |
+//              | ...                                           |
+//              |-----------------------------------------------|
+// offset 0 --> | code 0                                        | <-- data
+// offset 1 --> | code 1                                        |
+//              | ...                                           |
+//              |-----------------------------------------------|
 
 use crate::{
     datatableaccess::{
@@ -77,12 +79,12 @@ impl<'a> FunctionSection<'a> {
     /// Retrieves the type index, local variable list index, and code of a function at the specified index.
     pub fn get_item_type_index_and_local_variable_list_index_and_code(
         &'a self,
-        idx: usize,
+        function_internal_index: usize,
     ) -> (usize, usize, &'a [u8]) {
         let items = self.items;
         let codes_data = self.codes_data;
 
-        let item = &items[idx];
+        let item = &items[function_internal_index];
         let code_data =
             &codes_data[item.code_offset as usize..(item.code_offset + item.code_length) as usize];
 

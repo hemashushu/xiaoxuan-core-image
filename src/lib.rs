@@ -11,7 +11,7 @@ pub mod datatableaccess;
 pub mod entry;
 pub mod entry_reader;
 pub mod entry_writer;
-pub mod index_sections;
+pub mod linking_sections;
 pub mod module_image;
 
 // Conditional compilation for debug utilities.

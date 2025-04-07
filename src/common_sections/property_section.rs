@@ -13,33 +13,27 @@ pub const MODULE_NAME_BUFFER_LENGTH: usize = 256;
 pub struct PropertySection {
     pub edition: [u8; 8],
 
-    // Avoid using u64 integers because both instructions and image data are 4-byte aligned.
+    // Avoid using one u64 integer to represent the version number,
+    // because both instructions and image data are 4-byte aligned.
     pub version_patch: u16,
     pub version_minor: u16,
     pub version_major: u16,
     _padding0: [u8; 2], // Padding for 4-byte alignment.
 
+    /* DEPRECATED
     // The "module name", "import data count", and "import function count" are used to locate
     // the public index of functions and data in bridge function calls.
     // These details can also be derived from the `import*` sections, but those are optional at runtime.
     pub import_data_count: u32,
     pub import_function_count: u32,
+    */
 
     pub module_name_length: u32,
 
-    // This is the name of the module/package. It cannot be the name of a submodule (namespace),
-    // even if the current image is an "object module". It also cannot be the full name or name path.
+    // The name of the (similar to a "package" in other languages).
+    // It cannot be the name of a submodule.
     //
-    // Definitions:
-    // - "full_name" = "module_name::name_path"
-    // - "name_path" = "namespace::identifier"
-    // - "namespace" = "sub_module_name"{0,N}
-    //
-    // Example:
-    // For a function "add" in submodule "myapp::utils", the name path is "utils::add",
-    // and the full name is "myapp::utils::add".
-    //
-    // Only [a-zA-Z0-9_] and Unicode characters are allowed for module/submodule names.
+    // Only [a-zA-Z0-9_] and Unicode characters are allowed for module names.
     pub module_name_buffer: [u8; 256],
 }
 
@@ -50,8 +44,8 @@ impl PropertySection {
         version_patch: u16,
         version_minor: u16,
         version_major: u16,
-        import_data_count: u32,
-        import_function_count: u32,
+        // import_data_count: u32,
+        // import_function_count: u32,
     ) -> Self {
         let module_name_src = module_name.as_bytes();
         let mut module_name_dest = [0u8; MODULE_NAME_BUFFER_LENGTH];
@@ -71,8 +65,8 @@ impl PropertySection {
             version_minor,
             version_major,
             _padding0: [0u8; 2],
-            import_data_count,
-            import_function_count,
+            // import_data_count,
+            // import_function_count,
             module_name_length: module_name_src.len() as u32,
             module_name_buffer: module_name_dest,
         }
@@ -120,7 +114,7 @@ mod tests {
     #[test]
     fn test_write_section() {
         // Test writing a PropertySection to raw bytes.
-        let section = PropertySection::new("bar", *RUNTIME_EDITION, 7, 11, 13, 17, 19);
+        let section = PropertySection::new("bar", *RUNTIME_EDITION, 7, 11, 13, /* 17, 19 */);
 
         let mut section_data: Vec<u8> = vec![];
         section.write(&mut section_data).unwrap();
@@ -134,8 +128,10 @@ mod tests {
             13, 0, // version major
             0, 0, // version padding
             //
+            /*
             17, 0, 0, 0, // import data count
             19, 0, 0, 0, // import function count
+             */
             //
             3, 0, 0, 0, // name length
             0x62, 0x61, 0x72, // name buffer
@@ -158,8 +154,10 @@ mod tests {
             13, 0, // version major
             0, 0, // version padding
             //
+            /*
             17, 0, 0, 0, // import data count
             19, 0, 0, 0, // import function count
+             */
             //
             3, 0, 0, 0, // name length
             0x62, 0x61, 0x72, // name buffer
@@ -173,8 +171,8 @@ mod tests {
         assert_eq!(section.version_patch, 7);
         assert_eq!(section.version_minor, 11);
         assert_eq!(section.version_major, 13);
-        assert_eq!(section.import_data_count, 17);
-        assert_eq!(section.import_function_count, 19);
+        // assert_eq!(section.import_data_count, 17);
+        // assert_eq!(section.import_function_count, 19);
         assert_eq!(section.module_name_length, 3);
 
         assert_eq!(section.get_module_name(), "bar");

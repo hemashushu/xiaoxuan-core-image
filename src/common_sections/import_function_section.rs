@@ -4,19 +4,24 @@
 // the Mozilla Public License version 2.0 and additional exceptions.
 // For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
+// Note that the order of imported functions are unrelated to
+// the "function internal index" or the "imported module index".
+
 // "Import Function Section" binary layout:
 //
-//              |------------------------------------------------------------------------------------------------|
-//              | item count (u32) | extra header length (u32)                                                   |
-//              |------------------------------------------------------------------------------------------------|
-//  item 0 -->  | full name off 0 (u32) | full name len 0 (u32) | import module idx 0 (u32) | type index 0 (u32) | <-- table
-//  item 1 -->  | full name off 1       | full name len 1       | import module idx 1       | type index 1       |
-//              | ...                                                                                            |
-//              |------------------------------------------------------------------------------------------------|
-// offset 0 --> | full name string 0 (UTF-8)                                                                     | <-- data area
-// offset 1 --> | full name string 1                                                                             |
-//              | ...                                                                                            |
-//              |------------------------------------------------------------------------------------------------|
+//              |-----------------------------------------------------|
+//              | item count (u32) | extra header length (u32)        |
+//              |-----------------------------------------------------|
+//  item 0 -->  | full name offset 0 (u32) | full name length 0 (u32) |
+//              | import module idx 0 (u32) | type index 0 (u32)      | <-- table
+//  item 1 -->  | full name offset 1       | full name length 1       |
+//              | import module idx 1       | type index 1            |
+//              | ...                                                 |
+//              |-----------------------------------------------------|
+// offset 0 --> | full name string 0 (UTF-8)                          | <-- data
+// offset 1 --> | full name string 1                                  |
+//              | ...                                                 |
+//              |-----------------------------------------------------|
 
 use crate::{
     datatableaccess::{
@@ -35,15 +40,16 @@ pub struct ImportFunctionSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ImportFunctionItem {
-    // Defination of the "full_name":
-    // -------------------------------------
-    // - "full_name" = "module_name::name_path"
-    // - "name_path" = "namespace::identifier"
-    // - "namespace" = "sub_module_name"{0,N}
+    // Explanation of "full_name" and "name_path":
+    // ------------------------------------------
+    // - "full_name"  = "module_name::name_path"
+    // - "name_path"  = "namespaces::identifier"
+    // - "namespaces" = "sub_module_name"{0,N}
     //
-    // Example:
-    // For a function "add" in submodule "myapp::utils", the name path is "utils::add",
-    // and the full name is "myapp::utils::add".
+    // For example, assuming there is an object named "config" in the submodule "myapp::settings":
+    // - The full name is "myapp::settings::config".
+    // - The module name is "myapp".
+    // - The name path is "settings::config".
     pub full_name_offset: u32, // Offset of the full name string in the data area
     pub full_name_length: u32, // Length (in bytes) of the full name string in the data area
     pub import_module_index: u32, // Index of the import module

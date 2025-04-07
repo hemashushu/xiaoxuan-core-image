@@ -6,19 +6,21 @@
 
 // "External Library Section" binary layout:
 //
-//              |-----------------------------------------------------------------------------------|
-//              | item count (u32) | extra header length (u32)                                      |
-//              |-----------------------------------------------------------------------------------|
-//  item 0 -->  | lib name offset 0 (u32) | lib name length 0 (u32)                                 | <-- table
-//              | value offset 0 (u32) | value length 0 (u32) | lib type 0 (u8) | padding (3 bytes) |
-//  item 1 -->  | lib name offset 1       | lib name length 1                                       |
-//              | value offset 1 (u32) | value length 1 (u32) | lib type 1 (u8) | padding (3 bytes) |
-//              | ...                                                                               |
-//              |-----------------------------------------------------------------------------------|
-// offset 0 --> | library name string 0 (UTF-8) | value string 0 (UTF-8)                            | <-- data area
-// offset 1 --> | library name string 1         | value string 1                                    |
-//              | ...                                                                               |
-//              |-----------------------------------------------------------------------------------|
+//              |-----------------------------------------------------------|
+//              | item count (u32) | extra header length (u32)              |
+//              |-----------------------------------------------------------|
+//  item 0 -->  | library name offset 0 (u32) | library name length 0 (u32) | <-- table
+//              | value offset 0 (u32) | value length 0 (u32)               |
+//              | library type 0 (u8) | padding (3 bytes)                   |
+//  item 1 -->  | library name offset 1       | library name length 1       |
+//              | value offset 1 (u32) | value length 1 (u32)               |
+//              | library type 1 (u8) | padding (3 bytes)                   |
+//              | ...                                                       |
+//              |-----------------------------------------------------------|
+// offset 0 --> | library name string 0 (UTF-8) | value string 0 (UTF-8)    | <-- data
+// offset 1 --> | library name string 1         | value string 1            |
+//              | ...                                                       |
+//              |-----------------------------------------------------------|
 
 use anc_isa::{ExternalLibraryDependency, ExternalLibraryDependencyType};
 

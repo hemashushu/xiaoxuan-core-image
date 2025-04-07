@@ -5,10 +5,10 @@
 // For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
 pub mod data_index_section;
-pub mod dynamic_link_module_section;
 pub mod entry_point_section;
 pub mod external_function_index_section;
-pub mod external_function_section;
-pub mod external_library_section;
-pub mod external_type_section;
 pub mod function_index_section;
+pub mod linking_module_section;
+pub mod unified_external_function_section;
+pub mod unified_external_library_section;
+pub mod unified_external_type_section;

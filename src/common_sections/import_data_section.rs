@@ -4,19 +4,30 @@
 // the Mozilla Public License version 2.0 and additional exceptions.
 // For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
+// Typically, the imported data is organized in the order of
+// - "read-only data"
+// - "read-write data"
+// - "uninitialized data"
+// However, this order is not strictly enforced.
+// Note that the order is unrelated to the "data internal index" or the "imported module index".
+
 // "Import Data Section" binary layout:
 //
-//              |--------------------------------------------------------------------------------------------------------------------------------------|
-//              | item count (u32) | extra header length (u32)                                                                                         |
-//              |--------------------------------------------------------------------------------------------------------------------------------------|
-//  item 0 -->  | full name off 0 (u32) | full name len 0 (u32) | import module idx 0 (u32) | dat sec type 0 (u8) | mem data type 0 (u8) | pad 2 bytes | <-- table
-//  item 1 -->  | full name off 1       | full name len 1       | import module idx 1       | dat sec type 1                                           |
-//              | ...                                                                                                                                  |
-//              |--------------------------------------------------------------------------------------------------------------------------------------|
-// offset 0 --> | full name string 0 (UTF-8)                                                                                                           | <-- data area
-// offset 1 --> | full name string 1                                                                                                                   |
-//              | ...                                                                                                                                  |
-//              |--------------------------------------------------------------------------------------------------------------------------------------|
+//              |-------------------------------------------------------|
+//              | item count (u32) | extra header length (u32)          |
+//              |-------------------------------------------------------|
+//  item 0 -->  | full name off 0 (u32) | full name length 0 (u32)      |
+//              | import module idx 0 (u32) | data section type 0 (u8)  |
+//              | memory data type 0 (u8) | pad 2 bytes                 | <-- table
+//  item 1 -->  | full name off 1       | full name length 1            |
+//              | import module idx 1       | data section type 1       |
+//              | memory data type 0 (u8) | pad 2 bytes                 |
+//              | ...                                                   |
+//              |-------------------------------------------------------|
+// offset 0 --> | full name string 0 (UTF-8)                            | <-- data
+// offset 1 --> | full name string 1                                    |
+//              | ...                                                   |
+//              |-------------------------------------------------------|
 
 use anc_isa::{DataSectionType, MemoryDataType};
 
@@ -37,15 +48,16 @@ pub struct ImportDataSection<'a> {
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ImportDataItem {
-    // Defination of the "full_name":
-    // -------------------------------------
-    // - "full_name" = "module_name::name_path"
-    // - "name_path" = "namespace::identifier"
-    // - "namespace" = "sub_module_name"{0,N}
+    // Explanation of "full_name" and "name_path":
+    // ------------------------------------------
+    // - "full_name"  = "module_name::name_path"
+    // - "name_path"  = "namespaces::identifier"
+    // - "namespaces" = "sub_module_name"{0,N}
     //
-    // Example:
-    // For a data item "config" in submodule "myapp::settings", the name path is "settings::config",
-    // and the full name is "myapp::settings::config".
+    // For example, assuming there is an object named "config" in the submodule "myapp::settings":
+    // - The full name is "myapp::settings::config".
+    // - The module name is "myapp".
+    // - The name path is "settings::config".
     pub full_name_offset: u32, // Offset of the full name string in the data area
     pub full_name_length: u32, // Length (in bytes) of the full name string in the data area
     pub import_module_index: u32, // Index of the import module

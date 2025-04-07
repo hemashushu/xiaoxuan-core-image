@@ -1,21 +1,21 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "dependent module section" binary layout
+// "Linking Module Section" binary layout:
 //
 //              |------------------------------------------------|
 //              | item count (u32) | extra header length (u32)   |
 //              |------------------------------------------------|
-//  item 0 -->  | mod name off 0 (u32) | mod name len 0 (u32)    |  <-- table
+//  item 0 -->  | mod name off 0 (u32) | mod name len 0 (u32)    | <-- table
 //              | val offset (u32)     | val length 0 (u32)      |
 //  item 1 -->  | mod name off 1       | mod name len 1          |
-//              | val offset           | val offset 1            |
+//              | val offset           | val length 1            |
 //              | ...                                            |
 //              |------------------------------------------------|
-// offset 0 --> | name string 0 (UTF-8) | value string 0 (UTF-8) | <-- data area
+// offset 0 --> | name string 0 (UTF-8) | value string 0 (UTF-8) | <-- data
 // offset 1 --> | name string 1         | value string 1 (UTF-8) |
 //              | ...                                            |
 //              |------------------------------------------------|
@@ -24,26 +24,31 @@ use crate::{
     datatableaccess::{
         read_section_with_table_and_data_area, write_section_with_table_and_data_area,
     },
-    entry::{DynamicLinkModuleEntry, ModuleLocation},
+    entry::{LinkingModuleEntry, ModuleLocation},
     module_image::{ModuleSectionId, SectionEntry},
 };
 
 #[derive(Debug, PartialEq)]
-pub struct DynamicLinkModuleSection<'a> {
-    pub items: &'a [DynamicLinkModuleItem],
+pub struct LinkingModuleSection<'a> {
+    // Array of items representing the module entries.
+    pub items: &'a [LinkingModuleItem],
+    // Raw data area containing the names and values as byte slices.
     pub items_data: &'a [u8],
 }
 
+/// Represents a dynamically linked module, including its name and location.
+/// The first item in the entries is the main module in the application image.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
-pub struct DynamicLinkModuleItem {
-    pub name_offset: u32, // the offset of the name string in data area
-    pub name_length: u32, // the length (in bytes) of the name string in data area
-    pub value_offset: u32,
-    pub value_length: u32,
+pub struct LinkingModuleItem {
+    pub name_offset: u32,  // Offset of the name string in the data area.
+    pub name_length: u32,  // Length (in bytes) of the name string in the data area.
+    pub value_offset: u32, // Offset of the value string in the data area.
+    pub value_length: u32, // Length (in bytes) of the value string in the data area.
 }
 
-impl DynamicLinkModuleItem {
+impl LinkingModuleItem {
+    /// Creates a new `LinkingModuleItem` with the specified offsets and lengths.
     pub fn new(name_offset: u32, name_length: u32, value_offset: u32, value_length: u32) -> Self {
         Self {
             name_offset,
@@ -54,26 +59,29 @@ impl DynamicLinkModuleItem {
     }
 }
 
-impl<'a> SectionEntry<'a> for DynamicLinkModuleSection<'a> {
+impl<'a> SectionEntry<'a> for LinkingModuleSection<'a> {
+    /// Reads a `LinkingModuleSection` from the provided binary data.
     fn read(section_data: &'a [u8]) -> Self {
         let (items, names_data) =
-            read_section_with_table_and_data_area::<DynamicLinkModuleItem>(section_data);
-        DynamicLinkModuleSection {
+            read_section_with_table_and_data_area::<LinkingModuleItem>(section_data);
+        LinkingModuleSection {
             items,
             items_data: names_data,
         }
     }
 
+    /// Writes the `LinkingModuleSection` to the provided writer.
     fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         write_section_with_table_and_data_area(self.items, self.items_data, writer)
     }
 
+    /// Returns the section ID for the linking module.
     fn id(&'a self) -> ModuleSectionId {
-        ModuleSectionId::DynamicLinkModule
+        ModuleSectionId::LinkingModule
     }
 }
 
-impl<'a> DynamicLinkModuleSection<'a> {
+impl<'a> LinkingModuleSection<'a> {
     pub fn get_item_name_and_value(&'a self, idx: usize) -> (&'a str, &'a [u8]) {
         let items = self.items;
         let items_data = self.items_data;
@@ -87,7 +95,8 @@ impl<'a> DynamicLinkModuleSection<'a> {
         (std::str::from_utf8(name_data).unwrap(), value_data)
     }
 
-    pub fn convert_to_entries(&self) -> Vec<DynamicLinkModuleEntry> {
+    /// Converts the section into a vector of `LinkingModuleEntry` objects.
+    pub fn convert_to_entries(&self) -> Vec<LinkingModuleEntry> {
         let items = self.items;
         let items_data = self.items_data;
 
@@ -101,14 +110,15 @@ impl<'a> DynamicLinkModuleSection<'a> {
 
                 let name = std::str::from_utf8(name_data).unwrap().to_owned();
                 let module_location: ModuleLocation = ason::from_reader(value_data).unwrap();
-                DynamicLinkModuleEntry::new(name, Box::new(module_location))
+                LinkingModuleEntry::new(name, Box::new(module_location))
             })
             .collect()
     }
 
+    /// Converts a vector of `LinkingModuleEntry` objects into a section representation.
     pub fn convert_from_entries(
-        entries: &[DynamicLinkModuleEntry],
-    ) -> (Vec<DynamicLinkModuleItem>, Vec<u8>) {
+        entries: &[LinkingModuleEntry],
+    ) -> (Vec<LinkingModuleItem>, Vec<u8>) {
         let mut name_bytes = entries
             .iter()
             .map(|entry| entry.name.as_bytes().to_vec())
@@ -131,11 +141,11 @@ impl<'a> DynamicLinkModuleSection<'a> {
                 let value_length = value_bytes[idx].len() as u32;
                 let name_offset = next_offset;
                 let value_offset = name_offset + name_length;
-                next_offset = value_offset + value_length; // for next offset
+                next_offset = value_offset + value_length; // Update for the next offset.
 
-                DynamicLinkModuleItem::new(name_offset, name_length, value_offset, value_length)
+                LinkingModuleItem::new(name_offset, name_length, value_offset, value_length)
             })
-            .collect::<Vec<DynamicLinkModuleItem>>();
+            .collect::<Vec<LinkingModuleItem>>();
 
         let items_data = name_bytes
             .iter_mut()
@@ -153,28 +163,26 @@ impl<'a> DynamicLinkModuleSection<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        entry::{DynamicLinkModuleEntry, ModuleLocation, ModuleLocationLocal, ModuleLocationShare},
-        index_sections::dynamic_link_module_section::{
-            DynamicLinkModuleItem, DynamicLinkModuleSection,
-        },
+        entry::{LinkingModuleEntry, ModuleLocation, ModuleLocationLocal, ModuleLocationShare},
+        linking_sections::linking_module_section::{LinkingModuleItem, LinkingModuleSection},
         module_image::SectionEntry,
     };
 
     #[test]
     fn test_read_section() {
         let mut section_data = vec![
-            2u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // extra section header len (i32)
+            2u8, 0, 0, 0, // Number of items.
+            0, 0, 0, 0, // Extra section header length (u32).
             //
-            0, 0, 0, 0, // name offset (item 0)
-            3, 0, 0, 0, // name length
-            3, 0, 0, 0, // value offset
-            5, 0, 0, 0, // value length
+            0, 0, 0, 0, // Name offset (item 0).
+            3, 0, 0, 0, // Name length.
+            3, 0, 0, 0, // Value offset.
+            5, 0, 0, 0, // Value length.
             //
-            8, 0, 0, 0, // name offset (item 1)
-            4, 0, 0, 0, // name length
-            12, 0, 0, 0, // value offset
-            6, 0, 0, 0, // value length
+            8, 0, 0, 0, // Name offset (item 1).
+            4, 0, 0, 0, // Name length.
+            12, 0, 0, 0, // Value offset.
+            6, 0, 0, 0, // Value length.
         ];
 
         section_data.extend_from_slice(b"foo");
@@ -182,22 +190,22 @@ mod tests {
         section_data.extend_from_slice(b".bar");
         section_data.extend_from_slice(b".world");
 
-        let section = DynamicLinkModuleSection::read(&section_data);
+        let section = LinkingModuleSection::read(&section_data);
 
         assert_eq!(section.items.len(), 2);
-        assert_eq!(section.items[0], DynamicLinkModuleItem::new(0, 3, 3, 5,));
-        assert_eq!(section.items[1], DynamicLinkModuleItem::new(8, 4, 12, 6,));
+        assert_eq!(section.items[0], LinkingModuleItem::new(0, 3, 3, 5,));
+        assert_eq!(section.items[1], LinkingModuleItem::new(8, 4, 12, 6,));
         assert_eq!(section.items_data, "foohello.bar.world".as_bytes())
     }
 
     #[test]
     fn test_write_section() {
         let items = vec![
-            DynamicLinkModuleItem::new(0, 3, 3, 5),
-            DynamicLinkModuleItem::new(8, 4, 12, 6),
+            LinkingModuleItem::new(0, 3, 3, 5),
+            LinkingModuleItem::new(8, 4, 12, 6),
         ];
 
-        let section = DynamicLinkModuleSection {
+        let section = LinkingModuleSection {
             items: &items,
             items_data: b"foohello.bar.world",
         };
@@ -206,18 +214,18 @@ mod tests {
         section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
-            2u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // extra section header len (i32)
+            2u8, 0, 0, 0, // Number of items.
+            0, 0, 0, 0, // Extra section header length (u32).
             //
-            0, 0, 0, 0, // name offset (item 0)
-            3, 0, 0, 0, // name length
-            3, 0, 0, 0, // value offset
-            5, 0, 0, 0, // value length
+            0, 0, 0, 0, // Name offset (item 0).
+            3, 0, 0, 0, // Name length.
+            3, 0, 0, 0, // Value offset.
+            5, 0, 0, 0, // Value length.
             //
-            8, 0, 0, 0, // name offset (item 1)
-            4, 0, 0, 0, // name length
-            12, 0, 0, 0, // value offset
-            6, 0, 0, 0, // value length
+            8, 0, 0, 0, // Name offset (item 1).
+            4, 0, 0, 0, // Name length.
+            12, 0, 0, 0, // Value offset.
+            6, 0, 0, 0, // Value length.
         ];
 
         expect_data.extend_from_slice(b"foo");
@@ -225,7 +233,7 @@ mod tests {
         expect_data.extend_from_slice(b".bar");
         expect_data.extend_from_slice(b".world");
 
-        expect_data.extend_from_slice(&[0, 0]); // padding for 4-byte align
+        expect_data.extend_from_slice(&[0, 0]); // Padding for 4-byte alignment.
 
         assert_eq!(section_data, expect_data);
     }
@@ -233,14 +241,14 @@ mod tests {
     #[test]
     fn test_convert() {
         let entries = vec![
-            DynamicLinkModuleEntry::new(
+            LinkingModuleEntry::new(
                 "foobar".to_owned(),
                 Box::new(ModuleLocation::Local(Box::new(ModuleLocationLocal {
                     module_path: "/path/to/module".to_owned(),
                     hash: "01234567".to_owned(),
                 }))),
             ),
-            DynamicLinkModuleEntry::new(
+            LinkingModuleEntry::new(
                 "helloworld".to_owned(),
                 Box::new(ModuleLocation::Share(Box::new(ModuleLocationShare {
                     version: "1.2.3".to_owned(),
@@ -249,8 +257,8 @@ mod tests {
             ),
         ];
 
-        let (items, items_data) = DynamicLinkModuleSection::convert_from_entries(&entries);
-        let section = DynamicLinkModuleSection {
+        let (items, items_data) = LinkingModuleSection::convert_from_entries(&entries);
+        let section = LinkingModuleSection {
             items: &items,
             items_data: &items_data,
         };

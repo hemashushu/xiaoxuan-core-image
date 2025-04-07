@@ -6,19 +6,21 @@
 
 // "Type Section" binary layout:
 //
-//                     |-----------------------------------------------------------------------------------------------|
-//                     | item count (u32) | extra header length (u32)                                                  |
-//                     |-----------------------------------------------------------------------------------------------|
-//          item 0 --> | params count 0 (u16) | results count 0 (u16) | params offset 0 (u32) | results offset 0 (u32) | <-- table
-//          item 1 --> | params count 1       | results count 1       | params offset 1       | results offset 1       |
-//                     | ...                                                                                           |
-//                     |-----------------------------------------------------------------------------------------------|
-// param offset 0 -->  | parameter data type list 0                                                                    | <-- data area
-// result offset 0 --> | result data type list 0                                                                       |
-// param offset 1 -->  | parameter data type list 1                                                                    |
-// result offset 1 --> | result data type list 1                                                                       |
-//                     | ...                                                                                           |
-//                     |-----------------------------------------------------------------------------------------------|
+//                     |------------------------------------------------|
+//                     | item count (u32) | extra header length (u32)   |
+//                     |------------------------------------------------|
+//          item 0 --> | params count 0 (u16) | results count 0 (u16)   |
+//                     | params offset 0 (u32) | results offset 0 (u32) | <-- table
+//          item 1 --> | params count 1       | results count 1         |
+//                     | params offset 1       | results offset 1       |
+//                     | ...                                            |
+//                     |------------------------------------------------|
+//  param offset 0 --> | parameter data type list 0                     | <-- data
+// result offset 0 --> | result data type list 0                        |
+//  param offset 1 --> | parameter data type list 1                     |
+// result offset 1 --> | result data type list 1                        |
+//                     | ...                                            |
+//                     |------------------------------------------------|
 
 use std::ptr::slice_from_raw_parts;
 

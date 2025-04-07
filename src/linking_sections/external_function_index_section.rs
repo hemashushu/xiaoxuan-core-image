@@ -1,19 +1,10 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-//! this section is used to map the:
-//! `(module[current_module_index]).extcall(external_function_index)`
-//! to
-//! `unified_external_function_index`
-//!
-//! where
-//! - `current_module_index` == `index_of_range_item`
-//! - `items[range.offset + external_function_index]` is the entry of `external_function_index`
-
-// "external function index section" binary layout
+// "External Function Index Section" binary layout:
 //
 //         |----------------------------------------------|
 //         | item count (u32) | extra header length (u32) |
@@ -23,11 +14,15 @@
 //         | ...                                          |
 //         |----------------------------------------------|
 //
-//         |---------------------------------------|
-//         | unified external function idx 0 (u32) | <-- table 1
-//         | unified external function idx 1       |
-//         | ...                                   |
-//         |---------------------------------------|
+//           |---------------------------------------|
+//         / | unified external function idx 0 (u32) | <-- table 1
+// range 0 | | unified external function idx 1       |
+//         \ | ...                                   |
+//           |---------------------------------------|
+//         / | ...                                   |
+// range 1 | | ...                                   |
+//         \ | ...                                   |
+//           |---------------------------------------|
 
 use crate::{
     datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
@@ -35,14 +30,7 @@ use crate::{
     module_image::{ModuleSectionId, RangeItem, SectionEntry},
 };
 
-#[derive(Debug, PartialEq, Default)]
-pub struct ExternalFunctionIndexSection<'a> {
-    pub ranges: &'a [RangeItem],
-    pub items: &'a [ExternalFunctionIndexItem],
-}
-
-/// the index of this item is `external_function_index`
-/// mapping external_function_index -> unified_external_function_index
+/// The index of this item in a specific range is `external_function_index`.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct ExternalFunctionIndexItem {
@@ -50,6 +38,7 @@ pub struct ExternalFunctionIndexItem {
 }
 
 impl ExternalFunctionIndexItem {
+    /// Creates a new `ExternalFunctionIndexItem` with the given unified index.
     pub fn new(unified_external_function_index: u32) -> Self {
         Self {
             unified_external_function_index,
@@ -57,7 +46,15 @@ impl ExternalFunctionIndexItem {
     }
 }
 
+/// The index of range is the current `module_index`.
+#[derive(Debug, PartialEq, Default)]
+pub struct ExternalFunctionIndexSection<'a> {
+    pub ranges: &'a [RangeItem],
+    pub items: &'a [ExternalFunctionIndexItem],
+}
+
 impl<'a> SectionEntry<'a> for ExternalFunctionIndexSection<'a> {
+    /// Reads the section data and parses it into ranges and items.
     fn read(section_data: &'a [u8]) -> Self {
         let (ranges, items) =
             read_section_with_two_tables::<RangeItem, ExternalFunctionIndexItem>(section_data);
@@ -65,34 +62,37 @@ impl<'a> SectionEntry<'a> for ExternalFunctionIndexSection<'a> {
         ExternalFunctionIndexSection { ranges, items }
     }
 
+    /// Writes the ranges and items into the section data format.
     fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         write_section_with_two_tables(self.ranges, self.items, writer)
     }
 
+    /// Returns the section ID for the external function index section.
     fn id(&'a self) -> ModuleSectionId {
         ModuleSectionId::ExternalFunctionIndex
     }
 }
 
 impl ExternalFunctionIndexSection<'_> {
+    /// Returns the number of items in a specific range identified by `module_index`.
     pub fn get_items_count(&self, module_index: usize) -> usize {
         let range = &self.ranges[module_index];
         range.count as usize
     }
 
+    /// Retrieves the unified external function index for a specific item in a range.
     pub fn get_item_unified_external_function_index(
         &self,
         module_index: usize,
         external_function_index: usize,
     ) -> usize {
         let range = &self.ranges[module_index];
-
         let item_index = range.offset as usize + external_function_index;
         let item = &self.items[item_index];
-
         item.unified_external_function_index as usize
     }
 
+    /// Converts the section data into a list of entries for external function indices.
     pub fn convert_to_entries(&self) -> Vec<ExternalFunctionIndexListEntry> {
         self.ranges
             .iter()
@@ -110,6 +110,7 @@ impl ExternalFunctionIndexSection<'_> {
             .collect::<Vec<_>>()
     }
 
+    /// Converts a list of entries into ranges and items for the section.
     pub fn convert_from_entries(
         sorted_external_function_index_module_entries: &[ExternalFunctionIndexListEntry],
     ) -> (Vec<RangeItem>, Vec<ExternalFunctionIndexItem>) {
@@ -128,11 +129,7 @@ impl ExternalFunctionIndexSection<'_> {
             .iter()
             .flat_map(|index_module_entry| {
                 index_module_entry.index_entries.iter().map(|entry| {
-                    ExternalFunctionIndexItem::new(
-                        // entry.external_function_index as u32,
-                        entry.unified_external_function_index as u32,
-                        // entry.type_index as u32,
-                    )
+                    ExternalFunctionIndexItem::new(entry.unified_external_function_index as u32)
                 })
             })
             .collect::<Vec<_>>();
@@ -145,7 +142,7 @@ impl ExternalFunctionIndexSection<'_> {
 mod tests {
     use crate::{
         entry::{ExternalFunctionIndexEntry, ExternalFunctionIndexListEntry},
-        index_sections::external_function_index_section::{
+        linking_sections::external_function_index_section::{
             ExternalFunctionIndexItem, ExternalFunctionIndexSection,
         },
         module_image::{RangeItem, SectionEntry},
@@ -155,21 +152,16 @@ mod tests {
     fn test_read_section() {
         let section_data = vec![
             2u8, 0, 0, 0, // item count (little endian)
-            0, 0, 0, 0, // extra section header len (i32)
+            0, 0, 0, 0, // extra section header length (u32)
             //
-            0, 0, 0, 0, // offset 0 (item 0)
+            0, 0, 0, 0, // offset 0 (range 0)
             2, 0, 0, 0, // count 0
-            2, 0, 0, 0, // offset 1 (item 1)
+            2, 0, 0, 0, // offset 1 (range 1)
             1, 0, 0, 0, // count 1
             //
-            // 0, 0, 0, 0, // external function idx 0, item 0 (little endian)
-            3, 0, 0, 0, // uni external function idx 0
-            //
-            // 1, 0, 0, 0, // external function idx 1, item 1
-            5, 0, 0, 0, // uni external function idx 1
-            //
-            // 0, 0, 0, 0, // external function idx 2, item 2
-            7, 0, 0, 0, // uni external function idx 2
+            3, 0, 0, 0, // unified external function idx 0
+            5, 0, 0, 0, // unified external function idx 1
+            7, 0, 0, 0, // unified external function idx 2
         ];
 
         let section = ExternalFunctionIndexSection::read(&section_data);
@@ -177,8 +169,8 @@ mod tests {
         let ranges = section.ranges;
 
         assert_eq!(ranges.len(), 2);
-        assert_eq!(ranges[0], RangeItem::new(0, 2,));
-        assert_eq!(ranges[1], RangeItem::new(2, 1,));
+        assert_eq!(ranges[0], RangeItem::new(0, 2));
+        assert_eq!(ranges[1], RangeItem::new(2, 1));
 
         let items = section.items;
 
@@ -187,11 +179,9 @@ mod tests {
         assert_eq!(items[1], ExternalFunctionIndexItem::new(5));
         assert_eq!(items[2], ExternalFunctionIndexItem::new(7));
 
-        // test get index item
+        // Test retrieving unified external function indices
         assert_eq!(section.get_item_unified_external_function_index(0, 0), 3);
-
         assert_eq!(section.get_item_unified_external_function_index(0, 1), 5);
-
         assert_eq!(section.get_item_unified_external_function_index(1, 0), 7);
     }
 
@@ -217,21 +207,16 @@ mod tests {
             section_data,
             vec![
                 2u8, 0, 0, 0, // item count (little endian)
-                0, 0, 0, 0, // extra section header len (i32)
+                0, 0, 0, 0, // extra section header length (u32)
                 //
-                0, 0, 0, 0, // offset 0 (item 0)
+                0, 0, 0, 0, // offset 0 (range 0)
                 2, 0, 0, 0, // count 0
-                2, 0, 0, 0, // offset 1 (item 1)
+                2, 0, 0, 0, // offset 1 (range 1)
                 1, 0, 0, 0, // count 1
                 //
-                // 0, 0, 0, 0, // external function idx 0, item 0 (little endian)
-                3, 0, 0, 0, // uni external function idx 0
-                //
-                // 1, 0, 0, 0, // external function idx 1, item 1
-                5, 0, 0, 0, // uni external function idx 1
-                //
-                // 0, 0, 0, 0, // external function idx 2, item 2
-                7, 0, 0, 0, // uni external function idx 2
+                3, 0, 0, 0, // unified external function idx 0
+                5, 0, 0, 0, // unified external function idx 1
+                7, 0, 0, 0, // unified external function idx 2
             ]
         );
     }

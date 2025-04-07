@@ -10,30 +10,24 @@ use anc_isa::RUNTIME_EDITION;
 
 use crate::{
     common_sections::{
-        data_section::{ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection},
-        export_data_section::ExportDataSection,
-        export_function_section::ExportFunctionSection,
-        external_function_section::ExternalFunctionSection,
+        data_name_section::DataNameSection, external_function_section::ExternalFunctionSection,
         external_library_section::ExternalLibrarySection,
-        function_section::FunctionSection,
-        import_data_section::ImportDataSection,
-        import_function_section::ImportFunctionSection,
-        import_module_section::ImportModuleSection,
-        local_variable_section::LocalVariableSection,
-        property_section::PropertySection,
-        relocate_section::RelocateSection,
-        type_section::TypeSection,
+        function_name_section::FunctionNameSection, function_section::FunctionSection,
+        import_data_section::ImportDataSection, import_function_section::ImportFunctionSection,
+        import_module_section::ImportModuleSection, local_variable_section::LocalVariableSection,
+        property_section::PropertySection, read_only_data_section::ReadOnlyDataSection,
+        read_write_data_section::ReadWriteDataSection, relocate_section::RelocateSection,
+        type_section::TypeSection, uninit_data_section::UninitDataSection,
     },
-    entry::{ImageCommonEntry, ImageIndexEntry},
-    index_sections::{
-        data_index_section::DataIndexSection,
-        dynamic_link_module_section::DynamicLinkModuleSection,
-        entry_point_section::EntryPointSection,
+    entry::{ImageCommonEntry, ImageLinkingEntry},
+    linking_sections::{
+        data_index_section::DataIndexSection, entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
-        external_function_section::UnifiedExternalFunctionSection,
-        external_library_section::UnifiedExternalLibrarySection,
-        external_type_section::UnifiedExternalTypeSection,
         function_index_section::FunctionIndexSection,
+        linking_module_section::LinkingModuleSection,
+        unified_external_function_section::UnifiedExternalFunctionSection,
+        unified_external_library_section::UnifiedExternalLibrarySection,
+        unified_external_type_section::UnifiedExternalTypeSection,
     },
     module_image::{ImageType, ModuleImage, SectionEntry},
 };
@@ -52,8 +46,8 @@ pub fn write_object_file(
         image_common_entry.version.patch,
         image_common_entry.version.minor,
         image_common_entry.version.major,
-        image_common_entry.import_data_entries.len() as u32,
-        image_common_entry.import_function_entries.len() as u32,
+        // image_common_entry.import_data_entries.len() as u32,
+        // image_common_entry.import_function_entries.len() as u32,
     );
 
     // Convert and prepare all sections from the ImageCommonEntry.
@@ -148,16 +142,16 @@ pub fn write_object_file(
 
     // Export function section
     let (export_function_items, export_function_names_data) =
-        ExportFunctionSection::convert_from_entries(&image_common_entry.export_function_entries);
-    let export_function_section = ExportFunctionSection {
+        FunctionNameSection::convert_from_entries(&image_common_entry.function_name_entries);
+    let export_function_section = FunctionNameSection {
         items: &export_function_items,
         full_names_data: &export_function_names_data,
     };
 
     // Export data section
     let (export_data_items, export_data_names_data) =
-        ExportDataSection::convert_from_entries(&image_common_entry.export_data_entries);
-    let export_data_section = ExportDataSection {
+        DataNameSection::convert_from_entries(&image_common_entry.data_data_entries);
+    let export_data_section = DataNameSection {
         items: &export_data_items,
         full_names_data: &export_data_names_data,
     };
@@ -218,7 +212,7 @@ pub fn write_object_file(
 // This function generates a complete application image.
 pub fn write_image_file(
     image_common_entry: &ImageCommonEntry,
-    image_index_entry: &ImageIndexEntry,
+    image_index_entry: &ImageLinkingEntry,
     writer: &mut dyn Write,
 ) -> std::io::Result<()> {
     // Create the property section with metadata about the image.
@@ -228,8 +222,8 @@ pub fn write_image_file(
         image_common_entry.version.patch,
         image_common_entry.version.minor,
         image_common_entry.version.major,
-        image_common_entry.import_data_entries.len() as u32,
-        image_common_entry.import_function_entries.len() as u32,
+        // image_common_entry.import_data_entries.len() as u32,
+        // image_common_entry.import_function_entries.len() as u32,
     );
 
     // Convert and prepare all sections from the ImageCommonEntry.
@@ -324,16 +318,16 @@ pub fn write_image_file(
 
     // Export function section
     let (export_function_items, export_function_names_data) =
-        ExportFunctionSection::convert_from_entries(&image_common_entry.export_function_entries);
-    let export_function_section = ExportFunctionSection {
+        FunctionNameSection::convert_from_entries(&image_common_entry.function_name_entries);
+    let export_function_section = FunctionNameSection {
         items: &export_function_items,
         full_names_data: &export_function_names_data,
     };
 
     // Export data section
     let (export_data_items, export_data_names_data) =
-        ExportDataSection::convert_from_entries(&image_common_entry.export_data_entries);
-    let export_data_section = ExportDataSection {
+        DataNameSection::convert_from_entries(&image_common_entry.data_data_entries);
+    let export_data_section = DataNameSection {
         items: &export_data_items,
         full_names_data: &export_data_names_data,
     };
@@ -405,10 +399,8 @@ pub fn write_image_file(
 
     // Dynamic link module section
     let (dynamic_link_module_items, dynamic_link_module_data) =
-        DynamicLinkModuleSection::convert_from_entries(
-            &image_index_entry.dynamic_link_module_entries,
-        );
-    let dynamic_link_module_section = DynamicLinkModuleSection {
+        LinkingModuleSection::convert_from_entries(&image_index_entry.linking_module_entries);
+    let dynamic_link_module_section = LinkingModuleSection {
         items: &dynamic_link_module_items,
         items_data: &dynamic_link_module_data,
     };

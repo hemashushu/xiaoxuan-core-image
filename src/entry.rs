@@ -124,16 +124,91 @@ impl Debug for FunctionEntry {
 
 // Represents initialized data, including its type, content, length, and alignment.
 #[derive(Debug, PartialEq, Clone)]
-pub struct InitedDataEntry {
+pub struct ReadOnlyDataEntry {
     pub memory_data_type: MemoryDataType,
     pub data: Vec<u8>, // Raw data bytes.
     pub length: u32,   // Length of the data in bytes.
     pub align: u16,    // Alignment requirement in bytes.
 }
 
-impl InitedDataEntry {
+impl ReadOnlyDataEntry {
     /// Note that 'i32' in function name means a 32-bit integer, which is equivalent to
-    /// the 'uint32_t' in C or 'u32' in Rust. Do not confuse it with 'i32' in Rust.
+    /// the 'uint32_t' in C or 'u32' in Rust.
+    /// Do not confuse it with the 'i32' (signed integer) in Rust.
+    /// The same applies to the i8, i16, and i64.
+    pub fn from_i32(value: u32) -> Self {
+        let mut data: Vec<u8> = Vec::with_capacity(8);
+        data.extend(value.to_le_bytes().iter());
+
+        Self {
+            memory_data_type: MemoryDataType::I32,
+            data,
+            length: 4,
+            align: 4,
+        }
+    }
+
+    pub fn from_i64(value: u64) -> Self {
+        let mut data: Vec<u8> = Vec::with_capacity(8);
+        data.extend(value.to_le_bytes().iter());
+
+        Self {
+            memory_data_type: MemoryDataType::I64,
+            data,
+            length: 8,
+            align: 8,
+        }
+    }
+
+    pub fn from_f32(value: f32) -> Self {
+        let mut data: Vec<u8> = Vec::with_capacity(8);
+        data.extend(value.to_le_bytes().iter());
+
+        Self {
+            memory_data_type: MemoryDataType::F32,
+            data,
+            length: 4,
+            align: 4,
+        }
+    }
+
+    pub fn from_f64(value: f64) -> Self {
+        let mut data: Vec<u8> = Vec::with_capacity(8);
+        data.extend(value.to_le_bytes().iter());
+
+        Self {
+            memory_data_type: MemoryDataType::F64,
+            data,
+            length: 8,
+            align: 8,
+        }
+    }
+
+    pub fn from_bytes(data: Vec<u8>, align: u16) -> Self {
+        let length = data.len() as u32;
+
+        Self {
+            memory_data_type: MemoryDataType::Bytes,
+            data,
+            length,
+            align,
+        }
+    }
+}
+
+// Represents initialized data, including its type, content, length, and alignment.
+#[derive(Debug, PartialEq, Clone)]
+pub struct ReadWriteDataEntry {
+    pub memory_data_type: MemoryDataType,
+    pub data: Vec<u8>, // Raw data bytes.
+    pub length: u32,   // Length of the data in bytes.
+    pub align: u16,    // Alignment requirement in bytes.
+}
+
+impl ReadWriteDataEntry {
+    /// Note that 'i32' in function name means a 32-bit integer, which is equivalent to
+    /// the 'uint32_t' in C or 'u32' in Rust.
+    /// Do not confuse it with the 'i32' (signed integer) in Rust.
     /// The same applies to the i8, i16, and i64.
     pub fn from_i32(value: u32) -> Self {
         let mut data: Vec<u8> = Vec::with_capacity(8);
@@ -276,22 +351,13 @@ impl ExternalFunctionEntry {
     }
 }
 
-// About the "name", "full_name" and "name_path"
-// ---------------------------------------------
-// - "full_name" = "module_name::name_path"
-// - "name_path" = "namespace::identifier"
-// - "namespace" = "sub_module_name"{0,N}
-//
-// e.g.
-// the name path of function "add" in submodule "myapp:utils" is "utils::add",
-// and the full name is "myapp::utils::add"
-
 // Represents a module dependency, including its name and dependency details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportModuleEntry {
-    // Note that this is the name of module/package,
-    // it CANNOT be the name of submodule (i.e. namespace) even if the current image is
-    // a "object module", it also CANNOT be the full name or name path.
+    // The name of the module (similar to a "package" in other languages).
+    // It cannot be the name of a submodule.
+    //
+    // Only [a-zA-Z0-9_] and Unicode characters are allowed for module names.
     pub name: String,
     pub module_dependency: Box<ModuleDependency>,
 }
@@ -304,20 +370,25 @@ impl ImportModuleEntry {
         }
     }
 
+    /// Creates a self-reference entry.
+    /// It represents the current module and only presents
+    /// in the "import module section" of **object files**.
     pub fn self_reference_entry() -> Self {
         Self {
             name: SELF_REFERENCE_MODULE_NAME.to_owned(),
-            module_dependency: Box::new(ModuleDependency::Module),
+            module_dependency: Box::new(ModuleDependency::Current),
         }
     }
 }
 
-// Represents a dynamically linked module, including its name and location.
+/// Represents a dynamically linked module, including its name and location.
+/// The first item in the entries is the main module in the application image.
 #[derive(Debug, PartialEq, Clone)]
-pub struct DynamicLinkModuleEntry {
-    // Note that this is the name of module/package,
-    // it CANNOT be the name of submodule (i.e. namespace) even if the current image is
-    // a "object module", it also CANNOT be the full name or name path.
+pub struct LinkingModuleEntry {
+    // The name of the module (similar to a "package" in other languages).
+    // It cannot be the name of a submodule.
+    //
+    // Only [a-zA-Z0-9_] and Unicode characters are allowed for module names.
     pub name: String,
 
     pub module_location: Box<ModuleLocation>,
@@ -338,6 +409,8 @@ pub enum ModuleLocation {
     #[serde(rename = "runtime")]
     Runtime,
 
+    /// Presents the current module of application.
+    ///
     /// By default, the application's module file (*.ancm) is merged
     /// into the application image file (*.anci) as the first module of all
     /// dependent modules for simplification.
@@ -347,7 +420,7 @@ pub enum ModuleLocation {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename = "local")]
 pub struct ModuleLocationLocal {
-    // The module path (it is an absolute path).
+    // The module path (it is an absolute file path).
     pub module_path: String,
     pub hash: String,
 }
@@ -365,7 +438,7 @@ pub struct ModuleLocationShare {
     pub hash: String,
 }
 
-impl DynamicLinkModuleEntry {
+impl LinkingModuleEntry {
     pub fn new(name: String, module_location: Box<ModuleLocation>) -> Self {
         Self {
             name,
@@ -377,9 +450,22 @@ impl DynamicLinkModuleEntry {
 // Represents a function imported from another module, including its full name, module index, and type index.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportFunctionEntry {
-    pub full_name: String, // Full name of the imported function (e.g., "module_name::namespace::identifier").
+    // Full name of the imported function.
+    // e.g., "module_name::namespace::identifier".
+    // The module name can not be the virtual module name "module".
+    pub full_name: String,
+
+    // The index of the module from which the function is imported.
+    // Although the full name has already included a module name, but the
+    // module name in full name is not always the same as the module name.
+    //
+    // For example, when multiple modules are merged (statically link) into one module,
+    // all functions and data are shared the same module name but the module name
+    // in full names are different.
     pub import_module_index: usize,
-    pub type_index: usize, // Used for validation during linking.
+
+    // Used for validation during linking.
+    pub type_index: usize,
 }
 
 impl ImportFunctionEntry {
@@ -395,10 +481,25 @@ impl ImportFunctionEntry {
 // Represents data imported from another module, including its full name, module index, and type details.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportDataEntry {
-    pub full_name: String, // Full name of the imported data (e.g., "module_name::namespace::identifier").
+    // Full name of the imported data.
+    // e.g., "module_name::namespace::identifier".
+    // The module name can not be the virtual module name "module".
+    pub full_name: String,
+
+    // The index of the module from which the function is imported.
+    // Although the full name has already included a module name, but the
+    // module name in full name is not always the same as the module name.
+    //
+    // For example, when multiple modules are merged (statically link) into one module,
+    // all functions and data are shared the same module name but the module name
+    // in full names are different.
     pub import_module_index: usize,
-    pub data_section_type: DataSectionType, // For validation during linking.
-    pub memory_data_type: MemoryDataType,   // For validation during linking.
+
+    // For validation during linking.
+    pub data_section_type: DataSectionType,
+
+    // For validation during linking.
+    pub memory_data_type: MemoryDataType,
 }
 
 impl ImportDataEntry {
@@ -417,36 +518,49 @@ impl ImportDataEntry {
     }
 }
 
-// Represents a function exported from the module, including its full name and visibility.
 #[derive(Debug, PartialEq, Clone)]
-pub struct ExportFunctionEntry {
-    pub full_name: String, // Full name of the exported function (e.g., "module_name::namespace::identifier").
+pub struct FunctionNameEntry {
+    // Full name of the function.
+    // e.g., "module_name::namespace::identifier".
+    // The module name can not be the virtual module name "module".
+    pub full_name: String,
     pub visibility: Visibility,
+    pub internal_index: usize,
 }
 
-impl ExportFunctionEntry {
-    pub fn new(full_name: String, visibility: Visibility) -> Self {
+impl FunctionNameEntry {
+    pub fn new(full_name: String, visibility: Visibility, internal_index: usize) -> Self {
         Self {
             full_name,
             visibility,
+            internal_index,
         }
     }
 }
 
-// Represents data exported from the module, including its full name, visibility, and section type.
 #[derive(Debug, PartialEq, Clone)]
-pub struct ExportDataEntry {
-    pub full_name: String, // Full name of the exported data (e.g., "module_name::namespace::identifier").
+pub struct DataNameEntry {
+    // Full name of the data.
+    // e.g., "module_name::namespace::identifier".
+    // The module name can not be the virtual module name "module".
+    pub full_name: String,
     pub visibility: Visibility,
     pub section_type: DataSectionType,
+    pub internal_index_in_section: usize,
 }
 
-impl ExportDataEntry {
-    pub fn new(full_name: String, visibility: Visibility, section_type: DataSectionType) -> Self {
+impl DataNameEntry {
+    pub fn new(
+        full_name: String,
+        visibility: Visibility,
+        section_type: DataSectionType,
+        internal_index_in_section: usize,
+    ) -> Self {
         Self {
             full_name,
             visibility,
             section_type,
+            internal_index_in_section,
         }
     }
 }
@@ -559,6 +673,8 @@ impl RelocateEntry {
     }
 }
 
+/// Used for mapping the `(current_module_index, function_public_index)` to
+/// `(target_module_index, function_internal_index)`.
 #[derive(Debug, PartialEq)]
 pub struct FunctionIndexEntry {
     pub target_module_index: usize,
@@ -586,22 +702,24 @@ impl FunctionIndexListEntry {
     }
 }
 
+/// Used for mapping the `(current_module_index, data_public_index)` to
+/// `(target_module_index, target_data_section_type, data_internal_index_in_section)`.
 #[derive(Debug, PartialEq)]
 pub struct DataIndexEntry {
     pub target_module_index: usize,
-    pub data_internal_index: usize,
     pub target_data_section_type: DataSectionType,
+    pub data_internal_index_in_section: usize,
 }
 
 impl DataIndexEntry {
     pub fn new(
         target_module_index: usize,
-        data_internal_index: usize,
         target_data_section_type: DataSectionType,
+        data_internal_index_in_section: usize,
     ) -> Self {
         Self {
             target_module_index,
-            data_internal_index,
+            data_internal_index_in_section,
             target_data_section_type,
         }
     }
@@ -619,17 +737,8 @@ impl DataIndexListEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct ExternalFunctionIndexListEntry {
-    pub index_entries: Vec<ExternalFunctionIndexEntry>,
-}
-
-impl ExternalFunctionIndexListEntry {
-    pub fn new(index_entries: Vec<ExternalFunctionIndexEntry>) -> Self {
-        Self { index_entries }
-    }
-}
-
+/// Used for mapping the `(current_module_index, external_function_index)` to
+/// `unified_external_function_index`.
 #[derive(Debug, PartialEq)]
 pub struct ExternalFunctionIndexEntry {
     pub unified_external_function_index: usize,
@@ -643,10 +752,21 @@ impl ExternalFunctionIndexEntry {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ExternalFunctionIndexListEntry {
+    pub index_entries: Vec<ExternalFunctionIndexEntry>,
+}
+
+impl ExternalFunctionIndexListEntry {
+    pub fn new(index_entries: Vec<ExternalFunctionIndexEntry>) -> Self {
+        Self { index_entries }
+    }
+}
+
 /// Internal Entry Point Names
 /// --------------------------
 ///
-/// This section describes the naming conventions and execution behavior of internal entry points.
+/// The naming conventions and execution behavior of internal entry points.
 ///
 /// - **Default Entry Point**:
 ///   - Internal Name: `_start`
@@ -664,7 +784,13 @@ impl ExternalFunctionIndexEntry {
 ///   - User CLI Unit Name: Name path prefix, e.g., `{submodule_name}`, `{submodule_name}::test_get_`
 #[derive(Debug, PartialEq)]
 pub struct EntryPointEntry {
-    pub unit_name: String, // Internal name of the entry point.
+    /// Internal name of the entry point.
+    pub unit_name: String,
+
+    /// The public index of the function to be executed.
+    ///
+    /// Because the entry points always exist in the main module,
+    /// the module index is omitted (the index of main module is always 0).
     pub function_public_index: usize,
 }
 
@@ -680,12 +806,10 @@ impl EntryPointEntry {
 // Represents common properties of the module image, including its name, version, and type.
 #[derive(Debug)]
 pub struct ImageCommonEntry {
-    // The name of module/package,
+    // The name of the module (similar to a "package" in other languages).
+    // It cannot be the name of a submodule.
     //
-    // Note: It CANNOT be the name of submodule (i.e. namespace) even if the current image is
-    // a "object module", it also CANNOT be the full name or name path.
-    //
-    // Note that only [a-zA-Z0-9_] and unicode chars are allowed for the name of (sub)module(/source file).
+    // Only [a-zA-Z0-9_] and Unicode characters are allowed for module names.
     pub name: String,
     pub version: EffectiveVersion,
     pub image_type: ImageType,
@@ -694,45 +818,45 @@ pub struct ImageCommonEntry {
     pub local_variable_list_entries: Vec<LocalVariableListEntry>,
     pub function_entries: Vec<FunctionEntry>,
 
-    pub read_only_data_entries: Vec<InitedDataEntry>,
-    pub read_write_data_entries: Vec<InitedDataEntry>,
+    pub read_only_data_entries: Vec<ReadOnlyDataEntry>,
+    pub read_write_data_entries: Vec<ReadWriteDataEntry>,
     pub uninit_data_entries: Vec<UninitDataEntry>,
 
-    // The dependencies
+    // The dependencies of modules.
+    // The first entry is the current module in the object files.
     pub import_module_entries: Vec<ImportModuleEntry>,
 
-    // The following entries are used for linking:
-    // - import_function_entries
-    // - import_data_entries
-    // - export_function_entries
-    // - export_data_entries
+    // The entries are used for linking.
     pub import_function_entries: Vec<ImportFunctionEntry>,
+
+    // The entries are used for linking.
     pub import_data_entries: Vec<ImportDataEntry>,
 
-    // The name path entries only contain the internal functions.
-    pub export_function_entries: Vec<ExportFunctionEntry>,
+    // The entries only contain the internal functions.
+    pub function_name_entries: Vec<FunctionNameEntry>,
 
-    // The name path entries only contain the internal data items.
-    pub export_data_entries: Vec<ExportDataEntry>,
+    // The entries only contain the internal data items.
+    pub data_data_entries: Vec<DataNameEntry>,
 
     pub relocate_list_entries: Vec<RelocateListEntry>,
 
-    // The dependencies
+    // The dependencies of external libraries.
     pub external_library_entries: Vec<ExternalLibraryEntry>,
+
+    // The external function list.
     pub external_function_entries: Vec<ExternalFunctionEntry>,
 }
 
 #[derive(Debug)]
-pub struct ImageIndexEntry {
+pub struct ImageLinkingEntry {
     pub function_index_list_entries: Vec<FunctionIndexListEntry>,
     pub data_index_list_entries: Vec<DataIndexListEntry>,
     //
     pub external_function_index_entries: Vec<ExternalFunctionIndexListEntry>,
-    //
     pub unified_external_library_entries: Vec<ExternalLibraryEntry>,
     pub unified_external_type_entries: Vec<TypeEntry>,
     pub unified_external_function_entries: Vec<ExternalFunctionEntry>,
     //
-    pub dynamic_link_module_entries: Vec<DynamicLinkModuleEntry>,
+    pub linking_module_entries: Vec<LinkingModuleEntry>,
     pub entry_point_entries: Vec<EntryPointEntry>,
 }

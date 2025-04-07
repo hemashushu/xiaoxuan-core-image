@@ -7,7 +7,7 @@
 use anc_isa::EffectiveVersion;
 
 use crate::{
-    entry::{ImageCommonEntry, ImageIndexEntry},
+    entry::{ImageCommonEntry, ImageLinkingEntry},
     module_image::ModuleImage,
     ImageError,
 };
@@ -92,8 +92,8 @@ pub fn read_object_file(object_binary: &[u8]) -> Result<ImageCommonEntry, ImageE
         import_function_entries,
         import_data_entries,
         //
-        export_function_entries,
-        export_data_entries,
+        function_name_entries: export_function_entries,
+        data_data_entries: export_data_entries,
         relocate_list_entries,
         //
         external_library_entries,
@@ -106,7 +106,7 @@ pub fn read_object_file(object_binary: &[u8]) -> Result<ImageCommonEntry, ImageE
 // Reads an image file and converts its binary content into both ImageCommonEntry and ImageIndexEntry.
 pub fn read_image_file(
     image_binary: &[u8],
-) -> Result<(ImageCommonEntry, ImageIndexEntry), ImageError> {
+) -> Result<(ImageCommonEntry, ImageLinkingEntry), ImageError> {
     let module_image = ModuleImage::read(image_binary)?;
 
     // Extract and convert various sections of the module image into entries.
@@ -185,8 +185,8 @@ pub fn read_image_file(
         import_function_entries,
         import_data_entries,
         //
-        export_function_entries,
-        export_data_entries,
+        function_name_entries: export_function_entries,
+        data_data_entries: export_data_entries,
         relocate_list_entries,
         //
         external_library_entries,
@@ -223,14 +223,14 @@ pub fn read_image_file(
     let entry_point_entries = module_image.get_entry_point_section().convert_to_entries();
 
     // Construct the ImageIndexEntry with all extracted and converted entries.
-    let image_index_entry = ImageIndexEntry {
+    let image_index_entry = ImageLinkingEntry {
         function_index_list_entries,
         data_index_list_entries,
         external_function_index_entries,
         unified_external_library_entries,
         unified_external_type_entries,
         unified_external_function_entries,
-        dynamic_link_module_entries,
+        linking_module_entries: dynamic_link_module_entries,
         entry_point_entries,
     };
 

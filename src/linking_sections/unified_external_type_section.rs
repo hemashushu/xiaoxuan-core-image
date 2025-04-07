@@ -1,27 +1,28 @@
-// Copyright (c) 2024 Hemashushu <hippospark@gmail.com>, All rights reserved.
+// Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-//! The binary layout of this section is
-//! the same as `DataSection`
-
-// "type section" binary layout
+// "Unified External Type Section" binary layout:
 //
-//                     |-----------------------------------------------------------------------------------------------|
-//                     | item count (u32) | extra header length (u32)                                                  |
-//                     |-----------------------------------------------------------------------------------------------|
-//          item 0 --> | params count 0 (u16) | results count 0 (u16) | params offset 0 (u32) | results offset 0 (u32) | <-- table
-//          item 1 --> | params count 1       | results count 1       | params offset 1       | results offset 1       |
-//                     | ...                                                                                           |
-//                     |-----------------------------------------------------------------------------------------------|
-// param offset 0 -->  | parameters data type list 0                                                                   | <-- data area
-// result offset 0 --> | results data type list 0                                                                      |
-// param offset 1 -->  | parameters data type list 1                                                                   |
-// result offset 1 --> | results data type list 1                                                                      |
-//                     | ...                                                                                           |
-//                     |-----------------------------------------------------------------------------------------------|
+//                     |------------------------------------------------|
+//                     | item count (u32) | extra header length (u32)   |
+//                     |------------------------------------------------|
+//          item 0 --> | params count 0 (u16) | results count 0 (u16)   |
+//                     | params offset 0 (u32) | results offset 0 (u32) | <-- table
+//          item 1 --> | params count 1       | results count 1         |
+//                     | params offset 1       | results offset 1       |
+//                     | ...                                            |
+//                     |------------------------------------------------|
+//  param offset 0 --> | parameter data type list 0                     | <-- data
+// result offset 0 --> | result data type list 0                        |
+//  param offset 1 --> | parameter data type list 1                     |
+// result offset 1 --> | result data type list 1                        |
+//                     | ...                                            |
+//                     |------------------------------------------------|
+//
+// The binary layout of this section is identical to `TypeSection`.
 
 use std::ptr::slice_from_raw_parts;
 
@@ -37,24 +38,25 @@ use crate::{
 
 #[derive(Debug, PartialEq, Default)]
 pub struct UnifiedExternalTypeSection<'a> {
-    pub items: &'a [TypeItem],
-    pub types_data: &'a [u8],
+    pub items: &'a [TypeItem], // Array of type items in the section.
+    pub types_data: &'a [u8],  // Raw data for parameter and result types.
 }
 
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct TypeItem {
-    // the amount of parameters, because the size of 'data type' is 1 byte, so this value is also
-    // the length (in bytes) of the "parameters type list" in data area
+    // Number of parameters. Since each data type is 1 byte, this also represents
+    // the length (in bytes) of the "parameter type list" in the data area.
     pub params_count: u16,
 
-    // the amount of results, it's also the length (in bytes) of the "results type list" in data area
+    // Number of results. Similarly, this represents the length (in bytes) of the
+    // "result type list" in the data area.
     pub results_count: u16,
 
-    // the offset of the "parameters type list" in data area
+    // Offset of the "parameter type list" in the data area.
     pub params_offset: u32,
 
-    // the offset of the "results type list" in data area
+    // Offset of the "result type list" in the data area.
     pub results_offset: u32,
 }
 
@@ -76,11 +78,13 @@ impl TypeItem {
 
 impl<'a> SectionEntry<'a> for UnifiedExternalTypeSection<'a> {
     fn read(section_data: &'a [u8]) -> Self {
+        // Reads the section data and splits it into items and types_data.
         let (items, types_data) = read_section_with_table_and_data_area::<TypeItem>(section_data);
         UnifiedExternalTypeSection { items, types_data }
     }
 
     fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+        // Writes the section data, including the table and data area.
         write_section_with_table_and_data_area(self.items, self.types_data, writer)
     }
 
@@ -94,6 +98,7 @@ impl<'a> UnifiedExternalTypeSection<'a> {
         &'a self,
         idx: usize,
     ) -> (&'a [OperandDataType], &'a [OperandDataType]) {
+        // Retrieves the parameter and result types for a specific item by index.
         let items = self.items;
         let types_data = self.types_data;
 
@@ -121,7 +126,7 @@ impl<'a> UnifiedExternalTypeSection<'a> {
         (params_slice, results_slice)
     }
 
-    // for inspect
+    // Converts a specific item into a `TypeEntry` for inspection.
     pub fn get_type_entry(&self, idx: usize) -> TypeEntry {
         let (params, results) = self.get_item_params_and_results(idx);
         TypeEntry {
@@ -130,6 +135,7 @@ impl<'a> UnifiedExternalTypeSection<'a> {
         }
     }
 
+    // Converts all items in the section into a vector of `TypeEntry`.
     pub fn convert_to_entries(&self) -> Vec<TypeEntry> {
         let items = &self.items;
         let types_data = &self.types_data;
@@ -164,6 +170,7 @@ impl<'a> UnifiedExternalTypeSection<'a> {
             .collect()
     }
 
+    // Converts a vector of `TypeEntry` into the section's binary representation.
     pub fn convert_from_entries(entries: &[TypeEntry]) -> (Vec<TypeItem>, Vec<u8>) {
         let mut next_offset: u32 = 0;
 
@@ -175,9 +182,9 @@ impl<'a> UnifiedExternalTypeSection<'a> {
                 let results_count = entry.results.len() as u16;
                 let results_offset = params_offset + params_count as u32;
 
-                // the size of 'data type' is 1 byte, so the 'result_count' is
-                // also the length (in bytes) of the list.
-                next_offset = results_offset + results_count as u32; // for next offset
+                // Since each data type is 1 byte, `results_count` also represents
+                // the length (in bytes) of the result list.
+                next_offset = results_offset + results_count as u32; // Update for next offset.
 
                 TypeItem {
                     params_count,

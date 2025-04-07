@@ -1,22 +1,24 @@
 // Copyright (c) 2025 Hemashushu <hippospark@gmail.com>, All rights reserved.
 //
 // This Source Code Form is subject to the terms of
-// the Mozilla Public License version 2.0 and additional exceptions,
-// more details in file LICENSE, LICENSE.additional and CONTRIBUTING.
+// the Mozilla Public License version 2.0 and additional exceptions.
+// For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
-// "entry point section" binary layout
+// "Entry Point Section" binary layout:
 //
-//              |----------------------------------------------------------------------------|
-//              | item count (u32) | extra header length (u32)                               |
-//              |----------------------------------------------------------------------------|
-//  item 0 -->  | unit name offset 0 (u32) | unit name length 0 (u32) | fn pub index 0 (u32) | <-- table
-//  item 1 -->  | unit name offset 1       | unit name length 1       | fn pub index 1       |
-//              | ...                                                                        |
-//              |----------------------------------------------------------------------------|
-// offset 0 --> | unit name string 0 (UTF-8)                                                 | <-- data area
-// offset 1 --> | unit name string 1                                                         |
-//              | ...                                                                        |
-//              |----------------------------------------------------------------------------|
+//              |-----------------------------------------------------|
+//              | item count (u32) | extra header length (u32)        |
+//              |-----------------------------------------------------|
+//  item 0 -->  | unit name offset 0 (u32) | unit name length 0 (u32) |
+//              | fn public index 0 (u32)                             | <-- table
+//  item 1 -->  | unit name offset 1       | unit name length 1       |
+//              | fn public index 1                                   |
+//              | ...                                                 |
+//              |-----------------------------------------------------|
+// offset 0 --> | unit name string 0 (UTF-8)                          | <-- data
+// offset 1 --> | unit name string 1                                  |
+//              | ...                                                 |
+//              |-----------------------------------------------------|
 
 use crate::{
     datatableaccess::{
@@ -28,37 +30,44 @@ use crate::{
 
 #[derive(Debug, PartialEq, Default)]
 pub struct EntryPointSection<'a> {
+    /// A slice of entry point items representing the table.
     pub items: &'a [EntryPointItem],
+    /// A slice of UTF-8 encoded unit name strings representing the data area.
     pub unit_names_data: &'a [u8],
 }
 
-/// internal entry point names:
+/// Internal Entry Point Naming Conventions and Execution Behavior
+/// --------------------------------------------------------------
 ///
-/// - internal entry point name: "_start"
-///   executes function: '{app_module_name}::_start' (the default entry point)
-///   user CLI unit name: "" (empty string)
+/// - **Default Entry Point**:
+///   - Internal Name: `_start`
+///   - Executes Function: `{app_module_name}::_start`
+///   - User CLI Unit Name: `""` (empty string)
 ///
-/// - internal entry point name: "{submodule_name}"
-///   executes function: '{app_module_name}::app::{submodule_name}::_start' (the additional executable units)
-///   user CLI unit name: ":{submodule_name}"
+/// - **Additional Executable Units**:
+///   - Internal Name: `{submodule_name}`
+///   - Executes Function: `{app_module_name}::app::{submodule_name}::_start`
+///   - User CLI Unit Name: `:{submodule_name}`
 ///
-/// - internal entry point name: "{submodule_name}::test_*"
-///   executes function: '{app_module_name}::tests::{submodule_name}::test_*' (unit tests)
-///   user CLI unit name: name path prefix, e.g. "{submodule_name}", "{submodule_name}::test_get_"
-///
-/// this table only contains the internal functions,
-/// imported functions will not be list in this table.
+/// - **Unit Tests**:
+///   - Internal Name: `{submodule_name}::test_*`
+///   - Executes Function: `{app_module_name}::tests::{submodule_name}::test_*`
+///   - User CLI Unit Name: Name path prefix, e.g., `{submodule_name}`, `{submodule_name}::test_get_`
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct EntryPointItem {
-    /// The internal name of the entry points.
+    /// Offset of the unit name string in the data area.
     pub unit_name_offset: u32,
+    /// Length of the unit name string.
     pub unit_name_length: u32,
-
+    /// Public index of the function to be executed.
+    ///
+    /// The module index is omitted because entry points always exist in the main module.
     pub function_public_index: u32,
 }
 
 impl EntryPointItem {
+    /// Creates a new `EntryPointItem`.
     pub fn new(unit_name_offset: u32, unit_name_length: u32, function_public_index: u32) -> Self {
         Self {
             unit_name_offset,
@@ -69,6 +78,7 @@ impl EntryPointItem {
 }
 
 impl<'a> SectionEntry<'a> for EntryPointSection<'a> {
+    /// Reads an `EntryPointSection` from the given section data.
     fn read(section_data: &'a [u8]) -> Self {
         let (items, unit_names_data) =
             read_section_with_table_and_data_area::<EntryPointItem>(section_data);
@@ -78,16 +88,19 @@ impl<'a> SectionEntry<'a> for EntryPointSection<'a> {
         }
     }
 
+    /// Writes the `EntryPointSection` to the provided writer.
     fn write(&'a self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
         write_section_with_table_and_data_area(self.items, self.unit_names_data, writer)
     }
 
+    /// Returns the section ID for the entry point section.
     fn id(&'a self) -> ModuleSectionId {
         ModuleSectionId::EntryPoint
     }
 }
 
 impl<'a> EntryPointSection<'a> {
+    /// Retrieves the public index of the function corresponding to the given unit name.
     pub fn get_function_public_index(&'a self, expected_unit_name: &str) -> Option<usize> {
         let items = self.items;
         let unit_names_data = self.unit_names_data;
@@ -103,6 +116,7 @@ impl<'a> EntryPointSection<'a> {
         opt_idx.map(|idx| items[idx].function_public_index as usize)
     }
 
+    /// Converts the section into a vector of `EntryPointEntry` objects.
     pub fn convert_to_entries(&self) -> Vec<EntryPointEntry> {
         let items = self.items;
         let unit_names_data = self.unit_names_data;
@@ -119,6 +133,7 @@ impl<'a> EntryPointSection<'a> {
             .collect()
     }
 
+    /// Converts a vector of `EntryPointEntry` objects into section data.
     pub fn convert_from_entries(entries: &[EntryPointEntry]) -> (Vec<EntryPointItem>, Vec<u8>) {
         let unit_name_bytes = entries
             .iter()
@@ -133,7 +148,7 @@ impl<'a> EntryPointSection<'a> {
             .map(|(idx, entry)| {
                 let unit_name_offset = next_offset;
                 let unit_name_length = unit_name_bytes[idx].len() as u32;
-                next_offset += unit_name_length; // for next offset
+                next_offset += unit_name_length; // Update offset for the next entry.
 
                 EntryPointItem::new(
                     unit_name_offset,
@@ -156,7 +171,7 @@ impl<'a> EntryPointSection<'a> {
 mod tests {
     use crate::{
         entry::EntryPointEntry,
-        index_sections::entry_point_section::{EntryPointItem, EntryPointSection},
+        linking_sections::entry_point_section::{EntryPointItem, EntryPointSection},
         module_image::SectionEntry,
     };
 
@@ -177,26 +192,26 @@ mod tests {
         section.write(&mut section_data).unwrap();
 
         let mut expect_data = vec![
-            3u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // extra section header len (i32)
+            3u8, 0, 0, 0, // Number of items.
+            0, 0, 0, 0, // Extra section header length (u32).
             //
-            0, 0, 0, 0, // name offset (item 0)
-            6, 0, 0, 0, // name length
-            11, 0, 0, 0, // fn pub idx
+            0, 0, 0, 0, // Name offset (item 0).
+            6, 0, 0, 0, // Name length.
+            11, 0, 0, 0, // Function public index.
             //
-            6, 0, 0, 0, // name offset (item 1)
-            3, 0, 0, 0, // name length
-            13, 0, 0, 0, // fn pub idx
+            6, 0, 0, 0, // Name offset (item 1).
+            3, 0, 0, 0, // Name length.
+            13, 0, 0, 0, // Function public index.
             //
-            9, 0, 0, 0, // name offset (item 1)
-            5, 0, 0, 0, // name length
-            17, 0, 0, 0, // fn pub idx
+            9, 0, 0, 0, // Name offset (item 2).
+            5, 0, 0, 0, // Name length.
+            17, 0, 0, 0, // Function public index.
         ];
 
         expect_data.extend_from_slice(b"_start");
         expect_data.extend_from_slice(b"foo");
         expect_data.extend_from_slice(b"hello");
-        expect_data.extend_from_slice(b"\0\0"); // section 4-byte align
+        expect_data.extend_from_slice(b"\0\0"); // Section 4-byte alignment.
 
         assert_eq!(section_data, expect_data);
     }
@@ -204,20 +219,20 @@ mod tests {
     #[test]
     fn test_read_section() {
         let mut section_data = vec![
-            3u8, 0, 0, 0, // item count
-            0, 0, 0, 0, // extra section header len (i32)
+            3u8, 0, 0, 0, // Number of items.
+            0, 0, 0, 0, // Extra section header length (u32).
             //
-            0, 0, 0, 0, // name offset (item 0)
-            6, 0, 0, 0, // name length
-            11, 0, 0, 0, // fn pub idx
+            0, 0, 0, 0, // Name offset (item 0).
+            6, 0, 0, 0, // Name length.
+            11, 0, 0, 0, // Function public index.
             //
-            6, 0, 0, 0, // name offset (item 1)
-            3, 0, 0, 0, // name length
-            13, 0, 0, 0, // fn pub idx
+            6, 0, 0, 0, // Name offset (item 1).
+            3, 0, 0, 0, // Name length.
+            13, 0, 0, 0, // Function public index.
             //
-            9, 0, 0, 0, // name offset (item 1)
-            5, 0, 0, 0, // name length
-            17, 0, 0, 0, // fn pub idx
+            9, 0, 0, 0, // Name offset (item 2).
+            5, 0, 0, 0, // Name length.
+            17, 0, 0, 0, // Function public index.
         ];
 
         section_data.extend_from_slice("_start".as_bytes());

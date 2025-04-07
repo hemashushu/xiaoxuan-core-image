@@ -6,19 +6,19 @@
 
 // "Import Module Section" binary layout:
 //
-//              |------------------------------------------------|
-//              | item count (u32) | extra header length (u32)   |
-//              |------------------------------------------------|
-//  item 0 -->  | mod name off 0 (u32) | mod name len 0 (u32)    |  <-- table
-//              | val offset (u32)     | val length 0 (u32)      |
-//  item 1 -->  | mod name off 1       | mod name len 1          |
-//              | val offset           | val offset 1            |
-//              | ...                                            |
-//              |------------------------------------------------|
-// offset 0 --> | name string 0 (UTF-8) | value string 0 (UTF-8) | <-- data area
-// offset 1 --> | name string 1         | value string 1 (UTF-8) |
-//              | ...                                            |
-//              |------------------------------------------------|
+//              |---------------------------------------------------------|
+//              | item count (u32) | extra header length (u32)            |
+//              |---------------------------------------------------------|
+//  item 0 -->  | module name offset 0 (u32) | module name length 0 (u32) |
+//              | value offset (u32) | value length 0 (u32)               | <-- table
+//  item 1 -->  | module name offset 1       | module name length 1       |
+//              | value offset       | value offset 1                     |
+//              | ...                                                     |
+//              |---------------------------------------------------------|
+// offset 0 --> | name string 0 (UTF-8) | value string 0 (UTF-8)          | <-- data
+// offset 1 --> | name string 1         | value string 1 (UTF-8)          |
+//              | ...                                                     |
+//              |---------------------------------------------------------|
 
 use anc_isa::ModuleDependency;
 

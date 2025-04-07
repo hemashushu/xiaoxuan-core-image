@@ -5,35 +5,35 @@
 // For more details, see the LICENSE, LICENSE.additional, and CONTRIBUTING files.
 
 // Import necessary modules and sections for handling module images and their components.
-use crate::common_sections::data_section::{
-    ReadOnlyDataSection, ReadWriteDataSection, UninitDataSection,
-};
-use crate::common_sections::export_data_section::ExportDataSection;
-use crate::common_sections::export_function_section::ExportFunctionSection;
+use crate::common_sections::data_name_section::DataNameSection;
 use crate::common_sections::external_function_section::ExternalFunctionSection;
 use crate::common_sections::external_library_section::ExternalLibrarySection;
+use crate::common_sections::function_name_section::FunctionNameSection;
 use crate::common_sections::function_section::FunctionSection;
 use crate::common_sections::local_variable_section::LocalVariableSection;
 use crate::common_sections::property_section::PropertySection;
+use crate::common_sections::read_only_data_section::ReadOnlyDataSection;
+use crate::common_sections::read_write_data_section::ReadWriteDataSection;
 use crate::common_sections::type_section::TypeSection;
-use crate::index_sections::data_index_section::{DataIndexItem, DataIndexSection};
-use crate::index_sections::dynamic_link_module_section::DynamicLinkModuleSection;
-use crate::index_sections::entry_point_section::EntryPointSection;
-use crate::index_sections::external_function_index_section::{
+use crate::common_sections::uninit_data_section::UninitDataSection;
+use crate::linking_sections::data_index_section::{DataIndexItem, DataIndexSection};
+use crate::linking_sections::entry_point_section::EntryPointSection;
+use crate::linking_sections::external_function_index_section::{
     ExternalFunctionIndexItem, ExternalFunctionIndexSection,
 };
-use crate::index_sections::external_function_section::UnifiedExternalFunctionSection;
-use crate::index_sections::external_library_section::UnifiedExternalLibrarySection;
-use crate::index_sections::external_type_section::UnifiedExternalTypeSection;
-use crate::index_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection};
+use crate::linking_sections::function_index_section::{FunctionIndexItem, FunctionIndexSection};
+use crate::linking_sections::linking_module_section::LinkingModuleSection;
+use crate::linking_sections::unified_external_function_section::UnifiedExternalFunctionSection;
+use crate::linking_sections::unified_external_library_section::UnifiedExternalLibrarySection;
+use crate::linking_sections::unified_external_type_section::UnifiedExternalTypeSection;
 use crate::ImageError;
 
 use anc_isa::{DataSectionType, OperandDataType, RUNTIME_EDITION};
 
 use crate::entry::{
-    DynamicLinkModuleEntry, EntryPointEntry, ExportDataEntry, ExportFunctionEntry,
-    ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry, InitedDataEntry,
-    LocalVariableEntry, LocalVariableListEntry, ModuleLocation, TypeEntry, UninitDataEntry,
+    DataNameEntry, EntryPointEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
+    FunctionNameEntry, LinkingModuleEntry, LocalVariableEntry, LocalVariableListEntry,
+    ModuleLocation, ReadOnlyDataEntry, ReadWriteDataEntry, TypeEntry, UninitDataEntry,
 };
 
 use crate::module_image::{ImageType, ModuleImage, RangeItem, SectionEntry, Visibility};
@@ -87,8 +87,8 @@ pub fn helper_build_module_binary_with_single_function_and_data(
     result_datatypes: &[OperandDataType],
     local_variable_entries_without_function_args: &[LocalVariableEntry],
     code: Vec<u8>,
-    read_only_data_entries: &[InitedDataEntry],
-    read_write_data_entries: &[InitedDataEntry],
+    read_only_data_entries: &[ReadOnlyDataEntry],
+    read_write_data_entries: &[ReadWriteDataEntry],
     uninit_uninit_data_entries: &[UninitDataEntry],
 ) -> Vec<u8> {
     let type_entry = TypeEntry {
@@ -257,8 +257,8 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
 #[allow(clippy::too_many_arguments)]
 pub fn helper_build_module_binary_with_functions_and_data_and_external_functions(
     helper_function_entries: &[HelperFunctionEntry],
-    read_only_data_entries: &[InitedDataEntry],
-    read_write_data_entries: &[InitedDataEntry],
+    read_only_data_entries: &[ReadOnlyDataEntry],
+    read_write_data_entries: &[ReadWriteDataEntry],
     uninit_uninit_data_entries: &[UninitDataEntry],
     external_library_entries: &[ExternalLibraryEntry],
     helper_external_function_entries: &[HelperExternalFunctionEntry],
@@ -351,8 +351,8 @@ pub fn helper_build_module_binary_with_functions_and_data_and_external_functions
 #[allow(clippy::too_many_arguments)]
 pub fn helper_build_module_binary(
     name: &str,
-    read_only_data_entries: &[InitedDataEntry],
-    read_write_data_entries: &[InitedDataEntry],
+    read_only_data_entries: &[ReadOnlyDataEntry],
+    read_write_data_entries: &[ReadWriteDataEntry],
     uninit_uninit_data_entries: &[UninitDataEntry],
     type_entries: &[TypeEntry],
     local_list_entries: &[LocalVariableListEntry],
@@ -406,32 +406,34 @@ pub fn helper_build_module_binary(
     // Export function section.
     // For simplicity, these are arbitrary items.
     let (export_function_items, export_function_names_data) =
-        ExportFunctionSection::convert_from_entries(&[
-            ExportFunctionEntry::new("func0".to_owned(), Visibility::Public),
-            ExportFunctionEntry::new("func1".to_owned(), Visibility::Public),
+        FunctionNameSection::convert_from_entries(&[
+            FunctionNameEntry::new("func0".to_owned(), Visibility::Public, 0),
+            FunctionNameEntry::new("func1".to_owned(), Visibility::Public, 1),
         ]);
 
-    let export_function_section = ExportFunctionSection {
+    let export_function_section = FunctionNameSection {
         items: &export_function_items,
         full_names_data: &export_function_names_data,
     };
 
     // Export data section.
     // For simplicity, these are arbitrary items.
-    let (export_data_items, export_data_names_data) = ExportDataSection::convert_from_entries(&[
-        ExportDataEntry::new(
+    let (export_data_items, export_data_names_data) = DataNameSection::convert_from_entries(&[
+        DataNameEntry::new(
             "data0".to_owned(),
             Visibility::Public,
             DataSectionType::ReadWrite,
+            0,
         ),
-        ExportDataEntry::new(
+        DataNameEntry::new(
             "data1".to_owned(),
             Visibility::Public,
             DataSectionType::ReadWrite,
+            1,
         ),
     ]);
 
-    let export_data_section = ExportDataSection {
+    let export_data_section = DataNameSection {
         items: &export_data_items,
         full_names_data: &export_data_names_data,
     };
@@ -453,7 +455,7 @@ pub fn helper_build_module_binary(
     };
 
     // Property section.
-    let property_section = PropertySection::new(name, *RUNTIME_EDITION, 0, 0, 1, 0, 0);
+    let property_section = PropertySection::new(name, *RUNTIME_EDITION, 0, 0, 1 /* 0, 0 */);
 
     // Function index.
     let function_ranges: Vec<RangeItem> = vec![RangeItem {
@@ -502,7 +504,7 @@ pub fn helper_build_module_binary(
         .map(|(idx, _item)| (idx, DataSectionType::Uninit));
 
     for (idx, data_section_type) in ro_iter.chain(rw_iter).chain(uninit_iter) {
-        data_index_items.push(DataIndexItem::new(0, idx as u32, data_section_type));
+        data_index_items.push(DataIndexItem::new(0, data_section_type, idx as u32));
     }
 
     let data_index_section = DataIndexSection {
@@ -571,10 +573,10 @@ pub fn helper_build_module_binary(
 
     // Dynamic link module list.
     let import_module_entry =
-        DynamicLinkModuleEntry::new(name.to_owned(), Box::new(ModuleLocation::Embed));
+        LinkingModuleEntry::new(name.to_owned(), Box::new(ModuleLocation::Embed));
     let (module_list_items, module_list_data) =
-        DynamicLinkModuleSection::convert_from_entries(&[import_module_entry]);
-    let module_list_section = DynamicLinkModuleSection {
+        LinkingModuleSection::convert_from_entries(&[import_module_entry]);
+    let module_list_section = LinkingModuleSection {
         items: &module_list_items,
         items_data: &module_list_data,
     };
@@ -658,9 +660,14 @@ mod tests {
     };
 
     use crate::{
-        common_sections::{data_section::DataItem, local_variable_section::LocalVariableItem},
-        entry::{ExternalLibraryEntry, InitedDataEntry, LocalVariableEntry, UninitDataEntry},
-        index_sections::{
+        common_sections::{
+            self, local_variable_section::LocalVariableItem, read_only_data_section::DataItem,
+        },
+        entry::{
+            ExternalLibraryEntry, LocalVariableEntry, ReadOnlyDataEntry, ReadWriteDataEntry,
+            UninitDataEntry,
+        },
+        linking_sections::{
             data_index_section::DataIndexItem,
             external_function_index_section::ExternalFunctionIndexItem,
             function_index_section::FunctionIndexItem,
@@ -682,10 +689,10 @@ mod tests {
             &[LocalVariableEntry::from_i32()],
             vec![0u8],
             &[
-                InitedDataEntry::from_i32(0x11),
-                InitedDataEntry::from_i64(0x13),
+                ReadOnlyDataEntry::from_i32(0x11),
+                ReadOnlyDataEntry::from_i64(0x13),
             ],
-            &[InitedDataEntry::from_bytes(
+            &[ReadWriteDataEntry::from_bytes(
                 vec![0x17u8, 0x19, 0x23, 0x29, 0x31, 0x37],
                 8,
             )],
@@ -714,14 +721,14 @@ mod tests {
             data_index_section.items,
             &[
                 //
-                DataIndexItem::new(0, 0, DataSectionType::ReadOnly,),
-                DataIndexItem::new(0, 1, DataSectionType::ReadOnly,),
+                DataIndexItem::new(0, DataSectionType::ReadOnly, 0,),
+                DataIndexItem::new(0, DataSectionType::ReadOnly, 1,),
                 //
-                DataIndexItem::new(0, 0, DataSectionType::ReadWrite,),
+                DataIndexItem::new(0, DataSectionType::ReadWrite, 0,),
                 //
-                DataIndexItem::new(0, 0, DataSectionType::Uninit,),
-                DataIndexItem::new(0, 1, DataSectionType::Uninit,),
-                DataIndexItem::new(0, 2, DataSectionType::Uninit,),
+                DataIndexItem::new(0, DataSectionType::Uninit, 0,),
+                DataIndexItem::new(0, DataSectionType::Uninit, 1,),
+                DataIndexItem::new(0, DataSectionType::Uninit, 2,),
             ]
         );
 
@@ -759,7 +766,12 @@ mod tests {
         let rw_section = module_image.get_optional_read_write_data_section().unwrap();
         assert_eq!(
             &rw_section.items[0],
-            &DataItem::new(0, 6, MemoryDataType::Bytes, 8)
+            &common_sections::read_write_data_section::DataItem::new(
+                0,
+                6,
+                MemoryDataType::Bytes,
+                8
+            )
         );
         assert_eq!(
             &rw_section.datas_data[rw_section.items[0].data_offset as usize..][0..6],
@@ -769,15 +781,15 @@ mod tests {
         let uninit_section = module_image.get_optional_uninit_data_section().unwrap();
         assert_eq!(
             &uninit_section.items[0],
-            &DataItem::new(0, 4, MemoryDataType::I32, 4)
+            &common_sections::uninit_data_section::DataItem::new(0, 4, MemoryDataType::I32, 4)
         );
         assert_eq!(
             &uninit_section.items[1],
-            &DataItem::new(8, 8, MemoryDataType::I64, 8)
+            &common_sections::uninit_data_section::DataItem::new(8, 8, MemoryDataType::I64, 8)
         );
         assert_eq!(
             &uninit_section.items[2],
-            &DataItem::new(16, 4, MemoryDataType::I32, 4)
+            &common_sections::uninit_data_section::DataItem::new(16, 4, MemoryDataType::I32, 4)
         );
 
         // Check type section.
