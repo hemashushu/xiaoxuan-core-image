@@ -182,9 +182,9 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             // Heap memory instructions
             Opcode::memory_allocate
             | Opcode::memory_resize
-            | Opcode::memory_free
-            | Opcode::memory_fill
-            | Opcode::memory_copy => (offset_param, String::new()),
+            | Opcode::memory_free => (offset_param, String::new()),
+            // | Opcode::memory_fill
+            // | Opcode::memory_copy
 
             // Conversion instructions
             Opcode::truncate_i64_to_i32
@@ -436,9 +436,9 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", idx))
             }
-            Opcode::host_copy_from_data
-            | Opcode::host_copy_to_data
-            | Opcode::host_external_memory_copy => (offset_param, String::new()),
+            // Opcode::host_copy_from_data
+            // | Opcode::host_copy_to_data
+            // | Opcode::host_external_memory_copy => (offset_param, String::new()),
         };
 
         // format!(...)
