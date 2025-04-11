@@ -77,7 +77,7 @@ pub struct LocalVariableList {
     pub list_offset: u32,
     pub list_item_count: u32,
 
-    // The allocated bytes for a local variable list.
+    // The allocated bytes of local variables and arguments of a function or block.
     // This is the size of the 'local variable area' in the stack frame.
     //
     // Note that all variables in the 'local variable area' MUST be 8-byte aligned,

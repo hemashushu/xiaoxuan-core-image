@@ -28,6 +28,10 @@
 //         \ ...    | ...                                             |
 //                  |-------------------------------------------------|
 
+// This section represents a mapping table that associates
+// `(module_index, data_public_index)` with
+// `(target_module_index, target_data_section_type, data_internal_index_in_section)`.
+
 use anc_isa::DataSectionType;
 
 use crate::{

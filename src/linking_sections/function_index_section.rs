@@ -24,6 +24,10 @@
 //         \ | ...                                                    |
 //           |--------------------------------------------------------|
 
+// This section represents a mapping table that associates
+// `(module_index, function_public_index)` with
+// `(target_module_index, function_internal_index)`.
+
 use crate::{
     datatableaccess::{read_section_with_two_tables, write_section_with_two_tables},
     entry::{FunctionIndexEntry, FunctionIndexListEntry},
