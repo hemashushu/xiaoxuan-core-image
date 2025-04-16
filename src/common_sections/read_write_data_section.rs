@@ -48,9 +48,10 @@ pub struct DataItem {
 
     // Alignment of the data item itself.
     //
-    // This field is not required for runtime data loading and storing because the `data_offset`
-    // already implies the alignment at compilation time. The `data_offset` is aligned to
-    // `DATA_ITEM_ALIGN_BYTES` (8 bytes). However, this field is necessary for cases where data
+    // This field is not required for data loading and storing because the `data_offset`
+    // already implies the alignment at compilation time. (The `data_offset` is aligned to
+    // `DATA_ITEM_ALIGN_BYTES`, which is 8 bytes).
+    // However, this field is necessary for cases where data
     // is copied into other memory (e.g., copying a struct from the data section into the heap),
     // as the alignment is needed.
     //

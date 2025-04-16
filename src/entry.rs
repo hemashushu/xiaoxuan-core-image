@@ -33,66 +33,67 @@ impl TypeEntry {
 // Represents a list of local variables for a function or block.
 #[derive(Debug, PartialEq, Clone)]
 pub struct LocalVariableListEntry {
-    pub local_variable_entries: Vec<LocalVariableEntry>,
+    pub local_variable_types: Vec<OperandDataType>,
 }
 
 impl LocalVariableListEntry {
-    pub fn new(local_variable_entries: Vec<LocalVariableEntry>) -> Self {
+    pub fn new(local_variable_types: Vec<OperandDataType>) -> Self {
         Self {
-            local_variable_entries,
+            local_variable_types,
         }
     }
 }
 
-// Represents a single local variable, including its type, length, and alignment.
-#[derive(Debug, PartialEq, Clone)]
-pub struct LocalVariableEntry {
-    pub memory_data_type: MemoryDataType,
-    pub length: u32, // Actual length of the variable/data in bytes.
-    pub align: u16,  // Alignment requirement in bytes.
-}
-
-impl LocalVariableEntry {
-    pub fn from_i32() -> Self {
-        Self {
-            memory_data_type: MemoryDataType::I32,
-            length: 4,
-            align: 4,
-        }
-    }
-
-    pub fn from_i64() -> Self {
-        Self {
-            memory_data_type: MemoryDataType::I64,
-            length: 8,
-            align: 8,
-        }
-    }
-
-    pub fn from_f32() -> Self {
-        Self {
-            memory_data_type: MemoryDataType::F32,
-            length: 4,
-            align: 4,
-        }
-    }
-
-    pub fn from_f64() -> Self {
-        Self {
-            memory_data_type: MemoryDataType::F64,
-            length: 8,
-            align: 8,
-        }
-    }
-
-    pub fn from_bytes(length: u32, align: u16) -> Self {
-        Self {
-            memory_data_type: MemoryDataType::Bytes,
-            length,
-            align,
-        }
-    }
-}
+// DEPRECATED
+// // // Represents a single local variable, including its type, length, and alignment.
+// // #[derive(Debug, PartialEq, Clone)]
+// // pub struct LocalVariableEntry {
+// //     pub memory_data_type: MemoryDataType,
+// //     pub length: u32, // Actual length of the variable/data in bytes.
+// //     pub align: u16,  // Alignment requirement in bytes.
+// // }
+// //
+// // impl LocalVariableEntry {
+// //     pub fn from_i32() -> Self {
+// //         Self {
+// //             memory_data_type: MemoryDataType::I32,
+// //             length: 4,
+// //             align: 4,
+// //         }
+// //     }
+// //
+// //     pub fn from_i64() -> Self {
+// //         Self {
+// //             memory_data_type: MemoryDataType::I64,
+// //             length: 8,
+// //             align: 8,
+// //         }
+// //     }
+// //
+// //     pub fn from_f32() -> Self {
+// //         Self {
+// //             memory_data_type: MemoryDataType::F32,
+// //             length: 4,
+// //             align: 4,
+// //         }
+// //     }
+// //
+// //     pub fn from_f64() -> Self {
+// //         Self {
+// //             memory_data_type: MemoryDataType::F64,
+// //             length: 8,
+// //             align: 8,
+// //         }
+// //     }
+// //
+// //     pub fn from_bytes(length: u32, align: u16) -> Self {
+// //         Self {
+// //             memory_data_type: MemoryDataType::Bytes,
+// //             length,
+// //             align,
+// //         }
+// //     }
+// // }
 
 // Represents a function entry, including its type index, local variable list index, and bytecode.
 #[derive(PartialEq)]

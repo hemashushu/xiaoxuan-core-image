@@ -32,8 +32,8 @@ use anc_isa::{DataSectionType, OperandDataType, RUNTIME_EDITION};
 
 use crate::entry::{
     DataNameEntry, EntryPointEntry, ExternalFunctionEntry, ExternalLibraryEntry, FunctionEntry,
-    FunctionNameEntry, LinkingModuleEntry, LocalVariableEntry, LocalVariableListEntry,
-    ModuleLocation, ReadOnlyDataEntry, ReadWriteDataEntry, TypeEntry, UninitDataEntry,
+    FunctionNameEntry, LinkingModuleEntry, LocalVariableListEntry, ModuleLocation,
+    ReadOnlyDataEntry, ReadWriteDataEntry, TypeEntry, UninitDataEntry,
 };
 
 use crate::module_image::{ImageType, ModuleImage, RangeItem, SectionEntry, Visibility};
@@ -42,7 +42,7 @@ use crate::module_image::{ImageType, ModuleImage, RangeItem, SectionEntry, Visib
 pub struct HelperFunctionEntry {
     pub params: Vec<OperandDataType>,  // Function parameters.
     pub results: Vec<OperandDataType>, // Function results.
-    pub local_variable_item_entries_without_args: Vec<LocalVariableEntry>, // Local variables excluding arguments.
+    pub local_variable_item_entries_without_args: Vec<OperandDataType>, // Local variables excluding arguments.
     pub code: Vec<u8>, // Function code in binary format.
 }
 
@@ -50,7 +50,7 @@ pub struct HelperFunctionEntry {
 pub struct HelperBlockEntry {
     pub params: Vec<OperandDataType>,  // Block parameters.
     pub results: Vec<OperandDataType>, // Block results.
-    pub local_variable_item_entries_without_args: Vec<LocalVariableEntry>, // Local variables excluding arguments.
+    pub local_variable_item_entries_without_args: Vec<OperandDataType>, // Local variables excluding arguments.
 }
 
 /// A helper object representing an external function entry for unit tests.
@@ -66,7 +66,7 @@ pub struct HelperExternalFunctionEntry {
 pub fn helper_build_module_binary_with_single_function(
     param_datatypes: &[OperandDataType],
     result_datatypes: &[OperandDataType],
-    local_variable_entries_without_functions_args: &[LocalVariableEntry],
+    local_variable_entries_without_functions_args: &[OperandDataType],
     code: Vec<u8>,
 ) -> Vec<u8> {
     helper_build_module_binary_with_single_function_and_data(
@@ -85,7 +85,7 @@ pub fn helper_build_module_binary_with_single_function(
 pub fn helper_build_module_binary_with_single_function_and_data(
     param_datatypes: &[OperandDataType],
     result_datatypes: &[OperandDataType],
-    local_variable_entries_without_function_args: &[LocalVariableEntry],
+    local_variable_entries_without_function_args: &[OperandDataType],
     code: Vec<u8>,
     read_only_data_entries: &[ReadOnlyDataEntry],
     read_write_data_entries: &[ReadWriteDataEntry],
@@ -96,17 +96,12 @@ pub fn helper_build_module_binary_with_single_function_and_data(
         results: result_datatypes.to_owned(),
     };
 
-    let params_as_local_variables = param_datatypes
-        .iter()
-        .map(|data_type| convert_operand_data_type_to_local_variable_entry(*data_type))
-        .collect::<Vec<_>>();
-
-    let mut local_variable_entries = vec![];
-    local_variable_entries.extend_from_slice(&params_as_local_variables);
-    local_variable_entries.extend_from_slice(local_variable_entries_without_function_args);
+    let mut local_variable_types = vec![];
+    local_variable_types.extend_from_slice(param_datatypes);
+    local_variable_types.extend_from_slice(local_variable_entries_without_function_args);
 
     let local_variable_list_entry = LocalVariableListEntry {
-        local_variable_entries,
+        local_variable_types,
     };
 
     let function_entry = FunctionEntry {
@@ -134,7 +129,7 @@ pub fn helper_build_module_binary_with_single_function_and_data(
 pub fn helper_build_module_binary_with_single_function_and_blocks(
     param_datatypes: Vec<OperandDataType>,
     result_datatypes: Vec<OperandDataType>,
-    local_variable_item_entries_without_args: Vec<LocalVariableEntry>,
+    local_variable_item_entries_without_args: Vec<OperandDataType>,
     code: Vec<u8>,
     helper_block_entries: Vec<HelperBlockEntry>,
 ) -> Vec<u8> {
@@ -186,18 +181,12 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
     let local_variable_list_entries_of_functions = helper_function_entries
         .iter()
         .map(|entry| {
-            let params_as_local_variables = entry
-                .params
-                .iter()
-                .map(|data_type| convert_operand_data_type_to_local_variable_entry(*data_type))
-                .collect::<Vec<_>>();
-
-            let mut local_variables = vec![];
-            local_variables.extend_from_slice(&params_as_local_variables);
-            local_variables.extend_from_slice(&entry.local_variable_item_entries_without_args);
+            let mut local_variable_types = vec![];
+            local_variable_types.extend_from_slice(&entry.params);
+            local_variable_types.extend_from_slice(&entry.local_variable_item_entries_without_args);
 
             LocalVariableListEntry {
-                local_variable_entries: local_variables,
+                local_variable_types,
             }
         })
         .collect::<Vec<_>>();
@@ -205,18 +194,12 @@ pub fn helper_build_module_binary_with_functions_and_blocks(
     let local_variable_list_entries_of_blocks = helper_block_entries
         .iter()
         .map(|entry| {
-            let params_as_local_variables = entry
-                .params
-                .iter()
-                .map(|data_type| convert_operand_data_type_to_local_variable_entry(*data_type))
-                .collect::<Vec<_>>();
-
-            let mut local_variables = vec![];
-            local_variables.extend_from_slice(&params_as_local_variables);
-            local_variables.extend_from_slice(&entry.local_variable_item_entries_without_args);
+            let mut local_variable_types = vec![];
+            local_variable_types.extend_from_slice(&entry.params);
+            local_variable_types.extend_from_slice(&entry.local_variable_item_entries_without_args);
 
             LocalVariableListEntry {
-                local_variable_entries: local_variables,
+                local_variable_types,
             }
         })
         .collect::<Vec<_>>();
@@ -295,19 +278,12 @@ pub fn helper_build_module_binary_with_functions_and_data_and_external_functions
     let local_variable_list_entries = helper_function_entries
         .iter()
         .map(|entry| {
-            let params_as_local_variables = entry
-                .params
-                .iter()
-                .map(|data_type| convert_operand_data_type_to_local_variable_entry(*data_type))
-                .collect::<Vec<_>>();
-
-            let mut local_variable_entries = vec![];
-            local_variable_entries.extend_from_slice(&params_as_local_variables);
-            local_variable_entries
-                .extend_from_slice(&entry.local_variable_item_entries_without_args);
+            let mut local_variable_types = vec![];
+            local_variable_types.extend_from_slice(&entry.params);
+            local_variable_types.extend_from_slice(&entry.local_variable_item_entries_without_args);
 
             LocalVariableListEntry {
-                local_variable_entries,
+                local_variable_types,
             }
         })
         .collect::<Vec<_>>();
@@ -645,18 +621,19 @@ pub fn helper_load_modules_from_binaries<'a>(
     Ok(module_images)
 }
 
-/// Converts an operand data type to a local variable entry.
-/// This is a utility function used internally.
-fn convert_operand_data_type_to_local_variable_entry(
-    operand_data_type: OperandDataType,
-) -> LocalVariableEntry {
-    match operand_data_type {
-        OperandDataType::I32 => LocalVariableEntry::from_i32(),
-        OperandDataType::I64 => LocalVariableEntry::from_i64(),
-        OperandDataType::F32 => LocalVariableEntry::from_f32(),
-        OperandDataType::F64 => LocalVariableEntry::from_f64(),
-    }
-}
+// DEPRECATED
+// // /// Converts an operand data type to a local variable entry.
+// // /// This is a utility function used internally.
+// // fn convert_operand_data_type_to_local_variable_entry(
+// //     operand_data_type: OperandDataType,
+// // ) -> LocalVariableEntry {
+// //     match operand_data_type {
+// //         OperandDataType::I32 => LocalVariableEntry::from_i32(),
+// //         OperandDataType::I64 => LocalVariableEntry::from_i64(),
+// //         OperandDataType::F32 => LocalVariableEntry::from_f32(),
+// //         OperandDataType::F64 => LocalVariableEntry::from_f64(),
+// //     }
+// // }
 
 #[cfg(test)]
 mod tests {
@@ -672,10 +649,7 @@ mod tests {
         common_sections::{
             self, local_variable_section::LocalVariableItem, read_only_data_section::DataItem,
         },
-        entry::{
-            ExternalLibraryEntry, LocalVariableEntry, ReadOnlyDataEntry, ReadWriteDataEntry,
-            UninitDataEntry,
-        },
+        entry::{ExternalLibraryEntry, ReadOnlyDataEntry, ReadWriteDataEntry, UninitDataEntry},
         linking_sections::{
             data_index_section::DataIndexItem,
             external_function_index_section::ExternalFunctionIndexItem,
@@ -695,7 +669,7 @@ mod tests {
         let binary = helper_build_module_binary_with_single_function_and_data(
             &[OperandDataType::I64, OperandDataType::I64],
             &[OperandDataType::I32],
-            &[LocalVariableEntry::from_i32()],
+            &[OperandDataType::I32],
             vec![0u8],
             &[
                 ReadOnlyDataEntry::from_i32(0x11),
@@ -827,9 +801,9 @@ mod tests {
         assert_eq!(
             local_variable_section.get_local_variable_list(0),
             &[
-                LocalVariableItem::new(0, 8, MemoryDataType::I64, 8),
-                LocalVariableItem::new(8, 8, MemoryDataType::I64, 8),
-                LocalVariableItem::new(16, 4, MemoryDataType::I32, 4),
+                LocalVariableItem::new(0, 8, OperandDataType::I64),
+                LocalVariableItem::new(8, 8, OperandDataType::I64),
+                LocalVariableItem::new(16, 4, OperandDataType::I32),
             ]
         );
     }

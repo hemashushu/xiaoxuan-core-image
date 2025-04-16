@@ -22,7 +22,7 @@ pub struct BytecodeWriter {
 // Without padding:
 // - write_opcode
 // - write_opcode_i16
-// - write_opcode_i16_i16_i16
+// // DEPRECATED // - write_opcode_i16_i16_i16
 //
 // With alignment check:
 // - write_opcode_i32
@@ -166,20 +166,21 @@ impl BytecodeWriter {
         addr
     }
 
-    /// Writes a 64-bit instruction (opcode + three 16-bit parameters) and returns its address.
-    pub fn write_opcode_i16_i16_i16(
-        &mut self,
-        opcode: Opcode,
-        param0: u16,
-        param1: u16,
-        param2: u16,
-    ) -> usize {
-        let addr = self.put_opcode(opcode);
-        self.put_i16(param0);
-        self.put_i16(param1);
-        self.put_i16(param2);
-        addr
-    }
+    // DEPRECATED
+    // // /// Writes a 64-bit instruction (opcode + three 16-bit parameters) and returns its address.
+    // // pub fn write_opcode_i16_i16_i16(
+    // //     &mut self,
+    // //     opcode: Opcode,
+    // //     param0: u16,
+    // //     param1: u16,
+    // //     param2: u16,
+    // // ) -> usize {
+    // //     let addr = self.put_opcode(opcode);
+    // //     self.put_i16(param0);
+    // //     self.put_i16(param1);
+    // //     self.put_i16(param2);
+    // //     addr
+    // // }
 
     /// Writes a 96-bit instruction (opcode + padding + two 32-bit parameters) and returns its address.
     pub fn write_opcode_i32_i32(&mut self, opcode: Opcode, param0: u32, param1: u32) -> usize {
@@ -314,17 +315,18 @@ impl BytecodeWriterHelper {
         self
     }
 
-    pub fn append_opcode_i16_i16_i16(
-        mut self,
-        opcode: Opcode,
-        param0: u16,
-        param1: u16,
-        param2: u16,
-    ) -> Self {
-        self.writer
-            .write_opcode_i16_i16_i16(opcode, param0, param1, param2);
-        self
-    }
+    // DEPRECATED
+    // // pub fn append_opcode_i16_i16_i16(
+    // //     mut self,
+    // //     opcode: Opcode,
+    // //     param0: u16,
+    // //     param1: u16,
+    // //     param2: u16,
+    // // ) -> Self {
+    // //     self.writer
+    // //         .write_opcode_i16_i16_i16(opcode, param0, param1, param2);
+    // //     self
+    // // }
 
     pub fn append_opcode_i32_i32(mut self, opcode: Opcode, param0: u32, param1: u32) -> Self {
         self.writer.write_opcode_i32_i32(opcode, param0, param1);
@@ -374,7 +376,7 @@ mod tests {
     use anc_isa::opcode::Opcode;
     use pretty_assertions::assert_eq;
 
-    use crate::bytecode_writer::BytecodeWriterHelper;
+    use crate::{bytecode_reader::format_bytecode_as_text, bytecode_writer::BytecodeWriterHelper};
 
     #[test]
     fn test_bytecode_writer() {
@@ -383,7 +385,12 @@ mod tests {
             .append_opcode(Opcode::add_i32)
             .to_bytes();
 
-        assert_eq!(code0, vec![0x00, 0x03]);
+        assert_eq!(
+            code0,
+            vec![
+                0x00, 0x04, // Opcode::add_i32
+            ]
+        );
 
         // 32 bits
         let code1 = BytecodeWriterHelper::new()
@@ -393,8 +400,8 @@ mod tests {
         assert_eq!(
             code1,
             vec![
-                0x02, 0x03, // opcode
-                7, 0, // param
+                0x02, 0x04, // Opcode::add_imm_i32
+                0x07, 0x00, // Value: 7
             ]
         );
 
@@ -406,9 +413,9 @@ mod tests {
         assert_eq!(
             code2,
             vec![
-                0x40, 0x01, // opcode
-                0, 0, // padding
-                11, 0, 0, 0 // param
+                0x01, 0x01, // Opcode::imm_i32
+                0x00, 0x00, // Padding
+                0x0b, 0x00, 0x00, 0x00, // Value: 11
             ]
         );
 
@@ -420,26 +427,22 @@ mod tests {
         assert_eq!(
             code3,
             vec![
-                0xc2, 0x03, // opcode
-                13, 0, // param 0
-                17, 0, 0, 0 // param 1
+                0x02, 0x09, // Opcode::break_
+                0x0d, 0x00, // Reversed index: 13
+                0x11, 0x00, 0x00, 0x00, // Next instruction offset: 17
             ]
         );
 
-        // 64 bits - 3 params
-        let code4 = BytecodeWriterHelper::new()
-            .append_opcode_i16_i16_i16(Opcode::local_load_i64, 19, 23, 29)
-            .to_bytes();
-
-        assert_eq!(
-            code4,
-            vec![
-                0x80, 0x01, // opcode
-                19, 0, // param 0
-                23, 0, // param 1
-                29, 0 // param 2
-            ]
-        );
+        // DEPRECATED
+        // // // 64 bits - 3 params
+        // // let code4 = BytecodeWriterHelper::new()
+        // //     .append_opcode_i16_i16_i16(Opcode::local_load_i64, 19, 23, 29)
+        // //     .to_bytes();
+        // //
+        // // assert_eq!(
+        // //     format_bytecode_as_text(&code4),
+        // //     "0x0000  06 00 13 00  17 00 1d 00    local_load_64     rev:19  off:0x17  idx:29"
+        // // );
 
         // 96 bits - 2 params
         let code5 = BytecodeWriterHelper::new()
@@ -449,10 +452,10 @@ mod tests {
         assert_eq!(
             code5,
             vec![
-                0xc1, 0x03, // opcode
-                0, 0, // padding
-                31, 0, 0, 0, // param 0
-                37, 0, 0, 0 // param 1
+                0x01, 0x09, // Opcode::block
+                0x00, 0x00, // Padding
+                0x1f, 0x00, 0x00, 0x00, // Type index: 31
+                0x25, 0x00, 0x00, 0x00, // Local variable list index: 37
             ]
         );
 
@@ -464,11 +467,11 @@ mod tests {
         assert_eq!(
             code6,
             vec![
-                0xc4, 0x03, // opcode
-                0, 0, // padding
-                41, 0, 0, 0, // param 0
-                73, 0, 0, 0, // param 1
-                79, 0, 0, 0 // param 2
+                0x04, 0x09, // Opcode::block_alt
+                0x00, 0x00, // Padding
+                0x29, 0x00, 0x00, 0x00, // Type index: 41
+                0x49, 0x00, 0x00, 0x00, // Local variable list index: 73
+                0x4f, 0x00, 0x00, 0x00, // Next instruction offset: 79
             ]
         );
     }
@@ -484,9 +487,9 @@ mod tests {
         assert_eq!(
             code0,
             vec![
-                0x42, 0x01, // opcode
-                0, 0, // padding
-                0xdb, 0x0f, 0x49, 0x40, // param 0
+                0x03, 0x01, // Opcode::imm_f32
+                0x00, 0x00, // Padding
+                0xdb, 0x0f, 0x49, 0x40, // Value: 0x40490FDB
             ]
         );
 
@@ -497,10 +500,10 @@ mod tests {
         assert_eq!(
             code1,
             vec![
-                0x41, 0x01, // opcode
-                0, 0, // padding
-                0x88, 0x77, 0x66, 0x55, // param 0
-                0x44, 0x33, 0x22, 0x11 // param 1
+                0x02, 0x01, // Opcode::imm_i64
+                0x00, 0x00, // Padding
+                0x88, 0x77, 0x66, 0x55, // Low: 0x55667788
+                0x44, 0x33, 0x22, 0x11, // High: 0x11223344
             ]
         );
 
@@ -513,10 +516,10 @@ mod tests {
         assert_eq!(
             code2,
             vec![
-                0x43, 0x01, // opcode
-                0, 0, // padding
-                0x11, 0x31, 0x02, 0xde, // param 0
-                0x0b, 0x86, 0x0b, 0x39, // param 1
+                0x04, 0x01, // Opcode::imm_f64
+                0x00, 0x00, // Padding
+                0x11, 0x31, 0x02, 0xde, // Low: 0xDE023111
+                0x0b, 0x86, 0x0b, 0x39, // High: 0x390B860B
             ]
         );
     }
@@ -526,21 +529,19 @@ mod tests {
         // Test
         // - write_opcode
         // - write_opcode_i16
-        // - write_opcode_i16_i16_i16
+        // // DEPRECATED - write_opcode_i16_i16_i16
         {
             let data = BytecodeWriterHelper::new()
                 .append_opcode(Opcode::eqz_i32)
                 .append_opcode_i16(Opcode::add_imm_i32, 0x2)
-                .append_opcode_i16_i16_i16(Opcode::local_load_i64, 0x5, 0x7, 0x11)
+                // // DEPRECATED .append_opcode_i16_i16_i16(Opcode::local_load_i64, 0x5, 0x7, 0x11)
                 .to_bytes();
 
             assert_eq!(
-                data,
-                vec![
-                    0xc0, 0x02, // eqz_i32
-                    0x02, 0x03, 0x02, 0x00, // add_imm_i32
-                    0x80, 0x01, 0x05, 0x00, 0x07, 0x00, 0x11, 0x00 // local_load_i64
-                ]
+                format_bytecode_as_text(&data),
+                "\
+0x0000  00 08                       eqz_i32
+0x0002  02 04 02 00                 add_imm_i32       2"
             );
         }
 
@@ -573,36 +574,32 @@ mod tests {
                 .to_bytes();
 
             assert_eq!(
-                data,
-                vec![
-                    0xc0, 0x02, // eqz_i32
-                    0x00, 0x01, // NOP (auto padding)
-                    0x40, 0x01, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, // imm_i32
-                    0x02, 0x03, 0x02, 0x00, // add_imm_i32
-                    0x40, 0x01, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, // imm_i32
-                    //
-                    0xc0, 0x02, // eqz_i32
-                    0x00, 0x01, // NOP (auto padding)
-                    0xc0, 0x01, 0x17, 0x00, 0x19, 0x00, 0x00, 0x00, // data_load_i64
-                    0x02, 0x03, 0x02, 0x00, // add_imm_i32
-                    0xc0, 0x01, 0x17, 0x00, 0x19, 0x00, 0x00, 0x00, // data_load_i64
-                    //
-                    0xc0, 0x02, // eqz_i32
-                    0x00, 0x01, // NOP (auto padding)
-                    0xc1, 0x03, 0x00, 0x00, 0x23, 0x00, 0x00, 0x00, 0x29, 0x00, 0x00,
-                    0x00, // block
-                    0x02, 0x03, 0x02, 0x00, // add_imm_i32
-                    0xc1, 0x03, 0x00, 0x00, 0x23, 0x00, 0x00, 0x00, 0x29, 0x00, 0x00,
-                    0x00, // block
-                    //
-                    0xc0, 0x02, // eqz_i32
-                    0x00, 0x01, // NOP (auto padding)
-                    0xc4, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
-                    0x00, 0x00, 0x00, // block_alt
-                    0x02, 0x03, 0x02, 0x00, // add_imm_i32
-                    0xc4, 0x03, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00, 0x41,
-                    0x00, 0x00, 0x00, // block_alt
-                ]
+                format_bytecode_as_text(&data),
+                "\
+0x0000  00 08                       eqz_i32
+0x0002  00 01                       nop
+0x0004  01 01 00 00  13 00 00 00    imm_i32           0x00000013
+0x000c  02 04 02 00                 add_imm_i32       2
+0x0010  01 01 00 00  13 00 00 00    imm_i32           0x00000013
+0x0018  00 08                       eqz_i32
+0x001a  00 01                       nop
+0x001c  00 03 17 00  19 00 00 00    data_load_i64     off:0x17  idx:25
+0x0024  02 04 02 00                 add_imm_i32       2
+0x0028  00 03 17 00  19 00 00 00    data_load_i64     off:0x17  idx:25
+0x0030  00 08                       eqz_i32
+0x0032  00 01                       nop
+0x0034  01 09 00 00  23 00 00 00    block             type:35  local:41
+        29 00 00 00
+0x0040  02 04 02 00                 add_imm_i32       2
+0x0044  01 09 00 00  23 00 00 00    block             type:35  local:41
+        29 00 00 00
+0x0050  00 08                       eqz_i32
+0x0052  00 01                       nop
+0x0054  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+        37 00 00 00  41 00 00 00
+0x0064  02 04 02 00                 add_imm_i32       2
+0x0068  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+        37 00 00 00  41 00 00 00"
             );
         }
 
@@ -625,26 +622,24 @@ mod tests {
                 .to_bytes();
 
             assert_eq!(
-                data,
-                vec![
-                    0xc0, 0x02, // eqz_i32
-                    0x00, 0x01, // NOP (auto padding)
-                    0x41, 0x01, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, // imm_i64
-                    0x41, 0x01, 0x00, 0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, // imm_i64
-                    //
-                    0xc0, 0x02, // eqz_i32
-                    0x00, 0x01, // NOP (auto padding)
-                    0x42, 0x01, 0x00, 0x00, 0x54, 0xf8, 0x2d, 0x40, // imm_f32
-                    0x42, 0x01, 0x00, 0x00, 0x54, 0xf8, 0x2d, 0x40, // imm_f32
-                    0xc0, 0x02, // eqz_i32
-                    0x00, 0x01, // NOP (auto padding)
-                    0x43, 0x01, 0x00, 0x00, 0x69, 0x57, 0x14, 0x8b, 0x0a, 0xbf, 0x05,
-                    0x40, // imm_f64
-                    0x43, 0x01, 0x00, 0x00, 0x69, 0x57, 0x14, 0x8b, 0x0a, 0xbf, 0x05,
-                    0x40, // imm_f64
-                ]
+                format_bytecode_as_text(&data),
+                "\
+0x0000  00 08                       eqz_i32
+0x0002  00 01                       nop
+0x0004  02 01 00 00  13 00 00 00    imm_i64           low:0x00000013  high:0x00000000
+        00 00 00 00
+0x0010  02 01 00 00  17 00 00 00    imm_i64           low:0x00000017  high:0x00000000
+        00 00 00 00
+0x001c  00 08                       eqz_i32
+0x001e  00 01                       nop
+0x0020  03 01 00 00  54 f8 2d 40    imm_f32           0x402df854
+0x0028  03 01 00 00  54 f8 2d 40    imm_f32           0x402df854
+0x0030  00 08                       eqz_i32
+0x0032  00 01                       nop
+0x0034  04 01 00 00  69 57 14 8b    imm_f64           low:0x8b145769  high:0x4005bf0a
+        0a bf 05 40
+0x0040  04 01 00 00  69 57 14 8b    imm_f64           low:0x8b145769  high:0x4005bf0a
+        0a bf 05 40"
             );
         }
     }

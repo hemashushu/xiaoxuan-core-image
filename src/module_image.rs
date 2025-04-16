@@ -86,8 +86,7 @@ use crate::{
     linking_sections::{
         data_index_section::DataIndexSection, entry_point_section::EntryPointSection,
         external_function_index_section::ExternalFunctionIndexSection,
-        function_index_section::FunctionIndexSection,
-        linking_module_section::LinkingModuleSection,
+        function_index_section::FunctionIndexSection, linking_module_section::LinkingModuleSection,
         unified_external_function_section::UnifiedExternalFunctionSection,
         unified_external_library_section::UnifiedExternalLibrarySection,
         unified_external_type_section::UnifiedExternalTypeSection,
@@ -494,7 +493,7 @@ impl<'a> ModuleImage<'a> {
 
 #[cfg(test)]
 mod tests {
-    use anc_isa::{MemoryDataType, OperandDataType, RUNTIME_EDITION};
+    use anc_isa::{OperandDataType, RUNTIME_EDITION};
 
     use crate::{
         common_sections::{
@@ -502,7 +501,7 @@ mod tests {
             property_section::PropertySection,
             type_section::TypeSection,
         },
-        entry::{LocalVariableEntry, LocalVariableListEntry, TypeEntry},
+        entry::{LocalVariableListEntry, TypeEntry},
         module_image::{
             ImageType, ModuleImage, SectionEntry, BASE_MODULE_HEADER_LENGTH,
             IMAGE_FILE_MAGIC_NUMBER,
@@ -532,11 +531,8 @@ mod tests {
         };
 
         let local_variable_list_entries = vec![
-            LocalVariableListEntry::new(vec![
-                LocalVariableEntry::from_i32(),
-                LocalVariableEntry::from_i64(),
-            ]),
-            LocalVariableListEntry::new(vec![LocalVariableEntry::from_bytes(12, 4)]),
+            LocalVariableListEntry::new(vec![OperandDataType::I32, OperandDataType::I64]),
+            LocalVariableListEntry::new(vec![OperandDataType::F32]),
         ];
 
         let (local_variable_lists, local_variable_list_data) =
@@ -634,9 +630,9 @@ mod tests {
                 2, 0, 0, 0, // count
                 16, 0, 0, 0, // alloc bytes
                 //
-                24, 0, 0, 0, // offset (2 items * 12 bytes/item)
+                24, 0, 0, 0, // offset 3 (previous items) * 12 (bytes/item)
                 1, 0, 0, 0, // count
-                16, 0, 0, 0, // alloc bytes
+                8, 0, 0, 0, // alloc bytes
                 //
                 // data
                 //
@@ -644,21 +640,18 @@ mod tests {
                 0, 0, 0, 0, // var offset (i32)
                 4, 0, 0, 0, // var len
                 0, // data type
-                0, // padding
-                4, 0, // align
+                0, 0, 0, // padding
                 //
                 8, 0, 0, 0, // var offset (i64)
                 8, 0, 0, 0, // var len
                 1, // data type
-                0, // padding
-                8, 0, // align
+                0, 0, 0, // padding
                 //
                 // list 1
-                0, 0, 0, 0, // var offset
-                12, 0, 0, 0, // var len
-                4, // data type
-                0, // padding
-                4, 0, // align
+                0, 0, 0, 0, // var offset (f32)
+                4, 0, 0, 0, // var len
+                2, // data type
+                0, 0, 0 // padding
             ]
         );
 
@@ -711,14 +704,16 @@ mod tests {
         assert_eq!(
             local_variable_section_restore.get_local_variable_list(0),
             &[
-                LocalVariableItem::new(0, 4, MemoryDataType::I32, 4),
-                LocalVariableItem::new(8, 8, MemoryDataType::I64, 8),
+                LocalVariableItem::new(0, 4, OperandDataType::I32),
+                LocalVariableItem::new(8, 8, OperandDataType::I64),
             ]
         );
 
         assert_eq!(
             local_variable_section_restore.get_local_variable_list(1),
-            &[LocalVariableItem::new(0, 12, MemoryDataType::Bytes, 4),]
+            &[
+                LocalVariableItem::new(0, 4, OperandDataType::F32),
+            ]
         );
 
         // check common property section
