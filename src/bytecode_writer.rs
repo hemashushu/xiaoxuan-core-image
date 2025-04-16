@@ -22,7 +22,6 @@ pub struct BytecodeWriter {
 // Without padding:
 // - write_opcode
 // - write_opcode_i16
-// // DEPRECATED // - write_opcode_i16_i16_i16
 //
 // With alignment check:
 // - write_opcode_i32
@@ -166,22 +165,6 @@ impl BytecodeWriter {
         addr
     }
 
-    // DEPRECATED
-    // // /// Writes a 64-bit instruction (opcode + three 16-bit parameters) and returns its address.
-    // // pub fn write_opcode_i16_i16_i16(
-    // //     &mut self,
-    // //     opcode: Opcode,
-    // //     param0: u16,
-    // //     param1: u16,
-    // //     param2: u16,
-    // // ) -> usize {
-    // //     let addr = self.put_opcode(opcode);
-    // //     self.put_i16(param0);
-    // //     self.put_i16(param1);
-    // //     self.put_i16(param2);
-    // //     addr
-    // // }
-
     /// Writes a 96-bit instruction (opcode + padding + two 32-bit parameters) and returns its address.
     pub fn write_opcode_i32_i32(&mut self, opcode: Opcode, param0: u32, param1: u32) -> usize {
         let addr = self.insert_padding_if_necessary();
@@ -315,19 +298,6 @@ impl BytecodeWriterHelper {
         self
     }
 
-    // DEPRECATED
-    // // pub fn append_opcode_i16_i16_i16(
-    // //     mut self,
-    // //     opcode: Opcode,
-    // //     param0: u16,
-    // //     param1: u16,
-    // //     param2: u16,
-    // // ) -> Self {
-    // //     self.writer
-    // //         .write_opcode_i16_i16_i16(opcode, param0, param1, param2);
-    // //     self
-    // // }
-
     pub fn append_opcode_i32_i32(mut self, opcode: Opcode, param0: u32, param1: u32) -> Self {
         self.writer.write_opcode_i32_i32(opcode, param0, param1);
         self
@@ -433,17 +403,6 @@ mod tests {
             ]
         );
 
-        // DEPRECATED
-        // // // 64 bits - 3 params
-        // // let code4 = BytecodeWriterHelper::new()
-        // //     .append_opcode_i16_i16_i16(Opcode::local_load_i64, 19, 23, 29)
-        // //     .to_bytes();
-        // //
-        // // assert_eq!(
-        // //     format_bytecode_as_text(&code4),
-        // //     "0x0000  06 00 13 00  17 00 1d 00    local_load_64     rev:19  off:0x17  idx:29"
-        // // );
-
         // 96 bits - 2 params
         let code5 = BytecodeWriterHelper::new()
             .append_opcode_i32_i32(Opcode::block, 31, 37)
@@ -529,12 +488,10 @@ mod tests {
         // Test
         // - write_opcode
         // - write_opcode_i16
-        // // DEPRECATED - write_opcode_i16_i16_i16
         {
             let data = BytecodeWriterHelper::new()
                 .append_opcode(Opcode::eqz_i32)
                 .append_opcode_i16(Opcode::add_imm_i32, 0x2)
-                // // DEPRECATED .append_opcode_i16_i16_i16(Opcode::local_load_i64, 0x5, 0x7, 0x11)
                 .to_bytes();
 
             assert_eq!(

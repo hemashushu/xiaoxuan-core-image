@@ -95,30 +95,6 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                     format!("rev:{:<2}  idx:{}", reversed_index, index,),
                 )
             }
-
-            // DEPRECATED
-            // // Opcode::local_load_extend_i64
-            // // | Opcode::local_load_extend_i32_s
-            // // | Opcode::local_load_extend_i32_u
-            // // | Opcode::local_load_extend_i16_s
-            // // | Opcode::local_load_extend_i16_u
-            // // | Opcode::local_load_extend_i8_s
-            // // | Opcode::local_load_extend_i8_u
-            // // | Opcode::local_load_extend_f64
-            // // | Opcode::local_load_extend_f32
-            // // | Opcode::local_store_extend_i64
-            // // | Opcode::local_store_extend_i32
-            // // | Opcode::local_store_extend_i16
-            // // | Opcode::local_store_extend_i8
-            // // | Opcode::local_store_extend_f64
-            // // | Opcode::local_store_extend_f32 => {
-            // //     let (offset_next, reversed_index, index) =
-            // //         continue_read_param_i16_i32(codes, offset_param);
-            // //     (
-            // //         offset_next,
-            // //         format!("rev:{:<2}  idx:{}", reversed_index, index),
-            // //     )
-            // // }
             // Category: Data
             Opcode::data_load_i64
             | Opcode::data_load_i32_s
@@ -405,20 +381,6 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", idx))
             }
-            // DEPRECATED
-            // // Opcode::host_addr_local => {
-            // //     let (offset_next, reversed_idx, offset, idx) =
-            // //         continue_read_param_i16_i16_i16(codes, offset_param);
-            // //     (
-            // //         offset_next,
-            // //         format!("rev:{:<2}  off:0x{:02x}  idx:{}", reversed_idx, offset, idx,),
-            // //     )
-            // // }
-            // // Opcode::host_addr_local_extend => {
-            // //     let (offset_next, reversed_idx, idx) =
-            // //         continue_read_param_i16_i32(codes, offset_param);
-            // //     (offset_next, format!("rev:{:<2}  idx:{}", reversed_idx, idx))
-            // // }
             Opcode::host_addr_function => {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
                 (offset_next, format!("idx:{}", idx))
@@ -433,10 +395,6 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (offset_next, format!("idx:{}", idx))
             }
             Opcode::host_addr_data_dynamic => (offset_param, String::new()),
-            // DEPRECATED
-            // // Opcode::host_copy_from_data
-            // // | Opcode::host_copy_to_data
-            // // | Opcode::host_external_memory_copy => (offset_param, String::new()),
         };
 
         // format!(...)
@@ -546,22 +504,6 @@ fn continue_read_param_i16_i32(codes: &[u8], offset: usize) -> (usize, u16, u32)
         u32::from_le_bytes(param_data1.try_into().unwrap()),
     )
 }
-
-// DEPRECATED
-// // // 64 bits instruction parameters
-// // // [opcode + i16 + i16 + i16]
-// // fn continue_read_param_i16_i16_i16(codes: &[u8], offset: usize) -> (usize, u16, u16, u16) {
-// //     let param_data0 = &codes[offset..offset + 2];
-// //     let param_data1 = &codes[offset + 2..offset + 4];
-// //     let param_data2 = &codes[offset + 4..offset + 6];
-// //
-// //     (
-// //         offset + 6,
-// //         u16::from_le_bytes(param_data0.try_into().unwrap()),
-// //         u16::from_le_bytes(param_data1.try_into().unwrap()),
-// //         u16::from_le_bytes(param_data2.try_into().unwrap()),
-// //     )
-// // }
 
 // 96 bits instruction parameters
 // [opcode + padding + i32 + i32]

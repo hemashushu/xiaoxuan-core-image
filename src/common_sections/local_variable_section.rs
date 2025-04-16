@@ -36,7 +36,7 @@
 //
 //            |------------------------------------------------|
 // item 0 --> | var offset 0 (u32) | var actual length 0 (u32) |
-//            | operand data type 0 (u8) | pad (3 byte)        |
+//            | operand data type 0 (u8) | pad (3 bytes)       |
 // item 1 --> | var offset 1       | var actual length 1       |
 //            | operand data type 1      | pad                 |
 //            | ...                                            |
@@ -102,17 +102,6 @@ pub struct LocalVariableItem {
     pub operand_data_type: OperandDataType, // Type of the variable (e.g., i32, i64, etc.)
 
     _padding0: [u8; 3], // Padding for alignment
-
-                        // DEPRECATED
-                        // // pub memory_data_type: MemoryDataType,
-                        // // _padding0: u8,                        // Padding for alignment
-                        // // // 'var_align' specifies the alignment of the variable. It is not required for loading/storing local variables
-                        // // // (since they are always 8-byte aligned in the local variable area), but it is needed when copying data
-                        // // // into other memory (e.g., copying a struct from the local variable area to the heap).
-                        // // // - For byte arrays (including strings), the value should be 1.
-                        // // // - For structs, the value should be the maximum alignment of its fields.
-                        // // // - The maximum alignment value is 8, and the minimum is 1.
-                        // // pub var_align: u16,
 }
 
 impl LocalVariableItem {

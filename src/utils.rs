@@ -621,20 +621,6 @@ pub fn helper_load_modules_from_binaries<'a>(
     Ok(module_images)
 }
 
-// DEPRECATED
-// // /// Converts an operand data type to a local variable entry.
-// // /// This is a utility function used internally.
-// // fn convert_operand_data_type_to_local_variable_entry(
-// //     operand_data_type: OperandDataType,
-// // ) -> LocalVariableEntry {
-// //     match operand_data_type {
-// //         OperandDataType::I32 => LocalVariableEntry::from_i32(),
-// //         OperandDataType::I64 => LocalVariableEntry::from_i64(),
-// //         OperandDataType::F32 => LocalVariableEntry::from_f32(),
-// //         OperandDataType::F64 => LocalVariableEntry::from_f64(),
-// //     }
-// // }
-
 #[cfg(test)]
 mod tests {
     use core::str;
