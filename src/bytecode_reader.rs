@@ -88,11 +88,10 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             | Opcode::local_store_i8
             | Opcode::local_store_f64
             | Opcode::local_store_f32 => {
-                let (offset_next, reversed_index, index) =
-                    continue_read_param_i16_i32(codes, offset_param);
+                let (offset_next, layers, index) = continue_read_param_i16_i32(codes, offset_param);
                 (
                     offset_next,
-                    format!("rev:{:<2}  idx:{}", reversed_index, index,),
+                    format!("layers:{:<2}  index:{}", layers, index,),
                 )
             }
             // Category: Data
@@ -112,7 +111,10 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             | Opcode::data_store_f64
             | Opcode::data_store_f32 => {
                 let (offset_next, offset, index) = continue_read_param_i16_i32(codes, offset_param);
-                (offset_next, format!("off:0x{:02x}  idx:{}", offset, index))
+                (
+                    offset_next,
+                    format!("offset:0x{:02x}  index:{}", offset, index),
+                )
             }
             Opcode::data_load_extend_i64
             | Opcode::data_load_extend_i32_s
@@ -130,7 +132,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             | Opcode::data_store_extend_f64
             | Opcode::data_store_extend_f32 => {
                 let (offset_next, index) = continue_read_param_i32(codes, offset_param);
-                (offset_next, format!("idx:{}", index))
+                (offset_next, format!("index:{}", index))
             }
             Opcode::data_load_dynamic_i64
             | Opcode::data_load_dynamic_i32_s
@@ -328,11 +330,11 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 )
             }
             Opcode::break_ | Opcode::recur => {
-                let (offset_next, reversed_index, offset) =
+                let (offset_next, layers, offset) =
                     continue_read_param_i16_i32(codes, offset_param);
                 (
                     offset_next,
-                    format!("rev:{:<2}  off:0x{:02x}", reversed_index, offset),
+                    format!("layers:{:<2}  offset:0x{:02x}", layers, offset),
                 )
             }
             Opcode::block_alt => {
@@ -341,14 +343,14 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (
                     offset_next,
                     format!(
-                        "type:{:<2}  local:{:<2}  off:0x{:02x}",
+                        "type:{:<2}  local:{:<2}  offset:0x{:02x}",
                         type_idx, local_variable_list_index, offset
                     ),
                 )
             }
             Opcode::break_alt => {
                 let (offset_next, offset) = continue_read_param_i32(codes, offset_param);
-                (offset_next, format!("off:0x{:02x}", offset))
+                (offset_next, format!("offset:0x{:02x}", offset))
             }
             Opcode::block_nez => {
                 let (offset_next, local_variable_list_index, offset) =
@@ -356,14 +358,14 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
                 (
                     offset_next,
                     format!(
-                        "local:{:<2}  off:0x{:02x}",
+                        "local:{:<2}  offset:0x{:02x}",
                         local_variable_list_index, offset
                     ),
                 )
             }
             Opcode::call | Opcode::envcall | Opcode::extcall => {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
-                (offset_next, format!("idx:{}", idx))
+                (offset_next, format!("index:{}", idx))
             }
             Opcode::call_dynamic | Opcode::syscall => (offset_param, String::new()),
             // Category: Memory
@@ -379,20 +381,23 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             }
             Opcode::get_function | Opcode::get_data => {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
-                (offset_next, format!("idx:{}", idx))
+                (offset_next, format!("index:{}", idx))
             }
             Opcode::host_addr_function => {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
-                (offset_next, format!("idx:{}", idx))
+                (offset_next, format!("index:{}", idx))
             }
             Opcode::host_addr_function_dynamic => (offset_param, String::new()),
             Opcode::host_addr_data => {
                 let (offset_next, offset, idx) = continue_read_param_i16_i32(codes, offset_param);
-                (offset_next, format!("off:0x{:02x}  idx:{}", offset, idx))
+                (
+                    offset_next,
+                    format!("offset:0x{:02x}  index:{}", offset, idx),
+                )
             }
             Opcode::host_addr_data_extend => {
                 let (offset_next, idx) = continue_read_param_i32(codes, offset_param);
-                (offset_next, format!("idx:{}", idx))
+                (offset_next, format!("index:{}", idx))
             }
             Opcode::host_addr_data_dynamic => (offset_param, String::new()),
         };
@@ -565,6 +570,11 @@ mod tests {
             .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
             .append_opcode_i16(Opcode::add_imm_i32, 0x2)
             .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
+            //
+            .append_opcode(Opcode::eqz_i32)
+            .append_opcode_i16_i32(Opcode::local_load_i32_u, 0x43, 0x47)
+            .append_opcode_i16(Opcode::add_imm_i32, 0x53)
+            .append_opcode_i16_i32(Opcode::local_load_i32_u, 0x43, 0x47)
             .to_bytes();
 
         let text = format_bytecode_as_binary(&data);
@@ -586,7 +596,10 @@ mod tests {
 0x0058  31 00 00 00  37 00 00 00
 0x0060  41 00 00 00  02 04 02 00
 0x0068  04 09 00 00  31 00 00 00
-0x0070  37 00 00 00  41 00 00 00"
+0x0070  37 00 00 00  41 00 00 00
+0x0078  00 08 00 01  02 02 43 00
+0x0080  47 00 00 00  02 04 53 00
+0x0088  02 02 43 00  47 00 00 00"
         );
     }
 
@@ -612,6 +625,11 @@ mod tests {
             .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
             .append_opcode_i16(Opcode::add_imm_i32, 0x2)
             .append_opcode_i32_i32_i32(Opcode::block_alt, 0x31, 0x37, 0x41)
+            //
+            .append_opcode(Opcode::eqz_i32)
+            .append_opcode_i16_i32(Opcode::local_load_i32_u, 0x43, 0x47)
+            .append_opcode_i16(Opcode::add_imm_i32, 0x53)
+            .append_opcode_i16_i32(Opcode::local_load_i32_u, 0x43, 0x47)
             .to_bytes();
 
         let text = format_bytecode_as_text(&data);
@@ -626,9 +644,9 @@ mod tests {
 0x0010  01 01 00 00  13 00 00 00    imm_i32           0x00000013
 0x0018  00 08                       eqz_i32
 0x001a  00 01                       nop
-0x001c  00 03 17 00  19 00 00 00    data_load_i64     off:0x17  idx:25
+0x001c  00 03 17 00  19 00 00 00    data_load_i64     offset:0x17  index:25
 0x0024  02 04 02 00                 add_imm_i32       2
-0x0028  00 03 17 00  19 00 00 00    data_load_i64     off:0x17  idx:25
+0x0028  00 03 17 00  19 00 00 00    data_load_i64     offset:0x17  index:25
 0x0030  00 08                       eqz_i32
 0x0032  00 01                       nop
 0x0034  01 09 00 00  23 00 00 00    block             type:35  local:41
@@ -638,11 +656,16 @@ mod tests {
         29 00 00 00
 0x0050  00 08                       eqz_i32
 0x0052  00 01                       nop
-0x0054  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+0x0054  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  offset:0x41
         37 00 00 00  41 00 00 00
 0x0064  02 04 02 00                 add_imm_i32       2
-0x0068  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
-        37 00 00 00  41 00 00 00"
+0x0068  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  offset:0x41
+        37 00 00 00  41 00 00 00
+0x0078  00 08                       eqz_i32
+0x007a  00 01                       nop
+0x007c  02 02 43 00  47 00 00 00    local_load_i32_u  layers:67  index:71
+0x0084  02 04 53 00                 add_imm_i32       83
+0x0088  02 02 43 00  47 00 00 00    local_load_i32_u  layers:67  index:71"
         )
     }
 }

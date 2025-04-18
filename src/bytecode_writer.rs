@@ -39,7 +39,7 @@ pub struct BytecodeWriter {
 //
 // - block_alt (param type_index: i32, next_inst_offset: i32)
 // - block_nez (param local_variable_list_index: i32, next_inst_offset: i32)
-// - break (param reversed_index: i16, next_inst_offset: i32)
+// - break (param layers: i16, next_inst_offset: i32)
 // - break_alt (param next_inst_offset: i32)
 //
 // When generating bytecode for these instructions, the value of the
@@ -250,7 +250,7 @@ impl BytecodeWriter {
     }
 
     pub fn fill_break_stub(&mut self, addr: usize, next_inst_offset: u32) {
-        // (opcode:i16 reversed_index:i16, next_inst_offset:i32)
+        // (opcode:i16 layers:i16, next_inst_offset:i32)
         // Also applies to the 'break_alt' instruction.
         self.rewrite_buffer(addr + 4, next_inst_offset);
     }
@@ -398,7 +398,7 @@ mod tests {
             code3,
             vec![
                 0x02, 0x09, // Opcode::break_
-                0x0d, 0x00, // Reversed index: 13
+                0x0d, 0x00, // Layers: 13
                 0x11, 0x00, 0x00, 0x00, // Next instruction offset: 17
             ]
         );
@@ -540,9 +540,9 @@ mod tests {
 0x0010  01 01 00 00  13 00 00 00    imm_i32           0x00000013
 0x0018  00 08                       eqz_i32
 0x001a  00 01                       nop
-0x001c  00 03 17 00  19 00 00 00    data_load_i64     off:0x17  idx:25
+0x001c  00 03 17 00  19 00 00 00    data_load_i64     offset:0x17  index:25
 0x0024  02 04 02 00                 add_imm_i32       2
-0x0028  00 03 17 00  19 00 00 00    data_load_i64     off:0x17  idx:25
+0x0028  00 03 17 00  19 00 00 00    data_load_i64     offset:0x17  index:25
 0x0030  00 08                       eqz_i32
 0x0032  00 01                       nop
 0x0034  01 09 00 00  23 00 00 00    block             type:35  local:41
@@ -552,10 +552,10 @@ mod tests {
         29 00 00 00
 0x0050  00 08                       eqz_i32
 0x0052  00 01                       nop
-0x0054  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+0x0054  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  offset:0x41
         37 00 00 00  41 00 00 00
 0x0064  02 04 02 00                 add_imm_i32       2
-0x0068  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  off:0x41
+0x0068  04 09 00 00  31 00 00 00    block_alt         type:49  local:55  offset:0x41
         37 00 00 00  41 00 00 00"
             );
         }

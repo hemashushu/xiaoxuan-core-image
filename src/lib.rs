@@ -78,7 +78,7 @@ impl Display for ImageError {
 impl std::error::Error for ImageError {}
 
 // Computes a dependency hash from the given string input.
-// The hash is generated using Rust's default hasher (SipHash).
+// The hash is generated using Rust's default hasher (e.g. SipHash).
 pub fn compute_dependency_hash(values: &str) -> DependencyHash {
     let mut hasher = DefaultHasher::new();
     hasher.write(values.as_bytes());
