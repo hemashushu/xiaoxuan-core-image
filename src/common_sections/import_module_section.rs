@@ -250,6 +250,7 @@ mod tests {
                 "helloworld".to_owned(),
                 Box::new(ModuleDependency::Remote(Box::new(DependencyRemote {
                     url: "http://a.b/c".to_owned(),
+                    dir: Some("/modules/helloworld".to_owned()),
                     reversion: "v1.0.1".to_owned(),
                     condition: DependencyCondition::True,
                     parameters: HashMap::default(),

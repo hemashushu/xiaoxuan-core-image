@@ -370,7 +370,7 @@ pub fn format_bytecode_as_text(codes: &[u8]) -> String {
             Opcode::call_dynamic | Opcode::syscall => (offset_param, String::new()),
             // Category: Memory
             Opcode::memory_allocate
-            | Opcode::memory_resize
+            | Opcode::memory_reallocate
             | Opcode::memory_free
             | Opcode::memory_fill
             | Opcode::memory_copy => (offset_param, String::new()),

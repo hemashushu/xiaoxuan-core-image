@@ -815,7 +815,7 @@ mod tests {
             &[
                 ExternalLibraryEntry::new(
                     "libc".to_owned(),
-                    Box::new(ExternalLibraryDependency::System("libc.so.1".to_owned())),
+                    Box::new(ExternalLibraryDependency::Runtime),
                 ),
                 ExternalLibraryEntry::new(
                     "libmagic".to_owned(),
@@ -902,8 +902,8 @@ mod tests {
             },
             (
                 "libc",
-                ExternalLibraryDependencyType::System,
-                ExternalLibraryDependency::System("libc.so.1".to_owned(),)
+                ExternalLibraryDependencyType::Runtime,
+                ExternalLibraryDependency::Runtime
             )
         );
 
@@ -1028,8 +1028,8 @@ mod tests {
             },
             (
                 "libc",
-                ExternalLibraryDependencyType::System,
-                ExternalLibraryDependency::System("libc.so.1".to_owned(),)
+                ExternalLibraryDependencyType::Runtime,
+                ExternalLibraryDependency::Runtime
             )
         );
 

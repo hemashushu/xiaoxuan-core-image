@@ -15,8 +15,8 @@
 //              | type index 1       | local list index 1       |
 //              | ...                                           |
 //              |-----------------------------------------------|
-// offset 0 --> | code 0                                        | <-- data
-// offset 1 --> | code 1                                        |
+// offset 0 --> | code of function 0                            | <-- data
+// offset 1 --> | code of function 1                            |
 //              | ...                                           |
 //              |-----------------------------------------------|
 

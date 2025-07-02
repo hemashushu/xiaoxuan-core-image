@@ -157,7 +157,7 @@ impl<'a> ExternalLibrarySection<'a> {
                     ExternalLibraryDependency::Local(_) => ExternalLibraryDependencyType::Local,
                     ExternalLibraryDependency::Remote(_) => ExternalLibraryDependencyType::Remote,
                     ExternalLibraryDependency::Share(_) => ExternalLibraryDependencyType::Share,
-                    ExternalLibraryDependency::System(_) => ExternalLibraryDependencyType::System,
+                    ExternalLibraryDependency::Runtime => ExternalLibraryDependencyType::Runtime,
                 };
 
                 ExternalLibraryItem::new(
@@ -301,6 +301,7 @@ mod tests {
                 Box::new(ExternalLibraryDependency::Remote(Box::new(
                     DependencyRemote {
                         url: "http://a.b/c".to_owned(),
+                        dir: Some("/modules/helloworld".to_owned()),
                         reversion: "v1.0.1".to_owned(),
                         condition: DependencyCondition::True,
                         parameters: HashMap::default(),
